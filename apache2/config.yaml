@@ -1,6 +1,6 @@
-name: Apache2-PostgreSQL
+name: Apache2 PostgreSQL
 version: 2.14.0
-slug: apache2-PostgreSQL
+slug: apache2-postgresql
 description: Open Source Webserver with PHP and MariaDB.
 url: https://github.com/lolimanko/hassio-addons/tree/master/apache2
 arch:
