@@ -1,0 +1,24 @@
+name: "Keelung Gasmeter Updater"
+description: "A gasmeter updater addon"
+version: "0.0.99"
+slug: "keelung-gasmeter-updater"
+init: false
+host_network: true
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+map:
+  - share:rw
+options:
+  user_number: 
+  user_name: 
+  user_phone: 
+  camera_ip: 192.168.1.87
+schema:
+  user_number: str
+  user_name: str
+  user_phone: str
+  camera_ip: str
