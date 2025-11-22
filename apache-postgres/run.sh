@@ -41,7 +41,7 @@ fi
 
 #Set rights to web folders and create user
 if [ -d $DocumentRoot ]; then
-	find $DocumentRoot -type d -exec chmod 777 {} \;
+	find $DocumentRoot -type d -exec chmod 771 {} \;
 	if [ ! -z "$username" ] && [ ! -z "$password" ] && [ ! $username = "null" ] && [ ! $password = "null" ]; then
 		adduser -S $username -G www-data
 		echo "$username:$password" | chpasswd $username
@@ -49,6 +49,8 @@ if [ -d $DocumentRoot ]; then
 		find $webrootdocker -type f -exec chown $username:www-data -R {} \;
 	else
 		echo "No username and/or password was provided. Skipping account set up."
+		find $webrootdocker -type d -exec chown www-data:www-data -R {} \;
+		find $webrootdocker -type f -exec chown www-data:www-data -R {} \;
 	fi
 fi
 
