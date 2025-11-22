@@ -14,7 +14,7 @@ def SPF():
 
 def main():
   #start_playwright("N1820")
-  #start_playwright_supervise("D0800")
+  start_playwright_supervise("D0800")
   scheduler = BackgroundScheduler(timezone="Asia/Taipei")
   scheduler.add_job(start_playwright, 'cron', hour=6, minute=20, args=["D0620"])
   scheduler.add_job(start_playwright, 'cron', hour=11, minute=20, args=["D1100"])
@@ -125,7 +125,7 @@ def start_playwright_supervise(start_time):
                     page.locator( "xpath=//div[@data-value='上班']").click()
                 elif start_time=='D1730' :
                     page.locator( "xpath=//div[@data-value='下班']").click()
-                #page.locator("xpath=//span[text()='提交']/..").click()
+                page.locator("xpath=//span[text()='提交']/..").click()
                 pngfilename = now.strftime("%Y-%m-%d_%H:%M:%S")+'.png'
                 page.screenshot(path="/share/htdocs/supervise/"+pngfilename)
                 if len(os.listdir("/share/htdocs/"+row[0]))>30:
