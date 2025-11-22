@@ -1,0 +1,17 @@
+name: "playwright"
+description: "A local playwright addon"
+version: "0.0.54"
+slug: "playwright"
+init: false
+host_network: true
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+map:
+  - ssl:rw
+  - media:rw
+  - share:rw
+  - config:rw
