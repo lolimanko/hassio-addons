@@ -126,9 +126,9 @@ def start_playwright_supervise(start_time):
                 elif start_time=='D1730' :
                     page.locator( "xpath=//div[@data-value='下班']").click()
                 page.locator("xpath=//span[text()='提交']/..").click()
-                pngfilename = now.strftime("%Y-%m-%d_%H:%M:%S")+'.png'
+                pngfilename = now.strftime("%Y-%m-%d_%H:%M:%S_")+row[0]+'.png'
                 page.screenshot(path="/share/htdocs/supervise/"+pngfilename)
-                if len(os.listdir("/share/htdocs/"+row[0]))>30:
+                if len(os.listdir("/share/htdocs/supervise"))>30:
                   os.remove("/share/htdocs/supervise/"+sorted(os.listdir("/share/htdocs/supervise"))[0])
                     #print(os.listdir(row[0])[0])
 

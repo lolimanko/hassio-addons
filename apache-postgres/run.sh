@@ -41,7 +41,7 @@ fi
 
 #Set rights to web folders and create user
 if [ -d $DocumentRoot ]; then
-	find $DocumentRoot -type d -exec chmod 771 {} \;
+	find $DocumentRoot -type d -exec chmod 777 {} \;
 	if [ ! -z "$username" ] && [ ! -z "$password" ] && [ ! $username = "null" ] && [ ! $password = "null" ]; then
 		adduser -S $username -G www-data
 		echo "$username:$password" | chpasswd $username
