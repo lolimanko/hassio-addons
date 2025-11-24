@@ -14,7 +14,7 @@ def SPF():
 
 def main():
   #start_playwright("N1820")
-  start_playwright_supervise("D0800")
+  #start_playwright_supervise("D0800")
   scheduler = BackgroundScheduler(timezone="Asia/Taipei")
   scheduler.add_job(start_playwright, 'cron', hour=6, minute=20, args=["D0620"])
   scheduler.add_job(start_playwright, 'cron', hour=11, minute=20, args=["D1100"])

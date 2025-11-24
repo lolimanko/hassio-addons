@@ -1,6 +1,6 @@
 name: "playwright"
 description: "A local playwright addon"
-version: "0.0.63"
+version: "0.0.66"
 slug: "playwright"
 init: false
 host_network: true
