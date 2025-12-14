@@ -1,0 +1,21 @@
+ARG BUILD_FROM
+# hadolint ignore=DL3006
+FROM ${BUILD_FROM}
+
+#WORKDIR /
+#ADD . /
+# Set environment variables
+RUN apt-get update && apt-get install -y
+RUN apt install ffmpeg -y
+
+COPY stash-linux-arm64v8 /
+COPY run.sh /
+
+RUN chmod a+x /run.sh
+RUN chmod a+x stash-linux-arm64v8
+
+CMD [ "/run.sh" ]
+
+
+
+#CMD ["python3", "playwright_checkin.py"]
