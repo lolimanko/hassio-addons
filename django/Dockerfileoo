@@ -1,0 +1,25 @@
+# syntax=docker/dockerfile:1
+FROM alpine:3.14
+ENV PYTHONUNBUFFERED=1
+#WORKDIR /code
+#COPY requirements.txt /code/
+COPY requirements.txt .
+RUN apk update
+RUN apk add postgresql-dev
+RUN apk add gcc
+RUN apk add python3-dev
+RUN apk add musl-dev
+RUN apk add py3-pip
+RUN apk add py3-gunicorn
+RUN pip install psycopg2
+RUN pip install -r requirements.txt
+#COPY . /code/
+WORKDIR /media/checkin
+#CMD ["python", "manage.py", "makemigrations", "ci_staff"]
+#CMD ["python3", "manage.py", "runserver", "0.0.0.0:8000"]
+#CMD ["gunicorn" "checkin.wsgi:application" "--bind" "0.0.0.COPY run.sh /
+#COPY run.sh /
+#RUN chmod a+x /run.sh
+#RUN chmod a+x stash-linux-arm64v8
+
+CMD [ "run.sh" ]
