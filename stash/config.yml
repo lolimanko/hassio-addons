@@ -1,0 +1,110 @@
+api_key: ""
+autostart_video: true
+blobs_path: config/addons_config/stash/blobs
+blobs_storage: FILESYSTEM
+cache: config/addons_config/stash/cache
+calculate_md5: false
+create_galleries_from_folders: true
+create_image_clip_from_videos: false
+cssenabled: true
+dangerous_allow_public_without_auth: "true"
+database: config/addons_config/stash/stash-go.sqlite
+gallery_cover_regex: (poster|cover|folder|board)\.[^\.]+$
+generated: config/addons_config/stash/generated
+host: 0.0.0.0
+javascriptenabled: false
+jwt_secret_key: 3c80572e0ac74e475d734f3a1e2bd53d416d8196710f029f0ab3071beabf9457
+no_proxy: localhost,127.0.0.1,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12
+nobrowser: false
+notifications_enabled: true
+parallel_tasks: 1
+password: $2a$04$hVNTw3KYviKTu/DTJrxZt.JOR.xnusNhM0xiw5bAiPNUa/BAZTHZ.
+plugins:
+    package_sources:
+        - localpath: community
+          name: Community (stable)
+          url: https://stashapp.github.io/CommunityScripts/stable/index.yml
+        - localpath: null
+          name: stash
+          url: https://stashplug.jskull.com/_site/index.yml
+    settings: {}
+plugins_path: config/addons_config/stash/plugins
+port: 9999
+preview_audio: true
+preview_exclude_end: "0"
+preview_exclude_start: "0"
+preview_segment_duration: 0.75
+preview_segments: 12
+scrapers:
+    package_sources:
+        - localpath: community
+          name: Community (stable)
+          url: https://stashapp.github.io/CommunityScrapers/stable/index.yml
+scrapers_path: /root/.stash/scrapers
+security_tripwire_accessed_from_public_internet: 125.229.153.151
+sequential_scanning: false
+session_store_key: b31f344126bd4235a9c1fb6f8942006d462267075c47f87c0669bff7c094623c
+show_one_time_moved_notification: false
+sound_on_preview: false
+stash:
+    - excludeimage: false
+      excludevideo: false
+      path: /media/pthc
+theme_color: '#202b33'
+ui:
+    advancedMode: true
+    frontPageContent:
+        - __typename: CustomFilter
+          direction: DESC
+          message:
+            id: recently_released_objects
+            values:
+                objects: Scenes
+          mode: SCENES
+          sortBy: date
+        - __typename: CustomFilter
+          direction: DESC
+          message:
+            id: recently_added_objects
+            values:
+                objects: Studios
+          mode: STUDIOS
+          sortBy: created_at
+        - __typename: CustomFilter
+          direction: DESC
+          message:
+            id: recently_released_objects
+            values:
+                objects: Groups
+          mode: GROUPS
+          sortBy: date
+        - __typename: CustomFilter
+          direction: DESC
+          message:
+            id: recently_added_objects
+            values:
+                objects: Performers
+          mode: PERFORMERS
+          sortBy: created_at
+        - __typename: CustomFilter
+          direction: DESC
+          message:
+            id: recently_released_objects
+            values:
+                objects: Galleries
+          mode: GALLERIES
+          sortBy: date
+    lastNoteSeen: 20251026
+    taskDefaults:
+        scan:
+            rescan: true
+            scanGenerateClipPreviews: true
+            scanGenerateCovers: true
+            scanGenerateImagePreviews: false
+            scanGeneratePhashes: false
+            scanGeneratePreviews: false
+            scanGenerateSprites: false
+            scanGenerateThumbnails: true
+username: stash
+video_file_naming_algorithm: OSHASH
+write_image_thumbnails: true
