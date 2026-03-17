@@ -15,3 +15,4 @@ map:
   - media:rw
   - share:rw
   - config:rw
+image: lolimanko/playwright
