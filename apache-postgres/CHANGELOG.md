@@ -1,298 +1,138 @@
 # Changelog
-## 2.15.1
-- Automatically updated addon-base to version v19.0.0
 
-## 2.15.0
-- Automatically updated addon-base to version v19.0.0
-- Drop support for armhf, armv7, and i386 systems
+## 3.3.0 (2026-01-29)
 
-## 2.14.2
-- Test
+### 📦 Dependencies
 
-## 2.14.1
-- Automatically updated addon-base to version v18.2.1
-- Improved webdir permissions
+- fix App startups after base image update 20.0.0 (#617) [skip-tests] ([`04c90f6d`](https://github.com/FaserF/hassio-addons/commit/04c90f6d2ea1a75af00b8f6d80ed170271f144d1))
+- ⬆️ Update ghcr.io/hassio-addons/base Docker tag to v[20.0.1](https://github.com/hassio-addons/App-base/releases/tag/20.0.1) [skip-tests] (#618) ([`62a7ed57`](https://github.com/FaserF/hassio-addons/commit/62a7ed5794451961add1f8ec065f5cbe863d1623))
+- ⬆️ Update ghcr.io/hassio-addons/base Docker tag to v20 [skip-tests] (#616) ([`09e8340b`](https://github.com/FaserF/hassio-addons/commit/09e8340b06c4263037fab6cf6d90fc913c7f99d5))
 
-## 2.14.0
-- Automatically updated addon-base to version v18.0.1
+### 📝 Documentation
 
-## 2.13.2
-- Fixed an error while updating / installing V2.13.X
-  - This happened due to a faulty image building process
-  - Since this issue has been in the last few updates, I have stopped the automatic update and release workflow for now
+- Readme improvements ([`8a12ebd4`](https://github.com/FaserF/hassio-addons/commit/8a12ebd40149adb39f056b7dc3e10f1dd02853cb))
 
-## 2.13.1
-- Automatically updated addon-base to version v17.2.5
+### 🚀 Other
 
-## 2.13.0
-- Updates addon-base to version v17.2.4
-- add php-sockets
-- optimized default index.html
+- fix log level var ([`7f85096a`](https://github.com/FaserF/hassio-addons/commit/7f85096a73b11ea48fa87150def32425ea1e4807))
+- standardized log level handling between Apps ([`cf4bc264`](https://github.com/FaserF/hassio-addons/commit/cf4bc264edca7956fb4ae13ae76b22c8c5afafac))
 
-## 2.12.4
-- Automatically updated addon-base to version v17.2.2
+## 3.2.1 (2026-01-14)
 
-## 2.12.3
-- Automatically updated addon-base to version v17.2.1
+### 🚀 Other
 
-## 2.12.2
-- Automatically updated addon-base to version v17.2.1
+- fix /media access for apache2 #583 ([`2ef9e134`](https://github.com/FaserF/hassio-addons/commit/2ef9e134882919bc263954438e8c279a75eb2532))
+- fixed logo in Homeassistant App UI ([`f053f7b0`](https://github.com/FaserF/hassio-addons/commit/f053f7b0b0c43df32e122ba054ba6118379ab959))
+- small fixes & improvements ([`ce7a62e4`](https://github.com/FaserF/hassio-addons/commit/ce7a62e43eb50c87458588df6581b8ed3a741c9d))
+- New/improved log level option ([`73d8e254`](https://github.com/FaserF/hassio-addons/commit/73d8e254b10e01aaffc474d22192d2b8deea4c79))
+- small fixes ([`60c5ddf4`](https://github.com/FaserF/hassio-addons/commit/60c5ddf4fede8242031082aa8e7fa0d057c0087f))
 
-## 2.12.1
-- enabled the usage of own GitHub images
+## 3.2.0 (2026-01-11)
 
-## 2.12.0
-- Prepared using own GitHub image for backups & addon building
--> This lowers the backup sizes for this addon
--> Not yet activated, only everything has been prepared
+### 🎨 Style
 
-## 2.11.1
-- Automatically updated addon-base to version v17.2.1
+- auto-fix (shfmt,black,isort,prettier,markdownlint) ([`1838d16f`](https://github.com/FaserF/hassio-addons/commit/1838d16fd800bde467c70b033ad03e9e600e2891))
+- auto-fix (shfmt,black,isort,prettier,markdownlint) ([`cdc7143c`](https://github.com/FaserF/hassio-addons/commit/cdc7143ca2531fdf41778e43e852faee4cd49880))
 
-## 2.11.0
-- automatically update addon-base to version v17.0.2
-- update php and it's modules to 8.4
-- add support for php84-simplexml
+### ✨ Features
 
-## 2.10.3
-- automatically update addon-base to version v17.0.1
+- New/improved log level option ([`73d8e254`](https://github.com/FaserF/hassio-addons/commit/73d8e254b10e01aaffc474d22192d2b8deea4c79))
 
-## 2.10.2
-- automatically update addon-base to version v17.0.0
+### 🚀 Other
 
-## 2.10.1
-- automatically update addon-base to version v16.3.6
+- Improved database reset logic and resolved CI pipeline issues ([`fc27cc3b`](https://github.com/FaserF/hassio-addons/commit/fc27cc3bee4a9a34fd573f38e870ff921b3f7d3d))
+- Resolved CI workflow deployment errors ([`4e31bcdc`](https://github.com/FaserF/hassio-addons/commit/4e31bcdc3025f30797b5ce1f0b220d06b22db35f))
 
-## 2.10.0
-- add multiple PHP extensions: php83-simplexml php83-gd php83-json php83-imap php83-apcu
+### 📌 Release Note
 
-## 2.9.7
-- automatically update addon-base to version v16.3.5
+- new db reset option & log level improved/added
 
-## 2.9.6
-- automatically update addon-base to version v16.3.4
+## 3.1.4 (2026-01-10)
 
-## 2.9.5
-- automatically update addon-base to version v16.3.3
+### 🎨 Style
 
-## 2.9.4
-- automatically update addon-base to version v16.3.2
+- auto-fix (shfmt,black,isort,prettier,markdownlint) ([`b8c86b04`](https://github.com/FaserF/hassio-addons/commit/b8c86b04f6c1aa1763bf7c7c57072bd2b7591b10))
 
-## 2.9.3
-- add php83-cgi
+### 🚀 Other
 
-## 2.9.2
-- automatically update addon-base to version v16.3.1
+- General maintenance and configuration refinements ([`60c5ddf4`](https://github.com/FaserF/hassio-addons/commit/60c5ddf4fede8242031082aa8e7fa0d057c0087f))
 
-## 2.9.1
-- automatically update addon-base to version v16.3.0
+### 📌 Release Note
 
-## 2.9.0
-- add php-xmlwriter
-- update php 8.2 and modules to php 8.3
+- general background fixes and stability improvements
 
-## 2.8.4
-- automatically update addon-base to version v16.2.1
+## 3.1.3 (2026-01-10)
 
-## 2.8.3
-- automatically update addon-base to version v16.1.3
+### 🎨 Style
 
-## 2.8.2
-- automatically update addon-base to version v16.0.0
+- auto-fix (shfmt,black,isort,prettier,markdownlint) ([`ad9c556b`](https://github.com/FaserF/hassio-addons/commit/ad9c556bd9738f7ed077b08e2fbbf19a17acc342))
 
-## 2.8.1
-- Hotfix for using wrong PHP path
+### 🚀 Other
 
-## 2.8.0
-- bump hassio-addon-base to version v15.0.8
-- bump PHP and PHP extensions to 8.2
-- add php-exif module
-- add ffmpeg package
+- Fixed CI build pipeline issues ([`97345da9`](https://github.com/FaserF/hassio-addons/commit/97345da944580528955f6e0d0263cd86e2c27cc4))
 
-## 2.7.10
-- bump hassio-addon-base to version v15.0.5
+### 📌 Release Note
 
-## 2.7.9
-- automatically update hassio-addon-base to version v14.3.2
+- general App improvements & startup fixes
 
-## 2.7.8
-- automatically update hassio-addon-base to version v14.3.1
+## 3.1.2 (2026-01-09)
 
-## 2.7.7
-- automatically update hassio-addon-base to version v14.2.2
+### 📦 Dependencies
 
-## 2.7.6
-- automatically update hassio-addon-base to version v14.1.3
+- 🚀 release(n8n): version bump [skip-tests] ([`09fb196`](https://github.com/FaserF/hassio-addons/commit/09fb1968338774fcd193caa4e33f80a7cb5cad81))
 
-## 2.7.5
-- add php81-tokenizer module
+### 📌 Release Note
 
-## 2.7.4
-- automatically update hassio-addon-base to version v14.0.8
+- bug fixes and startup improvements
 
-## 2.7.3
-- automatically update hassio-addon-base to version v14.0.7
+## 3.1.1 (2026-01-09)
 
-## 2.7.2
-- automatically update hassio-addon-base to version 14.0.5
+### 🎨 Style
 
-## 2.7.1
-- automatically update hassio-addon-base to the latest version
+- auto-fix (shfmt,black,isort,prettier,markdownlint) ([`72718f5`](https://github.com/FaserF/hassio-addons/commit/72718f5cfc149f65ec936797326b6782ef996461))
 
-## 2.7.0
-- bump hassio-addon-base to V14.0.0
-- autorelease new version updates on addon base updates
+### 📌 Release Note
 
-## 2.6.3
-- bump hassio-addon-base to latest release
-- remove php-pecl-mcrypt for now (got obsolet by alpine)
+- General App structure improvements and startup bug fixes
 
-## 2.6.2
-- now really fix addon wont start on empty init_commands parameter
-- Switch config to yaml
+## 3.1.0 (2026-01-06)
 
-## 2.6.1
-- fix addon wont start on empty init_commands parameter
+### 📦 Dependencies
 
-## 2.6.0
-- add support for init_commands to use custom php, perl and so on modules
+- Update run.sh ([`b3fc648`](https://github.com/FaserF/hassio-addons/commit/b3fc648923c63183c25fd720abd47c88112bc5b3))
 
-## 2.5.1
-- bump hassio-addon-base to V13.1.2
-- potentially fixes temporary download issues with an older Alpine version
+### 📌 Release Note
 
-## 2.5.0
-- bump hassio-addon-base to V13.1.0
+- Manual release via Orchestrator
 
-## 2.4.8
-- bump hassio-addon-base to V12.2.7
-- prepare support for pecl ssh2 (not working yet)
+## 3.0.0 (2026-01-03)
 
-## 2.4.7
-- fixed opcache creation dir error
-- free up some more space by outsourcing addon screenshots
+🎉 **Happy New Year 2026!** 🎉
 
-## 2.4.6
-- fixed an error where config parameters could not be read and lead to an error after starting the addon
-- fixed an error with php opcache
+### 🎉 Major Release - Unified App Update
 
-## 2.4.5
-- add support for pdo_sqlite
-- bump hassio-addon-base to V12.2.4
+All Apps have been unified, updated, and many bugs have been fixed. Many Apps have been partially or completely rewritten to improve stability, performance, and maintainability.
 
-## 2.4.4
-- add support for xdebug
+#### Important Information
 
-## 2.4.3
-- fix installation error caused by mosquitto
+- **Edge Branch (Beta)**: A new `edge` branch is now available for those who want to test the latest features and improvements before they are released to the stable channel.
+- **Unsupported Branch**: A new `unsupported` branch has been created for Apps that no longer receive direct manual support. These Apps are still maintained but may have limited support compared to the main Apps.
+- **Bug Reports**: If you encounter any new issues, please report them on GitHub as usual. Your feedback helps us improve the Apps.
 
-## 2.4.2
-- bump hassio-addon-base to V12.2.2
+This release represents a significant effort to standardize and improve all Apps in the repository.
 
-## 2.4.1
-- fix custom php path not working since php8.1 update
+---
 
-## 2.4.0
-- fix update error
-- bump PHP to PHP8.1
+### 📦 Dependencies
 
-## 2.3.0
-- bump hassio-addon-base to V12.0.0
+- Update orchestrator-release.yaml ([`4774494`](https://github.com/FaserF/hassio-addons/commit/477449414ddf817f9297c2ac38ade8009b69ae12))
 
-## 2.2.2
-- bump hassio-addon-base to V11.1.2
+### 📋 Major Release - Changes
 
-## 2.2.1
-- bump hassio-addon-base to V11.1.1
+- **Bug Reports**: If you encounter any new issues, please report them on GitHub as usual. Your feedback helps us improve the Apps. (Manual)
+- **Unsupported Branch**: A new `unsupported` branch has been created for Apps that no longer receive direct manual support. These Apps are still maintained but may have limited support compared to the main Apps. (Manual)
+- **Edge Branch (Beta)**: A new `edge` branch is now available for those who want to test the latest features and improvements before they are released to the stable channel. (Manual)
 
-## 2.2.0
-- bump hassio-addon-base to V11.0.0
+### 📌 Release Note
 
-## 2.1.3
-- bump hassio-addon-base to V10.2.0
-
-## 2.1.2
-- bump hassio-addon-base to V10.1.0
-
-## 2.1.1
-- bump hassio-addon-base to V10.0.1
-
-## 2.1.0
-- bump hassio-addon-base to V10.0.0
-- fixed an issue in the php7-locales which resulted in an issue while installing the addon
-
-## 2.0.4
-- add php7-ctype support
-
-## 2.0.3
-- Enable Apache Foreground Logging
-
-## 2.0.2
-- ability to set a username and password to access the webfiles
-
-## 2.0.1
-- add php7-locales support
-- add Mosquitto-PHP support
-
-## 2.0.0
-- add php7-xml support
-- this addon is now available in three variants:
-Minimal
-Minimal with MariaDB
-this "normal" version with common used PHP Modules
-
-## 1.7.2
-- fixed error: can't find custom config
-
-## 1.7.1
-- fixed error: can't find custom web root folder
-
-## 1.7.0
-- add php7-session php7-intl php7-soap php7-session php7-fileinfo support
-
-## 1.6.0
-- add php7-iconv and php7-dom support
-
-## 1.5.1
-- add option to receive a apache2 config copy
-- fix PHP7-PDO syntax error in Dockerfile
-
-## 1.5.0
-- add PHP7-PDO package
-
-## 1.4.0
-- allow the usage of custom apache2 config files
-
-## 1.3.0
-- allow the usage of a custom php.ini file
-
-## 1.2.3
-- add /media folder as a root folder option
-
-## 1.2.2
-- hotfix update for ssl path not working
-
-## 1.2.1
-- enabled use of .htaccess files
-
-## 1.2.0
-- new option document_root -> Allowing the user to decide the document root folder
-- added default index.html if the user has no webfiles in the correct folder
-
-## 1.1.2
-- added php-mcrypt, php-zip
-- Ingress is now supported
-
-## 1.1.1
-- added mariadb-client to docker image
-
-## 1.1.0
-- New Icon
-- Prepared Ingress Support
-
-## 1.0.1
-- Fixed SSL
-- Removed MariaDB Options
-
-## 1.0.0
-- Initial release
+- Manual release via Orchestrator
