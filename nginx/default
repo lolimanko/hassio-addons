@@ -1,7 +1,7 @@
 server {
-
-	listen 9998 ssl ;
-	listen [::]:9998 ssl ;
+    #stash
+	listen 10000 ssl ;
+	listen [::]:10000 ssl ;
 
 	ssl_certificate /ssl/fullchain.pem;
 	ssl_certificate_key /ssl/privkey.pem;
@@ -20,6 +20,68 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_read_timeout 60000s;
+	}
+
+
+}
+
+server {
+    #gasmeter
+	listen 13531 ssl ;
+	listen [::]:13531 ssl ;
+
+	ssl_certificate /ssl/fullchain.pem;
+	ssl_certificate_key /ssl/privkey.pem;
+
+	client_max_body_size 8000M;
+
+	location / {
+		# First attempt to serve request as file, then
+		# as directory, then fall back to displaying a 404.
+		proxy_pass http://192.168.1.87:80/;
+
+	}
+
+
+}
+server {
+    #go2rtc
+	listen 1985 ssl ;
+	listen [::]:1985 ssl ;
+
+	ssl_certificate /ssl/fullchain.pem;
+	ssl_certificate_key /ssl/privkey.pem;
+
+	client_max_body_size 8000M;
+
+	location / {
+		# First attempt to serve request as file, then
+		# as directory, then fall back to displaying a 404.
+		proxy_pass http://127.0.0.1:1984/;
+
+	}
+
+
+}
+server {
+    #django
+	listen 8001 ssl ;
+	listen [::]:8001 ssl ;
+
+	ssl_certificate /ssl/fullchain.pem;
+	ssl_certificate_key /ssl/privkey.pem;
+
+	client_max_body_size 8000M;
+	
+	location ^~ /static/ {
+         alias /media/checkin/staticfiles/;
+    }
+
+	location / {
+		# First attempt to serve request as file, then
+		# as directory, then fall back to displaying a 404.
+		proxy_pass http://127.0.0.1:8000/;
+
 	}
 
 
