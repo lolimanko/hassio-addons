@@ -1,6 +1,6 @@
 name: "Keelung Gasmeter Updater"
 description: "A gasmeter updater addon"
-version: "0.0.99"
+version: "0.0.100"
 slug: "keelung-gasmeter-updater"
 init: false
 host_network: true
