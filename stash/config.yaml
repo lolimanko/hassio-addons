@@ -1,0 +1,24 @@
+name: "stash"
+description: "A stash addon"
+version: "0.0.71"
+slug: "stash"
+init: false
+
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+ports:
+  9999/tcp: 9999
+map:
+  - type: media
+    read_only: False
+  - type: share
+    read_only: false
+  - type: addon_config
+    read_only: false
+    path: /stash
+
+image: ghcr.io/lolimanko/stash
