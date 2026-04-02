@@ -223,8 +223,9 @@ def run():
         #ssl_key = os.path.join(ssl_path, 'server.key')
         # ssl_keys = (ssl_crt, ssl_key)
         # app.run(use_reloader=False, port=port, host=host, ssl_context=ssl_keys)
-        #server = WSGIServer((host, port), app, handler_class=WebSocketHandler, certfile=ssl_crt, keyfile=ssl_key)
-        server = WSGIServer((host, port), app, handler_class=WebSocketHandler, certfile='/ssl/fullchain.pem', keyfile='/ssl/privkey.pem')
+        server = WSGIServer((host, 5000), app, handler_class=WebSocketHandler, certfile=ssl_crt, keyfile=ssl_key)
+        server = WSGIServer((host, 5001), app, handler_class=WebSocketHandler, certfile='/ssl/fullchain.pem', keyfile='/ssl/privkey.pem')
+        
         wrap_socket = server.wrap_socket
         wrap_socket_and_handle = server.wrap_socket_and_handle
 
@@ -251,7 +252,7 @@ def run():
 
     else:
         # app.run(use_reloader=False, port=port, host=host)
-        server = WSGIServer((host, port), app, handler_class=WebSocketHandler)
+        server = WSGIServer((host, 5000), app, handler_class=WebSocketHandler)
 
     server.serve_forever()
 
