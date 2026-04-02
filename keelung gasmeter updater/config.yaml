@@ -3,14 +3,13 @@ description: "A gasmeter updater addon"
 version: "0.0.100"
 slug: "keelung-gasmeter-updater"
 init: false
-host_network: true
 arch:
   - aarch64
   - amd64
   - armhf
   - armv7
   - i386
-image: ghcr.io/lolimanko/keelung-gasmeter-updater
+image: ghcr.io/lolimanko/(arch)-keelung-gasmeter-updater
 map:
   - share:rw
 options:
