@@ -9,5 +9,5 @@ configuration:
     name: "用戶手機"
     description: "請輸入末六碼用戶手機號碼"
   camera_ip:
-    name: "AI on the edge ip"
-    description: "請輸入AI on the edge的IP"
+    name: "AI on the Edge Device ip"
+    description: "請輸入AI on the Edge Device的IP"

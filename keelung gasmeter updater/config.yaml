@@ -1,7 +1,8 @@
 name: "Keelung Gasmeter Updater"
-description: "A gasmeter updater addon"
+description: "欣隆瓦斯自動用戶線上自報度數"
 version: "0.0.100"
 slug: "keelung-gasmeter-updater"
+url: "https://github.com/lolimanko/hassio-addons/tree/master/keelung%20gasmeter%20updater"
 init: false
 arch:
   - aarch64
