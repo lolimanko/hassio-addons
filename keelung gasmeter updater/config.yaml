@@ -9,7 +9,7 @@ arch:
   - armhf
   - armv7
   - i386
-image: ghcr.io/lolimanko/(arch)-keelung-gasmeter-updater
+image: ghcr.io/lolimanko/{arch}-keelung-gasmeter-updater
 map:
   - share:rw
 options:
