@@ -828,24 +828,26 @@ def run_dashboard():
     if not port_is_available(settings['dashboard']['port']):
         err_print(0, 'Web控制面板啓動失敗', 'Port已被占用! 請到配置文件更換', status=1, no_sn=True)
         return
-
+    #dashboard_address = ''
+    if settings['dashboard']['host'] == '0.0.0.0':
+        host = Config.get_local_ip()
+    else:
+        host = settings['dashboard']['host']
     from Dashboard.Server import run as dashboard
+    
     server = threading.Thread(target=dashboard)
     server.daemon = True
     server.start()
-    if settings['dashboard']['SSL']:
-        dashboard_address = 'https://'
-    else:
-        dashboard_address = 'http://'
-    if settings['dashboard']['host'] == '0.0.0.0':
-        host = Config.get_local_ip()
-        dashboard_address = '【開放外部訪問】訪問地址: ' + dashboard_address
-    else:
-        host = settings['dashboard']['host']
-        dashboard_address = '訪問地址: ' + dashboard_address
+    err_print(0, 'Web控制面板已啓動', no_sn=True, status=2)
 
-    dashboard_address = dashboard_address + host + ':' + str(settings['dashboard']['port'])
-    err_print(0, 'Web控制面板已啓動', dashboard_address, no_sn=True, status=2)
+    if settings['dashboard']['SSL']:
+        
+        from Dashboard.Server_SSL import run as dashboard_SSL
+        Server_SSL = threading.Thread(target=dashboard_SSL)
+        Server_SSL.daemon = True
+        Server_SSL.start()
+        err_print(0, 'SSL Web控制面板已啓動', no_sn=True, status=2)
+
 
 
 signal.signal(signal.SIGINT, user_exit)
