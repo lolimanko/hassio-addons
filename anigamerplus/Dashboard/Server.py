@@ -79,7 +79,7 @@ def colored(text, color=None, on_color=None, attrs=None):
 
 termcolor.colored = colored
 app.logger.addHandler(handler)
-app_ssl.logger.addHandler(handler)
+
 
 # 读取web需要的配置名称列表
 id_list_path = os.path.join(Config.get_working_dir(), 'Dashboard', 'static', 'js', 'settings_id_list.js')
