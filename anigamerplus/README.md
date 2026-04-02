@@ -37,3 +37,9 @@ web_log_path = os.path.join(Config.get_working_dir(), 'configs', 'logs', 'web.lo
 server = WSGIServer((host, port), app, handler_class=WebSocketHandler, certfile='/ssl/fullchain.pem', keyfile='/ssl/privkey.pem')
 ```
 index.html login.html monitor.html register.html aniGamerPlus.js monitor.js 內絕對路徑改相對路徑
+
+## SSL功能開啟後ingress會失效
+Server.py
+```bash
+server = WSGIServer((host, port), app, handler_class=WebSocketHandler, certfile='/ssl/fullchain.pem', keyfile='/ssl/privkey.pem')
+```
