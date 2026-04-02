@@ -15,7 +15,3 @@ RUN chmod a+x /run.sh
 RUN chmod a+x /stash-linux-arm64v8
 
 CMD [ "/run.sh" ]
-#ENTRYPOINT [ "stash-linux-arm64v8" ]
-
-
-#CMD ["python3", "playwright_checkin.py"]
