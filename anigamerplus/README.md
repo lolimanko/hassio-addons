@@ -16,4 +16,6 @@ UA使用取Web控制臺獲取即可
 
 如果要使用SSL，SSL憑證與私鑰請放在Let's Encrypt預設位置
 
-（/ssl/fullchain.pem,/ssl/privkey.pem）
+（/ssl/fullchain.pem,/ssl/privkey.pem）以及
+
+/addon_configs/fdd0cf77_anigamerplus/config.json 中  "SSL": false, 改為  "SSL": true,
