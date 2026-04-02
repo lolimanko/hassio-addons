@@ -34,6 +34,7 @@ mimetypes.add_type('application/x-javascript', '.js')
 template_path = os.path.join(Config.get_working_dir(), 'Dashboard', 'templates')
 static_path = os.path.join(Config.get_working_dir(), 'Dashboard', 'static')
 app = Flask(__name__, template_folder=template_path, static_folder=static_path)
+app_ssl = Flask(__name__, template_folder=template_path, static_folder=static_path)
 app.debug = False
 sockets = Sockets(app)
 
@@ -79,7 +80,7 @@ def colored(text, color=None, on_color=None, attrs=None):
 
 termcolor.colored = colored
 app.logger.addHandler(handler)
-
+app_ssl.logger.addHandler(handler)
 
 # 读取web需要的配置名称列表
 id_list_path = os.path.join(Config.get_working_dir(), 'Dashboard', 'static', 'js', 'settings_id_list.js')
