@@ -8,14 +8,10 @@ WORKDIR /stash
 RUN apt-get update && apt-get install -y
 RUN apt install ffmpeg -y
 
-COPY stash-linux-arm64v8 /
-COPY run.sh /
+COPY stash-linux /
+COPY run-amd64.sh /
 
-RUN chmod a+x /run.sh
-RUN chmod a+x /stash-linux-arm64v8
+RUN chmod a+x /run-amd64.sh
+RUN chmod a+x /stash-linux
 
-CMD [ "/run.sh" ]
-#ENTRYPOINT [ "stash-linux-arm64v8" ]
-
-
-#CMD ["python3", "playwright_checkin.py"]
+CMD [ "/run-amd64.sh" ]

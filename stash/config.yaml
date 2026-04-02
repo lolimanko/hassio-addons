@@ -6,6 +6,7 @@ init: false
 
 arch:
   - aarch64
+  - amd64
 ports:
   9999/tcp: 9999
 map:
@@ -17,4 +18,4 @@ map:
     read_only: false
     path: /stash
 
-image: ghcr.io/lolimanko/stash
+image: ghcr.io/lolimanko/{arch}-stash
