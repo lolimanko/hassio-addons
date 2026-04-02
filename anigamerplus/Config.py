@@ -394,7 +394,7 @@ def __update_settings(old_settings):  # 升级配置文件
 
 
 def __update_database(old_version):
-    db_path = os.path.join(working_dir, ,'configs','aniGamer.db')
+    db_path = os.path.join(working_dir,'configs','aniGamer.db')
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
