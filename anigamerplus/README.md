@@ -1,12 +1,19 @@
 # aniGamerPlus for Home Assistant Community Add-ons
+
 ## Home Assistant Add-ons版的巴哈姆特動畫瘋自動下載工具
+
+### 使用說明
+
+cookie.txt與UA需添加
 
 cookie.txt 位置在 /addon_configs/fdd0cf77_anigamerplus 需手動添加 
 
 可使用 [filebrowser](https://github.com/alexbelgium/hassio-addons/tree/master/filebrowser) 之類工具添加 cookie.txt 
 
-cookie 獲取方法在 [https://github.com/miyouzi/aniGamerPlus](https://github.com/miyouzi/aniGamerPlus)
+cookie 獲取方法在 [原作者頁面](https://github.com/miyouzi/aniGamerPlus)
 
-SSL憑證與私鑰請放在Let's Encrypt預設位置
+UA使用取Web控制臺獲取即可
 
-(/ssl/fullchain.pem,/ssl/privkey.pem)
+如果要使用SSL，SSL憑證與私鑰請放在Let's Encrypt預設位置
+
+（/ssl/fullchain.pem,/ssl/privkey.pem）
