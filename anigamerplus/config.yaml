@@ -8,6 +8,10 @@ arch:
   - amd64
 ports:
   5000/tcp: 
+  5001/tcp: 
+ports_description:
+  5000/tcp: 儀錶板
+  5001/tcp: SSL儀錶板
 map:
   - type: addon_config
     read_only: false
