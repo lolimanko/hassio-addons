@@ -840,8 +840,8 @@ def run_dashboard():
     server.start()
     err_print(0, 'Web控制面板已啓動', no_sn=True, status=2)
 
-    if settings['dashboard']['SSL']:
-        
+    #if settings['dashboard']['SSL']:
+    if sys.argv[2] == 'true' :    
         from Dashboard.Server_SSL import run as dashboard_SSL
         Server_SSL = threading.Thread(target=dashboard_SSL)
         Server_SSL.daemon = True
@@ -889,7 +889,9 @@ if __name__ == '__main__':
     conn.commit()
     conn.close()
 
-    if len(sys.argv) > 1:  # 支持命令行使用
+    if sys.argv[1] == '--bashio':  
+        err_print(0,'bashio輸入模式', '', 1, no_sn=True, display_time=False)
+    elif len(sys.argv) > 1 :
         parser = argparse.ArgumentParser()
         parser.add_argument('--sn', '-s', type=int, help='視頻sn碼(數字)')
         parser.add_argument('--resolution', '-r', type=int, help='指定下載清晰度(數字)', choices=[360, 480, 540, 576, 720, 1080])
