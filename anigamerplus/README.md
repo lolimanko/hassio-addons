@@ -14,5 +14,7 @@ cookie會自動更新 cookie過時無法使用時 請輸入新cookie並開啟覆
 
 其餘設定可使用 [filebrowser](https://github.com/alexbelgium/hassio-addons/tree/master/filebrowser) 之類工具修改config.json
 
+config.json  aniGamer.db  cookie.txt  logs 位置在 /addon_configs/fdd0cf77_anigamerplus 
+
 cookie、UA 獲取方法，config.json配置文件說明在 [原作者頁面](https://github.com/miyouzi/aniGamerPlus)
 
