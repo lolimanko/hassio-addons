@@ -10,7 +10,7 @@
 
 cookie會自動更新 cookie過時無法使用時 請輸入新cookie並開啟覆寫cookie後執行一次後關閉覆寫cookie
 
-如要使用SSL請在設定頁中開啟SSL，設定好憑證檔名及私鑰檔名(都放在/SSL下)及輸入SSL Port
+如要使用SSL請在設定頁中開啟SSL，設定好憑證檔名及私鑰檔名(都放在/ssl下)及輸入SSL Port
 
 其餘設定可使用 [filebrowser](https://github.com/alexbelgium/hassio-addons/tree/master/filebrowser) 之類工具修改config.json
 
