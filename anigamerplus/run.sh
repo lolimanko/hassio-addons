@@ -9,16 +9,16 @@ certfile=$(bashio::config 'certfile')
 
 keyfile=$(bashio::config 'keyfile')
 
-if [ -f "configs/cookie.txt" ]; then
+if [ -f "/config/cookie.txt" ]; then
     
     echo "cookie exist."
     if [ $cookie_overwrite == true ]; then
-        echo $cookie > 'configs/cookie.txt'
+        echo $cookie > '/config/cookie.txt'
         echo "cookie overwrited  ."
     fi
 else
     
-    echo $cookie > 'configs/cookie.txt'
+    echo $cookie > '/config/cookie.txt'
     echo "cookie create."
 fi
 

@@ -17,10 +17,14 @@ if getattr(sys, 'frozen', False):
 else:
     working_dir = os.path.dirname(os.path.realpath(__file__))
 
-config_path = os.path.join(working_dir, 'configs', 'config.json')
-sn_list_path = os.path.join(working_dir, 'configs', 'sn_list.txt')
-cookie_path = os.path.join(working_dir, 'configs', 'cookie.txt')
-logs_dir = os.path.join(working_dir, 'configs', 'logs')
+#config_path = os.path.join(working_dir, 'configs', 'config.json')
+config_path = '/config/config.json'
+#sn_list_path = os.path.join(working_dir, 'configs', 'sn_list.txt')
+sn_list_path = '/config/sn_list.txt'
+#cookie_path = os.path.join(working_dir, 'configs', 'cookie.txt')
+cookie_path = '/config/cookie.txt'
+#logs_dir = os.path.join(working_dir, 'configs', 'logs')
+logs_dir = '/config/logs'
 aniGamerPlus_version = 'v24.6'
 latest_config_version = 17.2
 latest_database_version = 2.0

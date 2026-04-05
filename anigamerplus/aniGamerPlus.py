@@ -854,7 +854,8 @@ signal.signal(signal.SIGINT, user_exit)
 signal.signal(signal.SIGTERM, user_exit)
 settings = Config.read_settings()
 working_dir = settings['working_dir']
-db_path = os.path.join(working_dir, 'configs','aniGamer.db')
+#db_path = os.path.join(working_dir, 'configs','aniGamer.db')
+db_path = '/config/aniGamer.db'
 queue = {}  # 储存 sn 相关信息, {'tag': TAG, 'rename': RENAME}, rename,
 processing_queue = []
 thread_limiter = threading.Semaphore(settings['multi-thread'])  # 下载并发限制器

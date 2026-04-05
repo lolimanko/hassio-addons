@@ -16,7 +16,7 @@ ports_description:
 map:
   - type: addon_config
     read_only: false
-    path: /app/configs
+    #path: /app/configs
   - type: media
     read_only: False
   - type: share

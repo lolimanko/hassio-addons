@@ -85,7 +85,8 @@ def err_print(sn, err_msg, detail='', status=0, no_sn=False, prefix='', display=
             succeed_or_failed_print()
 
     if log_settings['save_logs']:
-        logs_dir = os.path.join(Config.get_working_dir(), 'configs', 'logs')
+        #logs_dir = os.path.join(Config.get_working_dir(), 'configs', 'logs')
+        logs_dir = '/config/logs'
         if not os.path.exists(logs_dir):
             os.makedirs(logs_dir)
         log_path = os.path.join(logs_dir, datetime.now().strftime("%Y-%m-%d") + '.log')
