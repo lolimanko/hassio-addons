@@ -842,7 +842,7 @@ def run_dashboard():
 
     #if settings['dashboard']['SSL']:
     if sys.argv[2] == 'true' :    
-        from Dashboard.Server_SSL import run as dashboard_SSL
+        from Dashboard.Server import run_ssl as dashboard_SSL
         Server_SSL = threading.Thread(target=dashboard_SSL)
         Server_SSL.daemon = True
         Server_SSL.start()
