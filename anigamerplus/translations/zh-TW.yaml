@@ -1,0 +1,10 @@
+configuration:
+  cookie_overwrite:
+    name: "覆寫cookie"
+    description: "cookie失效時用"
+  certfile:
+    name: "憑證檔名"
+    description: "檔案請放在/ssl下"
+  keyfile:
+    name: "私鑰檔名"
+    description: "檔案請放在/ssl下"

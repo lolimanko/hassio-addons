@@ -4,18 +4,15 @@
 
 ### 使用說明
 
-cookie.txt與UA需添加
+首次使用cookie.txt與UA需添加
 
-cookie.txt 位置在 /addon_configs/fdd0cf77_anigamerplus 需手動添加 
+在設定頁中需輸入cookie  首次執行不存在cookie.txt時會自動新增cookie至cookie.txt
 
-可使用 [filebrowser](https://github.com/alexbelgium/hassio-addons/tree/master/filebrowser) 之類工具添加 cookie.txt 
+cookie會自動更新 cookie過時無法使用時 請輸入新cookie並開啟覆寫cookie後執行一次後關閉覆寫cookie
 
-cookie 獲取方法在 [原作者頁面](https://github.com/miyouzi/aniGamerPlus)
+如要使用SSL請在設定頁中開啟SSL，設定好憑證檔名及私鑰檔名(都放在/SSL下)及輸入SSL Port
 
-UA使用取Web控制臺獲取即可
+其餘設定可使用 [filebrowser](https://github.com/alexbelgium/hassio-addons/tree/master/filebrowser) 之類工具修改config.json
 
-如果要使用SSL，SSL憑證與私鑰請放在Let's Encrypt預設位置
+cookie、UA 獲取方法，config.json配置文件說明在 [原作者頁面](https://github.com/miyouzi/aniGamerPlus)
 
-（/ssl/fullchain.pem,/ssl/privkey.pem）以及
-
-/addon_configs/fdd0cf77_anigamerplus/config.json 中  "SSL": false, 改為  "SSL": true,
