@@ -25,7 +25,7 @@ map:
     read_only: false
 image: "ghcr.io/lolimanko/{arch}-anigamerplus" 
 ingress: true 
-ingress_port: 5001
+ingress_port: 5000
 ingress_stream: true
 panel_icon: mdi:television
 options:
