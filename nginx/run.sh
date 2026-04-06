@@ -1,5 +1,5 @@
 #!/usr/bin/with-contenv bashio
-FILE="/app/default.conf"
+FILE="/config/default.conf"
 
 if [ -f "$FILE" ]; then
     cp -f /config/default.conf /etc/nginx/http.d/
