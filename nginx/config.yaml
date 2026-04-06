@@ -15,5 +15,4 @@ map:
     read_only: False
   - type: addon_config
     read_only: false
-    path: /app
 image: ghcr.io/lolimanko/{arch}-nginx
