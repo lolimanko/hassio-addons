@@ -2,7 +2,7 @@
 FILE="/app/default.conf"
 
 if [ -f "$FILE" ]; then
-    cp -f /app/default.conf /etc/nginx/http.d/
+    cp -f /config/default.conf /etc/nginx/http.d/
     echo "File $FILE exists and is a regular file."
 else
     echo "File $FILE does not exist or is not a regular file."

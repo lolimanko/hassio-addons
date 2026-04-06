@@ -8,11 +8,9 @@ RUN \
   \
   && mkdir -p /run/nginx
 
-#Copy our conf into the nginx http.d folder.
-#COPY proxy.conf /etc/nginx/http.d/
-WORKDIR /app
-#Launch nginx with debug options.
-#CMD [ "nginx","-g","daemon off;error_log /dev/stdout debug;" ]
+
+WORKDIR /
+
 COPY run.sh /
 RUN chmod a+x /run.sh
 
