@@ -28,6 +28,7 @@ from flask_sockets import Sockets
 from gevent.pywsgi import WSGIServer
 from geventwebsocket.exceptions import WebSocketError
 from geventwebsocket.handler import WebSocketHandler
+from flask_talisman import Talisman
 
 mimetypes.add_type('text/css', '.css')
 mimetypes.add_type('application/x-javascript', '.js')
@@ -222,6 +223,7 @@ def run():
 
     server.serve_forever()
 def run_ssl():
+    Talisman(app)
     settings = Config.read_settings()  # 读取配置
 
     if settings['dashboard']['BasicAuth']:
