@@ -77,13 +77,10 @@ COPY . .
 
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-#ENTRYPOINT [ "python3", "-u", "aniGamerPlus.py" ]
-#WORKDIR /
 COPY run.sh /
 RUN chmod a+x /run.sh
 CMD [ "/run.sh" ]
 
-#WORKDIR /
 ENTRYPOINT ["/init"]
 
 LABEL \

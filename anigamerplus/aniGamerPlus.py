@@ -849,7 +849,6 @@ def run_dashboard():
         err_print(0, 'SSL Web控制面板已啓動', no_sn=True, status=2)
 
 
-
 signal.signal(signal.SIGINT, user_exit)
 signal.signal(signal.SIGTERM, user_exit)
 settings = Config.read_settings()
@@ -891,7 +890,7 @@ if __name__ == '__main__':
     conn.close()
 
     if sys.argv[1] == '--bashio':  
-        err_print(0,'bashio輸入模式', '', 1, no_sn=True, display_time=False)
+        err_print(0,'bashio輸入模式', '', no_sn=True, display_time=False, status=2)
     elif len(sys.argv) > 1 :
         parser = argparse.ArgumentParser()
         parser.add_argument('--sn', '-s', type=int, help='視頻sn碼(數字)')
