@@ -1,6 +1,6 @@
 name: "stash"
 description: "Stash is a self-hosted webapp written in Go which organizes and serves your diverse content collection, catering to both your SFW and NSFW needs."
-version: "0.0.71"
+version: "0.0.82"
 slug: "stash"
 init: false
 url: "https://github.com/stashapp/stash"
@@ -16,6 +16,6 @@ map:
     read_only: false
   - type: addon_config
     read_only: false
-    path: /stash
+    path: /root/.stash
 
 image: ghcr.io/lolimanko/{arch}-stash
