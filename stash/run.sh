@@ -23,4 +23,23 @@ else
   echo 'session_store_key: '$(openssl rand -hex 32) >> '/root/.stash/config.yml'
   
 fi
+
+if [ -d /root/.stash/generated ]; then
+  echo "generated Yes"
+else
+  echo "generated No"
+  mkdir /root/.stash/generated
+fi
+if [ -d /root/.stash/cache ]; then
+  echo "cache Yes"
+else
+  echo "cache No"
+  mkdir /root/.stash/cache
+fi
+if [ -d /root/.stash/blobs ]; then
+  echo "blobs Yes"
+else
+  echo "blobs No"
+  mkdir /root/.stash/blobs
+fi
 exec stash
