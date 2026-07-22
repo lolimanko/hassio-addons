@@ -771,7 +771,7 @@ def __init_proxy():
 
 
 def do_request(url, headers, cookies, params=None):
-    return requests.get(url, headers=headers, cookies=cookies, params=params)
+    return Config.bahamut_request('GET', url, headers=headers, cookies=cookies, params=params)
 
 
 def parse_anime(soup, animes, headers, cookies):
@@ -790,14 +790,10 @@ def export_my_anime():
 
     url = "https://ani.gamer.com.tw/mygather.php"
     header = {
-        'accept':
-        'application/json',
-        'origin':
-        'https://ani.gamer.com.tw',
-        'authority':
-        'ani.gamer.com.tw',
-        'user-agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36',
+        'accept': 'application/json',
+        'origin': 'https://ani.gamer.com.tw',
+        'referer': 'https://ani.gamer.com.tw/',
+        'User-Agent': settings['ua'],
     }
 
     cookies = Config.read_cookie()
@@ -810,7 +806,7 @@ def export_my_anime():
     while True:
         params = {'page': page, 'sort': 0}
         bahamygatherPage = do_request(url, headers=header, cookies=cookies, params=params)
-        if bahamygatherPage.status_code == requests.codes.ok:
+        if bahamygatherPage.status_code == 200:
             soup = BeautifulSoup(bahamygatherPage.text, 'html.parser')
             if not parse_anime(soup, animes, header, cookies):
                 break
@@ -853,8 +849,8 @@ signal.signal(signal.SIGINT, user_exit)
 signal.signal(signal.SIGTERM, user_exit)
 settings = Config.read_settings()
 working_dir = settings['working_dir']
-#db_path = os.path.join(working_dir, 'configs','aniGamer.db')
-db_path = '/config/aniGamer.db'
+db_path = os.path.join(working_dir, 'aniGamer.db')
+#db_path = '/config/aniGamer.db'
 queue = {}  # 储存 sn 相关信息, {'tag': TAG, 'rename': RENAME}, rename,
 processing_queue = []
 thread_limiter = threading.Semaphore(settings['multi-thread'])  # 下载并发限制器
@@ -889,6 +885,7 @@ if __name__ == '__main__':
     conn.commit()
     conn.close()
 
+    #if len(sys.argv) > 1:  # 支持命令行使用
     if sys.argv[1] == '--bashio':  
         err_print(0,'bashio輸入模式', '', no_sn=True, display_time=False, status=2)
     elif len(sys.argv) > 1 :

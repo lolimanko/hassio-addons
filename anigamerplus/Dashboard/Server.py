@@ -28,7 +28,6 @@ from flask_sockets import Sockets
 from gevent.pywsgi import WSGIServer
 from geventwebsocket.exceptions import WebSocketError
 from geventwebsocket.handler import WebSocketHandler
-#from flask_talisman import Talisman
 
 mimetypes.add_type('text/css', '.css')
 mimetypes.add_type('application/x-javascript', '.js')
@@ -42,7 +41,7 @@ sockets = Sockets(app)
 # logger = logging.getLogger('werkzeug')
 logger = logging.getLogger('geventwebsocket')
 logging.basicConfig(level=logging.INFO)  # 记录访问
-#web_log_path = os.path.join(Config.get_working_dir(), 'configs', 'logs', 'web.log')
+#web_log_path = os.path.join(Config.get_working_dir(), 'logs', 'web.log')
 web_log_path = '/config/logs/web.log'
 handler = TimedRotatingFileHandler(filename=web_log_path, when='midnight', backupCount=7, encoding='utf-8')
 handler.suffix = '%Y-%m-%d.log'
@@ -105,7 +104,11 @@ def config():
     settings = Config.read_settings()
     web_settings = {}
     for id in id_list:
-        web_settings[id] = settings[id]  # 仅返回 web 需要的配置
+        if id == 'browser_fingerprint':
+            web_settings['browser_fingerprint_ja3'] = settings[id]['ja3']
+            web_settings['browser_fingerprint_akamai'] = settings[id]['akamai']
+        else:
+            web_settings[id] = settings[id]  # 仅返回 web 需要的配置
 
     return jsonify(web_settings)
 
@@ -115,7 +118,13 @@ def recv_config():
     data = json.loads(request.get_data(as_text=True))
     new_settings = Config.read_settings()
     for id in id_list:
-        new_settings[id] = data[id]  # 更新配置
+        if id == 'browser_fingerprint':
+            new_settings[id] = {
+                'ja3': data.get('browser_fingerprint_ja3', ''),
+                'akamai': data.get('browser_fingerprint_akamai', '')
+            }
+        else:
+            new_settings[id] = data[id]  # 更新配置
     Config.write_settings(new_settings)  # 保存配置
     err_print(0, 'Dashboard', '通過 Web 控制臺更新了 config.json', no_sn=True, status=2)
     return '{"status":"200"}'
@@ -223,8 +232,6 @@ def run():
 
     server.serve_forever()
 def run_ssl():
-    #csp = {}
-    #Talisman(app,content_security_policy=csp)
     settings = Config.read_settings()  # 读取配置
 
     if settings['dashboard']['BasicAuth']:
@@ -268,7 +275,8 @@ def run_ssl():
     
 
     server.serve_forever()
-    
+
+
 if __name__ == '__main__':
     run()
     pass

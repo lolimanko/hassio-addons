@@ -8,6 +8,7 @@
 import os, json, re, sys, requests, time, random, codecs, chardet
 import sqlite3
 import socket
+from curl_cffi import requests as curl_requests
 from urllib.parse import quote
 from urllib.parse import urlencode
 
@@ -17,16 +18,16 @@ if getattr(sys, 'frozen', False):
 else:
     working_dir = os.path.dirname(os.path.realpath(__file__))
 
-#config_path = os.path.join(working_dir, 'configs', 'config.json')
+#config_path = os.path.join(working_dir, 'config.json')
 config_path = '/config/config.json'
-#sn_list_path = os.path.join(working_dir, 'configs', 'sn_list.txt')
+#sn_list_path = os.path.join(working_dir, 'sn_list.txt')
 sn_list_path = '/config/sn_list.txt'
-#cookie_path = os.path.join(working_dir, 'configs', 'cookie.txt')
+#cookie_path = os.path.join(working_dir, 'cookie.txt')
 cookie_path = '/config/cookie.txt'
-#logs_dir = os.path.join(working_dir, 'configs', 'logs')
+#logs_dir = os.path.join(working_dir, 'logs')
 logs_dir = '/config/logs'
-aniGamerPlus_version = 'v24.6'
-latest_config_version = 17.2
+aniGamerPlus_version = 'v25.0'
+latest_config_version = 18.0
 latest_database_version = 2.0
 cookie = None
 max_multi_thread = 5
@@ -107,7 +108,7 @@ def __init_settings():
                 'video_filename_extension': 'mp4',  # 视频扩展名/封装格式
                 'zerofill': 1,  # 剧集名补零, 此项填补足位数, 小于等于 1 即不补零
                 # cookie的自动刷新对 UA 有检查
-                'ua': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36",
+                'ua': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
                 'use_proxy': False,
                 'proxy': 'http://user:passwd@example.com:1000',  # 代理功能, config_version v13.0 删除链式代理
                 "no_proxy_akamai": False,  # 不代理 akamai CDN
@@ -155,7 +156,7 @@ def __init_settings():
                 'mobile_ads_time': 25,
                 'use_dashboard': True,
                 'dashboard': {
-                    'host': '0.0.0.0',
+                    'host': '127.0.0.1',
                     'port': 5000,
                     'SSL': False,
                     'BasicAuth': False,
@@ -224,7 +225,7 @@ def __update_settings(old_settings):  # 升级配置文件
         new_settings['lock_resolution'] = False  # v4.1 新增分辨率锁定开关
 
     if 'ua' not in new_settings.keys():  # v4.2 新增 UA 配置
-        new_settings['ua'] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.96 Safari/537.36"
+        new_settings['ua'] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
 
     if 'classify_bangumi' not in new_settings.keys():
         new_settings['classify_bangumi'] = True  # v5.0 新增是否建立番剧目录开关
@@ -321,7 +322,7 @@ def __update_settings(old_settings):  # 升级配置文件
 
     if 'dashboard' not in new_settings.keys():
         new_settings['dashboard'] = {
-            'host': '0.0.0.0',
+            'host': '127.0.0.1',
             'port': 5000,
             'SSL': False,
             'BasicAuth': False,
@@ -390,6 +391,13 @@ def __update_settings(old_settings):  # 升级配置文件
         # v24.4 sn解析冷卻時間(秒)
         new_settings['parse_sn_cd'] = 5
 
+    if 'browser_fingerprint' not in new_settings.keys():
+        # v25.0 添加浏览器指纹配置
+        new_settings['browser_fingerprint'] = {
+            'ja3': '771,4865-4866-4867-49195-49199-49196-49200-52393-52392-49171-49172-156-157-47-53,0-10-65281-17613-43-45-16-5-65037-13-35-27-18-23-11-51,4588-29-23-24,0',
+            'akamai': '1:65536;2:0;4:6291456;6:262144|15663105|0|m,a,s,p'
+        }
+
     new_settings['config_version'] = latest_config_version
     with open(config_path, 'w', encoding='utf-8') as f:
         json.dump(new_settings, f, ensure_ascii=False, indent=4)
@@ -398,7 +406,7 @@ def __update_settings(old_settings):  # 升级配置文件
 
 
 def __update_database(old_version):
-    db_path = os.path.join(working_dir,'configs','aniGamer.db')
+    db_path = os.path.join(working_dir, 'aniGamer.db')
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
@@ -450,7 +458,7 @@ def __update_database(old_version):
     __color_print(0, msg, status=2, no_sn=True)
 
 
-def __read_settings_file():
+def __read_settings_file() -> dict:
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
             # 转义win路径
@@ -506,7 +514,7 @@ def del_bom(path, display=True):
                 break
 
 
-def read_settings(config=''):
+def read_settings(config='') -> dict:
     if config == '':
         if not os.path.exists(config_path):
             __init_settings()
@@ -543,7 +551,7 @@ def read_settings(config=''):
 
     if not settings['ua']:
         # 如果 ua 项目为空
-        settings['ua'] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.96 Safari/537.36"
+        settings['ua'] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
 
     # 如果用户自定了番剧目录且存在
     if settings['bangumi_dir'] and os.path.exists(settings['bangumi_dir']):
@@ -553,7 +561,7 @@ def read_settings(config=''):
         # 如果用户没有有自定番剧目录或目录不存在，则保存在本地 bangumi 目录
         #settings['bangumi_dir'] = os.path.join(working_dir, 'bangumi')
         settings['bangumi_dir'] =  '/media/bangumi'
-        
+
     # 如果用户自定了缓存目录且存在
     if settings['temp_dir'] and os.path.exists(settings['temp_dir']):
         # 缓存路径规范化
@@ -562,6 +570,7 @@ def read_settings(config=''):
         # 如果用户没有有自定缓存目录或目录不存在，则保存在本地 temp 目录
         #settings['temp_dir'] = os.path.join(working_dir, 'temp')
         settings['temp_dir'] = '/media/temp'
+
     settings['working_dir'] = working_dir
     settings['aniGamerPlus_version'] = aniGamerPlus_version
 
@@ -602,6 +611,14 @@ def read_settings(config=''):
             settings['use_dashboard'] = False
             __color_print(0, 'Web控制面板', '未發現控制面板所必須的Dashboard資料夾, 强制禁用控制面板!', no_sn=True, status=1)
             write_settings(settings)
+
+    if settings.get('browser_fingerprint', {}).get('ja3'):
+        # https://github.com/lexiforest/curl_cffi/issues/549
+        # 移除 curl-cffi 不支持的指纹参数
+        settings['browser_fingerprint']['ja3'] = settings.get('browser_fingerprint', {}).get('ja3').replace('-17613', '').replace('-41', '')
+
+    # v25.0 强制冷却时间3s以上
+    settings['parse_sn_cd'] = max(settings['parse_sn_cd'], 3)
 
     return settings
 
@@ -775,6 +792,30 @@ def renew_cookies(new_cookie, log=True):
             if log:
                 __color_print(0, '新cookie保存成功', no_sn=True, display=False)
             break
+
+
+def bahamut_request(method, url, **kwargs):
+    # 巴哈站點請求統一走 curl-cffi，通過 TLS 指紋驗證
+    settings = read_settings()
+    bf = settings.get('browser_fingerprint', {})
+    ja3 = bf.get('ja3') or None
+    akamai = bf.get('akamai') or None
+    if 'firefox' in settings['ua'].lower():
+        impersonate = 'firefox'
+    else:
+        impersonate = 'chrome'
+    headers = dict(kwargs.pop('headers', None) or {})
+    if not any(k.lower() == 'user-agent' for k in headers):
+        headers['User-Agent'] = settings['ua']
+    kwargs['headers'] = headers
+    if settings.get('use_proxy') and settings.get('proxy'):
+        kwargs['proxies'] = {'https': settings['proxy'], 'http': settings['proxy']}
+    kwargs.setdefault('timeout', 10)
+    session = curl_requests.Session(impersonate=impersonate, ja3=ja3, akamai=akamai)
+    try:
+        return session.request(method, url, **kwargs)
+    except curl_requests.RequestsError as e:
+        raise requests.exceptions.RequestException(str(e)) from e
 
 
 def read_latest_version_on_github():
