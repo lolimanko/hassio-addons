@@ -1,4 +1,4 @@
-ARG BUILD_FROM=ghcr.io/hassio-addons/base:20.0.1
+ARG BUILD_FROM=ghcr.io/hassio-addons/base:21.0.0
 FROM $BUILD_FROM
 
 #Add nginx and create the run folder for nginx.
