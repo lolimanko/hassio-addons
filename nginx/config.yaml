@@ -1,6 +1,6 @@
 name: "nginx"
 description: "A nginx addon"
-version: "0.0.98"
+version: "1.30.4"
 slug: "nginx"
 init: false
 host_network: true
