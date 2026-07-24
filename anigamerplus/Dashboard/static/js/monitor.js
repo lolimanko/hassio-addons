@@ -3,8 +3,8 @@ layui.use('element', function(){
 	
 	let protocol = window.location.protocol;
 	let ws = protocol.replace('http', 'ws');
-	//let tasks_progress_url = ws+'//'+window.location.host+'/data/tasks_progress'+'?token=';
-	let tasks_progress_url = 'data/tasks_progress'+'?token=';
+	let tasks_progress_url = data/tasks_progress'+'?token=';
+	
 	// 获取token
 	$.get('data/get_token', function(token){
 		tasks_progress_url += token;

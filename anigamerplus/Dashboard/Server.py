@@ -41,7 +41,6 @@ sockets = Sockets(app)
 # logger = logging.getLogger('werkzeug')
 logger = logging.getLogger('geventwebsocket')
 logging.basicConfig(level=logging.INFO)  # 记录访问
-#web_log_path = os.path.join(Config.get_working_dir(), 'logs', 'web.log')
 web_log_path = '/config/logs/web.log'
 handler = TimedRotatingFileHandler(filename=web_log_path, when='midnight', backupCount=7, encoding='utf-8')
 handler.suffix = '%Y-%m-%d.log'
