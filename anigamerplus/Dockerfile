@@ -1,4 +1,4 @@
-ARG BUILD_FROM=python:3.9-slim
+ARG BUILD_FROM=python:3.12-slim
 # hadolint ignore=DL3006
 FROM ${BUILD_FROM}
 
