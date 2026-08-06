@@ -2,6 +2,7 @@ name: "stash"
 description: "Stash is a self-hosted webapp written in Go which organizes and serves your diverse content collection, catering to both your SFW and NSFW needs."
 version: "0.31.1"
 slug: "stash"
+url: https://github.com/stashapp/stash
 init: false
 #host_network: true
 ports:
