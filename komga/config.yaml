@@ -1,0 +1,37 @@
+name: "Komga"
+version: 1.24.3
+slug: "komga"
+description: "Komga is a media server for your comics, mangas, BDs, magazines and eBooks."
+url: https://komga.org/docs/introduction
+arch:
+  - amd64
+  - aarch64
+  - armhf
+  - i386
+  - armv7
+ports:
+  25600/tcp: 25600
+  25601/tcp: 25601
+map:
+  - type: ssl
+    read_only: False
+  - type: addon_config
+    read_only: false
+  - type: media
+    read_only: False
+  - type: share
+    read_only: false
+init: false
+ingress: true 
+#ingress_port: 5000
+ingress_stream: true
+#ingress_stream: false
+options:
+  ssl: false
+  certfile: fullchain.pem
+  keyfile: privkey.pem
+schema:
+  ssl: bool
+  certfile: str
+  keyfile: str
+#image: "ghcr.io/gotson/komga"
