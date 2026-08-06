@@ -1,4 +1,4 @@
-# stash for Home Assistant Community Add-ons
+# Stash for Home Assistant Community Add-ons
 
 <h3>Stash is a self-hosted webapp written in Go which organizes and serves your diverse content collection, catering to both your SFW and NSFW needs.</h3>
 
