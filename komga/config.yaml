@@ -9,6 +9,9 @@ arch:
 ports:
   25600/tcp: 25600
   25601/tcp: 25601
+ports_description:
+  25600/tcp: http
+  25601/tcp: https
 map:
   - type: ssl
     read_only: False
