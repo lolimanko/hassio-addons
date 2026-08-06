@@ -32,3 +32,4 @@ schema:
   certfile: str
   keyfile: str
 image: "ghcr.io/lolimanko/{arch}-komga"
+panel_icon: mdi:book-open-variant-outline
