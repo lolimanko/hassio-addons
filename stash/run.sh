@@ -2,9 +2,7 @@
 
 #INGRESS_PATH="$(bashio::app.ingress_entry)"
 ssl=$(bashio::config 'ssl')
-
 certfile=$(bashio::config 'certfile')
-
 keyfile=$(bashio::config 'keyfile')
 ingress_port=$(bashio::app.ingress_port)
 ingress_interface=$(bashio::app.ip_address)
@@ -19,7 +17,7 @@ else
     echo "config.yml not exist."
     cp /config.yml /root/.stash/config.yml
 fi
-if [ $ssl ]; then
+if [ "$ssl" = "true" ]; then
     
     echo "ssl enable."
     cp /ssl.conf /etc/nginx/http.d/ssl.conf
