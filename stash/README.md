@@ -2,7 +2,7 @@
 
 <h3>Stash is a self-hosted webapp written in Go which organizes and serves your diverse content collection, catering to both your SFW and NSFW needs.</h3>
 
-![Screenshot of Stash web application interface](demo_image.png)
+![Screenshot of Stash web application interface](https://github.com/lolimanko/hassio-addons/blob/master/stash/demo_image.png?raw=true)
 
 - Stash gathers information about videos in your collection from the internet, and is extensible through the use of community-built plugins for a large number of content producers and sites.
 - Stash supports a wide variety of both video and image formats.
