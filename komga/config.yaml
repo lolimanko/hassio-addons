@@ -6,9 +6,6 @@ url: https://komga.org/docs/introduction
 arch:
   - amd64
   - aarch64
-  - armhf
-  - i386
-  - armv7
 ports:
   25600/tcp: 25600
   25601/tcp: 25601
@@ -34,4 +31,4 @@ schema:
   ssl: bool
   certfile: str
   keyfile: str
-#image: "ghcr.io/gotson/komga"
+image: "ghcr.io/lolimanko/{arch}-komga"
