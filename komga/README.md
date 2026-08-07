@@ -2,4 +2,4 @@
 
 fork from https://github.com/Nina-Syrina/Homeassistant-Addons/tree/main
 
-Add Ingress and HTTPS.
+added Ingress and HTTPS support.
