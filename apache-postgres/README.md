@@ -7,4 +7,4 @@
 
 fork from [https://github.com/FaserF/hassio-addons/tree/master/apache2](https://github.com/FaserF/hassio-addons/tree/master/apache2) 
 
-just add postgres support
+just added postgres support
