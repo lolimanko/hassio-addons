@@ -1,0 +1,9 @@
+#!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+
+exec java -Dspring.profiles.include=docker --enable-native-access=ALL-UNNAMED -jar /app/application.jar --spring.config.additional-location=file:/config/ 
+
+
+#exec stash
+
+

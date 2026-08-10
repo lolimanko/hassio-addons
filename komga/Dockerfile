@@ -1,129 +1,37 @@
-#ARG BASE_IMAGE=ubuntu
-#ARG UBUNTU_VERSION=26.04
-#ARG BUILD_FROM=${BASE_IMAGE}:${UBUNTU_VERSION}
-ARG BUILD_FROM=ghcr.io/gotson/komga
-FROM ${BUILD_FROM} AS merge
+ARG BUILD_FROM=ghcr.io/home-assistant/base-ubuntu:26.04
+#ARG BUILD_FROM=ghcr.io/hassio-addons/ubuntu-base:11.0.0
 
-# Default ENV
-ENV \
-    LANG="C.UTF-8" \
-    DEBIAN_FRONTEND="noninteractive"
+ARG BUILD_FROM_KOMGA=ghcr.io/gotson/komga
 
-SHELL ["/bin/bash", "-o", "pipefail", "-x", "-c"]
+FROM ${BUILD_FROM_KOMGA} AS komga
 
-ARG BASHIO_REPOSITORY=hassio-addons/bashio
-ARG BASHIO_VERSION=0.17.5
-ARG S6_OVERLAY_ARCH
-ARG S6_OVERLAY_REPOSITORY=just-containers/s6-overlay
-ARG S6_OVERLAY_VERSION=3.2.3.0
-ARG TEMPIO_ARCH
-ARG TEMPIO_REPOSITORY=home-assistant/tempio
-ARG TEMPIO_VERSION=2026.07.0
-
-# Sanity check for later steps
-ARG TARGETARCH
-RUN \
-    if [ -z "${TARGETARCH}" ]; then \
-        echo "TARGETARCH is not set, please use Docker BuildKit for the build." && exit 1; \
-    fi
-
-# Enable APT cache reuse with BuildKit
-RUN \
-    rm -f /etc/apt/apt.conf.d/docker-clean
-
-# Base system packages
-RUN \
-    --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends \
-        bash \
-        jq \
-        tzdata \
-        curl \
-        ca-certificates \
-        xz-utils
-
-# S6-Overlay
-ADD --unpack=true "https://github.com/${S6_OVERLAY_REPOSITORY}/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz" /
-ADD --unpack=true "https://github.com/${S6_OVERLAY_REPOSITORY}/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-symlinks-arch.tar.xz" /
-ADD --unpack=true "https://github.com/${S6_OVERLAY_REPOSITORY}/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-symlinks-noarch.tar.xz" /
-
-# bashio
-ADD --unpack=true "https://github.com/${BASHIO_REPOSITORY}/archive/v${BASHIO_VERSION}.tar.gz" /usr/src/bashio
-
-WORKDIR /usr/src/bashio
-
-RUN \
-    mv /usr/src/bashio/bashio-*/lib /usr/lib/bashio \
-    && ln -s /usr/lib/bashio/bashio /usr/bin/bashio \
-    && rm -rf /usr/src/bashio
-
-# Arch-specific downloads (tempio and s6-overlay)
-RUN \
-      case "${TARGETARCH}" in \
-        amd64) \
-            S6_OVERLAY_ARCH="${S6_OVERLAY_ARCH:-x86_64}" \
-            ;; \
-        arm64) \
-            S6_OVERLAY_ARCH="${S6_OVERLAY_ARCH:-aarch64}" \
-            TEMPIO_ARCH="${TEMPIO_ARCH:-aarch64}" \
-            ;; \
-    esac \
-    && echo "Selected from TARGETARCH=${TARGETARCH} arch-specific" \
-        " S6_OVERLAY_ARCH=${S6_OVERLAY_ARCH:=${TARGETARCH}}" \
-        " TEMPIO_ARCH=${TEMPIO_ARCH:=${TARGETARCH}}" \
-    && curl -L -f -s "https://github.com/${S6_OVERLAY_REPOSITORY}/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${S6_OVERLAY_ARCH}.tar.xz" \
-        | tar Jxvf - -C / \
-    && curl -L -f -s -o /usr/bin/tempio \
-        "https://github.com/${TEMPIO_REPOSITORY}/releases/download/${TEMPIO_VERSION}/tempio_${TEMPIO_ARCH}" \
-    && chmod a+x /usr/bin/tempio
-
-# Touch-ups and cleanup
-RUN \
-    mkdir -p /etc/fix-attrs.d \
-    && mkdir -p /etc/services.d \
-    && rm -rf /var/lib/apt/lists/*
-
-#########################
-# Final flattened image #
-#########################
-
-# Inherit config from the original base image
 FROM ${BUILD_FROM}
 
-# Copy everything from the merged build
-COPY --from=merge / /
+COPY --from=komga /opt/java/openjdk /opt/java/openjdk
+COPY --from=komga /app /app
+COPY --from=komga /usr/bin/kepubify /usr/bin/kepubify
 
-# S6-Overlay
+ENV JAVA_HOME="/opt/java/openjdk"
+ENV PATH="/opt/java/openjdk/bin:${PATH}"
+
+ENV \
+    KOMGA_CONFIGDIR="/config" \
+    LANG="en_US.UTF-8" \
+    LANGUAGE="en_US:en" \
+    LC_ALL="en_US.UTF-8"
+    
+ENV LANG=C.UTF-8
+ENV LANGUAGE=C.UTF-8
+ENV LC_ALL=C.UTF-8
+VOLUME /config
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends nginx \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY rootfs /
+WORKDIR /
 ENTRYPOINT ["/init"]
 
-# Set shell
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-
-# Default ENV
-ENV \
-    LANG="C.UTF-8" \
-    DEBIAN_FRONTEND="noninteractive" \
-    S6_BEHAVIOUR_IF_STAGE2_FAILS=2 \
-    S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0 \
-    S6_CMD_WAIT_FOR_SERVICES=1 \
-    S6_SERVICES_READYTIME=50
-
-LABEL \
-    io.hass.type="base" \
-    io.hass.base.name="ubuntu"
-    
-RUN apt update -y && apt install nginx -y
-COPY nginx.conf /etc/nginx/nginx.conf
-COPY mime.types /etc/nginx/includes/mime.types
-COPY ingress.conf /etc/nginx/http.d/ingress.conf
-COPY ssl.conf /ssl.conf
-COPY proxy_params.conf /etc/nginx/includes/proxy_params.conf
-COPY server_params.conf /etc/nginx/includes/server_params.conf
-
-#ENV SERVER_SERVLET_CONTEXT_PATH=/komga
-COPY run.sh /
-RUN chmod a+x /run.sh
-RUN chmod 777 -R /etc/nginx
-CMD [ "/run.sh" ]
-    
+EXPOSE 25600

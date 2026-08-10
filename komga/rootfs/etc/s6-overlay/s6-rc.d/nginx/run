@@ -1,6 +1,6 @@
 #!/usr/bin/with-contenv bashio
 
-#INGRESS_PATH="$(bashio::app.ingress_entry)"
+set -e
 ssl=$(bashio::config 'ssl')
 certfile=$(bashio::config 'certfile')
 keyfile=$(bashio::config 'keyfile')
@@ -17,5 +17,7 @@ else
     echo "ssl disable."
     #cp /config.yml /root/.stash/config.yml
 fi
-nginx -g "daemon off;error_log /dev/stdout debug;" & java -Dspring.profiles.include=docker --enable-native-access=ALL-UNNAMED -jar application.jar --spring.config.additional-location=file:/config/
 
+bashio::log.info "Running nginx..."
+
+exec nginx -g "daemon off;error_log /dev/stdout debug;"
