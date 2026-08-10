@@ -245,7 +245,7 @@ def run_ssl():
 
 
 
-    server = WSGIServer((host, 5001), app, handler_class=WebSocketHandler, certfile='/ssl/'+sys.argv[3], keyfile='/ssl/'+sys.argv[4])
+    server = WSGIServer((host, 5001), app, handler_class=WebSocketHandler, certfile='/ssl/'+os.environ.get('certfile'), keyfile='/ssl/'+os.environ.get('keyfile'))
         
     wrap_socket = server.wrap_socket
     wrap_socket_and_handle = server.wrap_socket_and_handle

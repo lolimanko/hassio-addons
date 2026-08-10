@@ -156,7 +156,7 @@ def __init_settings():
                 'mobile_ads_time': 25,
                 'use_dashboard': True,
                 'dashboard': {
-                    'host': '127.0.0.1',
+                    'host': '0.0.0.0',
                     'port': 5000,
                     'SSL': False,
                     'BasicAuth': False,

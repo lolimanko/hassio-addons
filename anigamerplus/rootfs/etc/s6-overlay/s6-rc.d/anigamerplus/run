@@ -3,11 +3,11 @@ cookie=$(bashio::config 'cookie')
 
 cookie_overwrite=$(bashio::config 'cookie_overwrite')
 
-ssl=$(bashio::config 'ssl')
+export ssl=$(bashio::config 'ssl')
 
-certfile=$(bashio::config 'certfile')
+export certfile=$(bashio::config 'certfile')
 
-keyfile=$(bashio::config 'keyfile')
+export keyfile=$(bashio::config 'keyfile')
 
 if [ -f "/config/cookie.txt" ]; then
     
@@ -22,4 +22,5 @@ else
     echo "cookie create."
 fi
 
-exec python3 -u aniGamerPlus.py --bashio $ssl $certfile $keyfile
+#exec python3 -u /aniGamerPlus.py --bashio $ssl $certfile $keyfile
+exec python3 -u /aniGamerPlus.py
