@@ -1,0 +1,31 @@
+#!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+
+if [ -f "/root/.stash/config.yml" ]; then
+    
+    echo "config.yml exist."
+
+else
+    echo "config.yml not exist."
+    cp /config.yml /root/.stash/config.yml
+    echo 'jwt_secret_key: '$(openssl rand -hex 32) >> '/root/.stash/config.yml'
+    echo 'session_store_key: '$(openssl rand -hex 32) >> '/root/.stash/config.yml'
+fi
+
+
+if [ ! -d /root/.stash/generated ]; then
+  mkdir /root/.stash/generated
+  echo "generated folder created"
+fi
+if [ ! -d /root/.stash/cache ]; then
+  mkdir /root/.stash/cache
+  echo "cache folder created"
+fi
+if [ ! -d /root/.stash/blobs ]; then
+  mkdir /root/.stash/blobs
+  echo "blobs folder created"
+fi
+
+exec stash
+
+

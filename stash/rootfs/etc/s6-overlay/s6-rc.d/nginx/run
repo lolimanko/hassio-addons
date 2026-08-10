@@ -1,0 +1,36 @@
+#!/command/with-contenv bashio
+# vim: ft=bash
+# shellcheck shell=bash
+# ==============================================================================
+# Start nginx service
+# ==============================================================================
+
+set -e
+
+INGRESS_PATH="$(bashio::app.ingress_entry)"
+ingress_url="$(bashio::app.ingress_url)"
+ssl=$(bashio::config 'ssl')
+
+certfile=$(bashio::config 'certfile')
+
+keyfile=$(bashio::config 'keyfile')
+ingress_port=$(bashio::app.ingress_port)
+ingress_interface=$(bashio::app.ip_address)
+sed -i "s/%%port%%/${ingress_port}/g" /etc/nginx/http.d/ingress.conf
+sed -i "s/%%interface%%/${ingress_interface}/g" /etc/nginx/http.d/ingress.conf
+if [ "$ssl" = "true" ]; then
+    
+    echo "ssl enable."
+    cp /ssl.conf /etc/nginx/http.d/ssl.conf
+    sed -i "s/%%certfile%%/${certfile}/g" /etc/nginx/http.d/ssl.conf
+    sed -i "s/%%keyfile%%/${keyfile}/g" /etc/nginx/http.d/ssl.conf
+else
+    echo "ssl disable."
+    #cp /config.yml /root/.stash/config.yml
+fi
+# start server
+bashio::log.info "Running nginx..."
+
+#exec nginx -g 'daemon off;'
+#exec nginx
+exec nginx -g "daemon off;error_log /dev/stdout debug;"
