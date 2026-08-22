@@ -226,10 +226,11 @@ def run():
     port = settings['dashboard']['port']
     host = settings['dashboard']['host']
 
-
     server = WSGIServer((host, 5000), app, handler_class=WebSocketHandler)
 
     server.serve_forever()
+
+
 def run_ssl():
     settings = Config.read_settings()  # 读取配置
 
@@ -243,35 +244,33 @@ def run_ssl():
     port = settings['dashboard']['port']
     host = settings['dashboard']['host']
 
+    server = WSGIServer(
+        (host, 5001),
+        app,
+        handler_class=WebSocketHandler,
+        certfile='/ssl/' + os.environ.get('certfile'),
+        keyfile='/ssl/' + os.environ.get('keyfile')
+    )
 
-
-    server = WSGIServer((host, 5001), app, handler_class=WebSocketHandler, certfile='/ssl/'+os.environ.get('certfile'), keyfile='/ssl/'+os.environ.get('keyfile'))
-        
     wrap_socket = server.wrap_socket
     wrap_socket_and_handle = server.wrap_socket_and_handle
 
-        # 处理一些浏览器(比如Chrome)尝试 SSL v3 访问时报错
+    # 处理一些浏览器(比如Chrome)尝试 SSL v3 访问时报错
     def my_wrap_socket(sock, **_kwargs):
         try:
-                # print('my_wrap_socket')
             return wrap_socket(sock, **_kwargs)
         except ssl.SSLError:
-                # print('my_wrap_socket ssl.SSLError')
             pass
 
-        # 此方法依赖上面的返回值, 因此当尝试访问 SSL v3 时, 这个也会出错
+    # 此方法依赖上面的返回值, 因此当尝试访问 SSL v3 时, 这个也会出错
     def my_wrap_socket_and_handle(client_socket, address):
         try:
-                # print('my_wrap_socket_and_handle')
             return wrap_socket_and_handle(client_socket, address)
         except AttributeError:
-                # print('my_wrap_socket_and_handle AttributeError')
             pass
 
     server.wrap_socket = my_wrap_socket
     server.wrap_socket_and_handle = my_wrap_socket_and_handle
-
-    
 
     server.serve_forever()
 

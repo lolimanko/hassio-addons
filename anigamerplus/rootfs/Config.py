@@ -22,7 +22,7 @@ config_path = '/config/config.json'
 sn_list_path = '/config/sn_list.txt'
 cookie_path = '/config/cookie.txt'
 logs_dir = '/config/logs'
-aniGamerPlus_version = 'v25.1'
+aniGamerPlus_version = 'v25.2'
 latest_config_version = 18.0
 latest_database_version = 2.0
 cookie = None
@@ -559,8 +559,7 @@ def read_settings(config='') -> dict:
         settings['bangumi_dir'] = os.path.abspath(settings['bangumi_dir'])
     else:
         # 如果用户没有有自定番剧目录或目录不存在，则保存在本地 bangumi 目录
-        #settings['bangumi_dir'] = os.path.join(working_dir, 'bangumi')
-        settings['bangumi_dir'] =  '/media/bangumi'
+        settings['bangumi_dir'] = '/media/bangumi'
 
     # 如果用户自定了缓存目录且存在
     if settings['temp_dir'] and os.path.exists(settings['temp_dir']):
@@ -568,7 +567,6 @@ def read_settings(config='') -> dict:
         settings['temp_dir'] = os.path.abspath(settings['temp_dir'])
     else:
         # 如果用户没有有自定缓存目录或目录不存在，则保存在本地 temp 目录
-        #settings['temp_dir'] = os.path.join(working_dir, 'temp')
         settings['temp_dir'] = '/media/temp'
 
     settings['working_dir'] = working_dir

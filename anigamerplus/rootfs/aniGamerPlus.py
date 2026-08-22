@@ -824,24 +824,27 @@ def run_dashboard():
     if not port_is_available(settings['dashboard']['port']):
         err_print(0, 'Web控制面板啓動失敗', 'Port已被占用! 請到配置文件更換', status=1, no_sn=True)
         return
-    #dashboard_address = ''
+
     if settings['dashboard']['host'] == '0.0.0.0':
         host = Config.get_local_ip()
     else:
         host = settings['dashboard']['host']
+
     from Dashboard.Server import run as dashboard
-    
+
     server = threading.Thread(target=dashboard)
     server.daemon = True
     server.start()
+
     err_print(0, 'Web控制面板已啓動', no_sn=True, status=2)
 
-    #if settings['dashboard']['SSL']:
-    if os.environ.get('ssl') == 'true' :    
+    if os.environ.get('ssl') == 'true':
         from Dashboard.Server import run_ssl as dashboard_SSL
+
         Server_SSL = threading.Thread(target=dashboard_SSL)
         Server_SSL.daemon = True
         Server_SSL.start()
+
         err_print(0, 'SSL Web控制面板已啓動', no_sn=True, status=2)
 
 
@@ -885,9 +888,6 @@ if __name__ == '__main__':
     conn.close()
 
     if len(sys.argv) > 1:  # 支持命令行使用
-    #if sys.argv[1] == '--bashio':  
-    #    err_print(0,'bashio輸入模式', '', no_sn=True, display_time=False, status=2)
-    #elif len(sys.argv) > 1 :
         parser = argparse.ArgumentParser()
         parser.add_argument('--sn', '-s', type=int, help='視頻sn碼(數字)')
         parser.add_argument('--resolution', '-r', type=int, help='指定下載清晰度(數字)', choices=[360, 480, 540, 576, 720, 1080])
