@@ -1076,7 +1076,7 @@ class Anime:
             client.username_pw_set(os.environ.get('MQTT_USER'),os.environ.get('MQTT_PASSWORD'))
             client.connect(os.environ.get('MQTT_HOST'), 1883)
             message = {"title": "【aniGamerPlus消息】","message": '《' + self._video_filename + '》下載完成，本集 ' + str(self.video_size) + ' MB'}
-            client.publish("home/python/notify",json.dumps(message, ensure_ascii=False))
+            client.publish("home/anigamerplus/notify",json.dumps(message, ensure_ascii=False))
             client.disconnect()
 
         # plex 自動更新媒體庫
