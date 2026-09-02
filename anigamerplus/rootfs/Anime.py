@@ -16,7 +16,8 @@ from ftplib import FTP, FTP_TLS
 import socket
 import threading
 from urllib.parse import quote
-
+import json
+import paho.mqtt.client as mqtt
 
 class TryTooManyTimeError(BaseException):
     pass
@@ -1070,6 +1071,13 @@ class Anime:
                     err_print(self._sn, 'discord NOTIFY ERROR', "Exception: Send msg error\nReq: " + r.text, status=1)
             except:
                 err_print(self._sn, 'Discord NOTIFY UNKNOWN ERROR', 'Exception: ' + str(e), status=1)
+        if os.environ.get('mqtt') == 'true' :
+            client = mqtt.Client()
+            client.username_pw_set(os.environ.get('MQTT_USER'),os.environ.get('MQTT_PASSWORD'))
+            client.connect(os.environ.get('MQTT_HOST'), 1883)
+            message = {"title": "【aniGamerPlus消息】","message": '《' + self._video_filename + '》下載完成，本集 ' + str(self.video_size) + ' MB'}
+            client.publish("home/python/notify",json.dumps(message, ensure_ascii=False))
+            client.disconnect()
 
         # plex 自動更新媒體庫
         if self._settings['plex_refresh']:

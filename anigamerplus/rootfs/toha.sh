@@ -143,3 +143,78 @@ text = text[:start] + new + text[end:]
 path.write_text(text)
 print(f"已修改: {path}")
 PY
+
+python3 <<'PY'
+from pathlib import Path
+
+path = Path("Anime.py")
+text = path.read_text()
+
+old = """            except:
+                err_print(self._sn, 'Discord NOTIFY UNKNOWN ERROR', 'Exception: ' + str(e), status=1)
+
+        # plex 自動更新媒體庫
+        if self._settings['plex_refresh']:
+"""
+
+new = """            except:
+                err_print(self._sn, 'Discord NOTIFY UNKNOWN ERROR', 'Exception: ' + str(e), status=1)
+
+        if os.environ.get('mqtt') == 'true':
+            client = mqtt.Client()
+            client.username_pw_set(
+                os.environ.get('MQTT_USER'),
+                os.environ.get('MQTT_PASSWORD')
+            )
+            client.connect(os.environ.get('MQTT_HOST'), 1883)
+
+            message = {
+                "title": "【aniGamerPlus消息】",
+                "message": '《' + self._video_filename + '》下載完成，本集 ' + str(self.video_size) + ' MB'
+            }
+
+            client.publish(
+                "home/python/notify",
+                json.dumps(message, ensure_ascii=False)
+            )
+            client.disconnect()
+
+        # plex 自動更新媒體庫
+        if self._settings['plex_refresh']:
+"""
+
+if old not in text:
+    raise SystemExit(f"找不到指定內容，未修改: {path}")
+
+path.write_text(text.replace(old, new, 1))
+print(f"已修改: {path}")
+PY
+
+python3 <<'PY'
+from pathlib import Path
+
+path = Path("Anime.py")
+text = path.read_text()
+
+old = """from urllib.parse import quote
+
+
+class TryTooManyTimeError(BaseException):
+    pass
+"""
+
+new = """from urllib.parse import quote
+import json
+import paho.mqtt.client as mqtt
+
+
+class TryTooManyTimeError(BaseException):
+    pass
+"""
+
+if old not in text:
+    raise SystemExit("找不到目標內容，aniGamerPlus.py 未修改")
+
+path.write_text(text.replace(old, new, 1))
+print(f"已修改: {path}")
+PY

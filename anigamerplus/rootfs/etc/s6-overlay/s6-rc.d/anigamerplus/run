@@ -3,10 +3,12 @@ cookie=$(bashio::config 'cookie')
 
 cookie_overwrite=$(bashio::config 'cookie_overwrite')
 
-export ssl=$(bashio::config 'ssl')
-
+export ssl=$(bashio::config 'SSL')
+export mqtt=$(bashio::config 'MQTT')
+export MQTT_HOST=$(bashio::services mqtt "host")
+export MQTT_USER=$(bashio::services mqtt "username")
+export MQTT_PASSWORD=$(bashio::services mqtt "password")
 export certfile=$(bashio::config 'certfile')
-
 export keyfile=$(bashio::config 'keyfile')
 
 if [ -f "/config/cookie.txt" ]; then
@@ -22,5 +24,4 @@ else
     echo "cookie create."
 fi
 
-#exec python3 -u /aniGamerPlus.py --bashio $ssl $certfile $keyfile
 exec python3 -u /aniGamerPlus.py

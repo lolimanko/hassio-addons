@@ -1,5 +1,5 @@
 name: "aniGamerPlus"
-version: 25.2
+version: 25.2.5
 slug: "anigamerplus"
 description: "巴哈姆特動畫瘋自動下載工具"
 url: "https://github.com/lolimanko/hassio-addons/tree/master/anigamerplus"
@@ -23,20 +23,25 @@ map:
     read_only: false
   - type: ssl
     read_only: false
-image: "ghcr.io/lolimanko/{arch}-anigamerplus" 
+#image: "ghcr.io/lolimanko/{arch}-anigamerplus" 
 ingress: true 
 ingress_port: 5000
 ingress_stream: true
 panel_icon: mdi:television
+hassio_api: true
+services:
+  - mqtt:want
 options:
   cookie: 
   cookie_overwrite: false
-  ssl: false
+  SSL: false
   certfile: fullchain.pem
   keyfile: privkey.pem
+  MQTT: false
 schema:
   cookie: str
   cookie_overwrite: bool
-  ssl: bool
+  SSL: bool
   certfile: str
   keyfile: str
+  MQTT: bool
