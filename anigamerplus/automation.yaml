@@ -1,0 +1,14 @@
+alias: 'anigamerplus '
+description: ''
+triggers:
+  - trigger: mqtt
+    options:
+      topic: home/anigamerplus/notify
+conditions: []
+actions:
+  - action: notify.mobile_iphone99
+    metadata: {}
+    data:
+      message: '{{ trigger.payload_json.message }}'
+      title: '{{ trigger.payload_json.title }}'
+mode: single
