@@ -18,3 +18,6 @@ config.json  aniGamer.db  cookie.txt  logs 位置在 /addon_configs/fdd0cf77_ani
 
 cookie、UA 獲取方法，config.json配置文件說明在 [原作者頁面](https://github.com/miyouzi/aniGamerPlus)
 
+MQTT 功能需安裝[Mosquitto broker](https://github.com/home-assistant/addons/tree/master/mosquitto)
+完成下載可送出MQTT訊息
+自動化範本為automation.yaml
