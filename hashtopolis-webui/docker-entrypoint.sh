@@ -1,10 +1,6 @@
-#!/usr/bin/env bashio
+#!/bin/bash
 
 set -e
-HASHTOPOLIS_CUSTOM_THEMES_DIR="docker/empty-custom-themes"
-export HASHTOPOLIS_BACKEND_URL=$(bashio::config 'hashtopolis_backend_url')
-
-
 
 environment=${1:-"production"}
 
@@ -18,13 +14,6 @@ function update_app_config {
   fi
 
   echo "Done configuring up Hashtopolis frontend (env=$environment) at $app_cfg_base/assets/config.json"
-  
-  if [ -f "/etc/nginx/conf.d/ssl.conf" ]; then
-   
-    echo "File SSL exists and is a regular file."
-  else
-    echo "File SSL does not exist or is not a regular file."
-  fi
 }
 
 function sync_custom_themes {
@@ -130,12 +119,6 @@ if [ "$environment" = "development" ]; then
   npm start
 else
   # Prepare configuration
-
-  ssl=$(bashio::config 'SSL')
-  if [  "$ssl" = "false"   ]; then
-    echo "ssl false"
-    rm /etc/nginx/conf.d/ssl.conf
-  fi
   update_app_config "/usr/share/nginx/html"
   sync_custom_themes "/usr/share/nginx/html"
 
