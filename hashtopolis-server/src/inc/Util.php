@@ -1,0 +1,1759 @@
+<?php
+
+namespace Hashtopolis\inc;
+
+use Exception;
+use Hashtopolis\dba\AbstractModelFactory;
+use Hashtopolis\dba\Aggregation;
+use Hashtopolis\dba\AbstractModel;
+use Hashtopolis\dba\models\AccessGroup;
+use Hashtopolis\dba\models\AccessGroupUser;
+use Hashtopolis\dba\models\AgentZap;
+use Hashtopolis\dba\models\Assignment;
+use Hashtopolis\dba\models\Chunk;
+use Hashtopolis\dba\ContainFilter;
+use Hashtopolis\dba\models\CrackerBinary;
+use Hashtopolis\dba\models\File;
+use Hashtopolis\dba\models\FileTask;
+use Hashtopolis\dba\models\Hash;
+use Hashtopolis\dba\models\Hashlist;
+use Hashtopolis\dba\models\HashlistHashlist;
+use Hashtopolis\dba\JoinFilter;
+use Hashtopolis\dba\models\LogEntry;
+use Hashtopolis\dba\OrderFilter;
+use Hashtopolis\dba\QueryFilter;
+use Hashtopolis\dba\models\StoredValue;
+use Hashtopolis\dba\models\Task;
+use Hashtopolis\dba\models\TaskWrapper;
+use Hashtopolis\dba\models\Zap;
+use Hashtopolis\dba\models\AgentBinary;
+use Hashtopolis\dba\models\AgentStat;
+use Hashtopolis\dba\models\FileDelete;
+use Hashtopolis\dba\Factory;
+use Hashtopolis\dba\UpdateSet;
+use Hashtopolis\dba\models\Speed;
+use Composer\Semver\Comparator;
+use Hashtopolis\inc\defines\DCleaning;
+use Hashtopolis\inc\defines\DConfig;
+use Hashtopolis\inc\defines\DDeviceCompress;
+use Hashtopolis\inc\defines\DDirectories;
+use Hashtopolis\inc\defines\DFileType;
+use Hashtopolis\inc\defines\DHashlistFormat;
+use Hashtopolis\inc\defines\DLogEntry;
+use Hashtopolis\inc\defines\DLogEntryIssuer;
+use Hashtopolis\inc\defines\DNotificationType;
+use Hashtopolis\inc\defines\DOperatingSystem;
+use Hashtopolis\inc\defines\DPayloadKeys;
+use Hashtopolis\inc\defines\DPrince;
+use Hashtopolis\inc\defines\DTaskTypes;
+use Hashtopolis\inc\handlers\NotificationHandler;
+use Hashtopolis\inc\utils\AccessUtils;
+use PDO;
+use Random\RandomException;
+use SplFileObject;
+
+/**
+ *
+ * @author Sein
+ *
+ *         Bunch of useful static functions.
+ */
+class Util {
+  /**
+   * Determines the file extension of the given file name (based on the last dot).
+   * Returns an empty string if no extension was found.
+   *
+   * @param string $filename
+   * @return string
+   */
+  public static function extractFileExtension(string $filename): string {
+    $split = explode(".", $filename);
+    if (sizeof($split) == 1) {
+      return "";
+    }
+    return $split[sizeof($split) - 1];
+  }
+  
+  /**
+   * Downloads the data at the given url and saves it at the specified destination.
+   * It will overwrite files if they already exist.
+   *
+   * @param string $url
+   * @param string $dest
+   * @throws HTException
+   */
+  public static function downloadFromUrl(string $url, string $dest): void {
+    $furl = fopen($url, "rb");
+    if (!$furl) {
+      throw new HTException("Failed to open URL!");
+    }
+    $fileLocation = fopen($dest, "w");
+    if (!$fileLocation) {
+      throw new HTException("Failed to open destination file!");
+    }
+    $buffersize = 131072;
+    while (!feof($furl)) {
+      if (!$data = fread($furl, $buffersize)) {
+        throw new HTException("Data reading error!");
+      }
+      fwrite($fileLocation, $data);
+    }
+    fclose($fileLocation);
+    fclose($furl);
+  }
+  
+  /**
+   * Loads the last speed data on a specific task. Either for the full task, or a specific agent.
+   * The data is provided as an associative array with the timestamps as keys.
+   *
+   * @param int $taskId
+   * @param int $limit
+   * @param int $agentId corresponding agent to show data from, 0 to sum up from all agents on this task
+   * @param int $delta time distance between the data points
+   * @return int[]
+   * @throws Exception
+   */
+  public static function getSpeedDataSet(int $taskId, int $limit = 50, int $agentId = 0, int $delta = 10): array {
+    // if agentId is 0 we need to find out how many agents there are to find how many entries we would need max
+    $requestLimit = $limit * $delta / 5;
+    if ($agentId == 0) { // This might be to rewritten, it's just an estimation how to calculate an ideal number of entries to be requested
+      // we cannot request all entries here as this number might grow quite quickly over time
+      $qF = new QueryFilter(Assignment::TASK_ID, $taskId, "=");
+      $agentCount = Factory::getAssignmentFactory()->countFilter([Factory::FILTER => $qF]) + 1;
+      $requestLimit = $agentCount * $limit * $delta / 5;
+    }
+    
+    $qF1 = new QueryFilter(Speed::TASK_ID, $taskId, "=");
+    $oF = new OrderFilter(Speed::SPEED_ID, "DESC LIMIT $requestLimit");
+    if ($agentId > 0) {
+      $qF2 = new QueryFilter(Speed::AGENT_ID, $agentId, "=");
+      $entries = Factory::getSpeedFactory()->filter([Factory::FILTER => [$qF1, $qF2], Factory::ORDER => $oF]);
+    }
+    else {
+      $entries = Factory::getSpeedFactory()->filter([Factory::FILTER => $qF1, Factory::ORDER => $oF]);
+    }
+    
+    if (sizeof($entries) == 0) {
+      return [];
+    }
+    
+    $data = [];
+    $used = [];
+    for ($i = 0; $i < $limit; $i++) {
+      $data[$i] = 0;
+      $used[$i] = [];
+    }
+    
+    $first = $entries[0]->getTime();
+    foreach ($entries as $entry) {
+      $pos = intval($limit - 1 - floor(($first - $entry->getTime()) / $delta));
+      if ($pos < 0) {
+        continue; // too old entry
+      }
+      else if (in_array($entry->getAgentId(), $used[$pos])) {
+        continue; // if we already have a newer entry in this range, we ignore it
+      }
+      $data[$pos] += $entry->getSpeed();
+      $used[$pos][] = $entry->getAgentId();
+    }
+    
+    // prepare with timestamps
+    $first = intval(round($first, -log10($delta)));
+    $timestampData = [];
+    foreach ($data as $key => $val) {
+      $timestampData[$first - ($limit - 1 - $key) * $delta] = $val;
+    }
+    return $timestampData;
+  }
+  
+  /**
+   * Get the hashtype name by its ID
+   *
+   * @param int $hashtypeId
+   * @return string
+   * @throws Exception
+   */
+  public static function getHashtypeById(int $hashtypeId): string {
+    $hashtype = Factory::getHashTypeFactory()->get($hashtypeId);
+    if ($hashtype == null) {
+      return "N/A";
+    }
+    return $hashtype->getDescription();
+  }
+  
+  /**
+   * Get the commit hash and branch (if available) of the Hashtopolis server.
+   *
+   * @param bool $hashOnly
+   * @return string
+   */
+  public static function getGitCommit(bool $hashOnly = false): string {
+    $gitcommit = "";
+    $gitfolder = dirname(__FILE__) . "/../../.git";
+    if (file_exists($gitfolder) && is_dir($gitfolder)) {
+      $head = file_get_contents($gitfolder . "/HEAD");
+      $branch = trim(substr($head, strlen("ref: refs/heads/"), -1));
+      if (file_exists($gitfolder . "/refs/heads/" . $branch)) {
+        $commit = trim(file_get_contents($gitfolder . "/refs/heads/" . $branch));
+        if ($hashOnly) {
+          return $commit;
+        }
+        $gitcommit = "commit " . substr($commit, 0, 7) . " branch $branch";
+      }
+      else {
+        $commit = $head;
+        if ($hashOnly) {
+          return $commit;
+        }
+        $gitcommit = "commit " . substr($commit, 0, 7);
+      }
+    }
+    return $gitcommit;
+  }
+  
+  /**
+   * function to check agent version for older update scripts, that still has
+   * the 'type' field in AgentBinary instead of 'binaryType'
+   * @throws Exception
+   */
+  public static function checkAgentVersionLegacy($type, $version, $silent = false): void {
+    $agentBinaryFactory = Factory::getAgentBinaryFactory();
+    $dict = $agentBinaryFactory->getNullObject()->getKeyValueDict();
+    unset($dict["binaryType"]);
+    $dict["type"] = null;
+    $keys = array_keys($dict);
+    
+    $query = "SELECT " . implode(", ", $keys) . " FROM " . $agentBinaryFactory->getModelTable();
+    $query .= " WHERE type=?";
+    $dbh = $agentBinaryFactory->getDB();
+    $stmt = $dbh->prepare($query);
+    $vals = [$type];
+    $stmt->execute($vals);
+    
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($row != null) {
+      $row["binaryType"] = $row["type"];
+      $binary = $agentBinaryFactory->createObjectFromDict($row);
+      
+      if (Comparator::lessThan($binary->getVersion(), $version)) {
+        if (!$silent) {
+          echo "update $type version... ";
+        }
+        
+        $query = "UPDATE " . $agentBinaryFactory->getModelTable() . " SET " . AgentBinary::VERSION . "=?";
+        
+        $values = [];
+        $query = $query . " WHERE " . $binary->getPrimaryKey() . "=?";
+        $values[] = $version;
+        $values[] = $binary->getPrimaryKeyValue();
+        
+        $stmt = $dbh->prepare($query);
+        $stmt->execute($values);
+        if (!$silent) {
+          echo "OK";
+        }
+      }
+    }
+  }
+  
+  /**
+   * @param string $type
+   * @param string $version
+   * @param bool $silent
+   * @throws Exception
+   */
+  public static function checkAgentVersion(string $type, string $version, bool $silent = false): void {
+    $qF = new QueryFilter(AgentBinary::BINARY_TYPE, $type, "=");
+    $binary = Factory::getAgentBinaryFactory()->filter([Factory::FILTER => $qF], true);
+    if ($binary != null) {
+      if (Comparator::lessThan($binary->getVersion(), $version)) {
+        if (!$silent) {
+          echo "update $type version... ";
+        }
+        Factory::getAgentBinaryFactory()->set($binary, AgentBinary::VERSION, $version);
+        if (!$silent) {
+          echo "OK";
+        }
+      }
+    }
+  }
+  
+  /**
+   * @param $issuer string API or User
+   * @param $issuerId string either the ID of the user or the token of the client
+   * @param $level string
+   * @param $message string
+   * @throws Exception
+   */
+  public static function createLogEntry(string $issuer, string $issuerId, string $level, string $message): void {
+    $count = Factory::getLogEntryFactory()->countFilter(array());
+    if ($count > SConfig::getInstance()->getVal(DConfig::NUMBER_LOGENTRIES) * 1.2) {
+      // if we have exceeded the log entry limit by 20%, delete the oldest ones
+      $toDelete = floor(SConfig::getInstance()->getVal(DConfig::NUMBER_LOGENTRIES) * 0.2);
+      $oF = new OrderFilter(LogEntry::TIME, "ASC LIMIT $toDelete");
+      Factory::getLogEntryFactory()->massDeletion([Factory::ORDER => $oF]);
+    }
+    
+    $entry = new LogEntry(null, $issuer, $issuerId, $level, $message, time());
+    Factory::getLogEntryFactory()->save($entry);
+    
+    switch ($level) {
+      case DLogEntry::ERROR:
+        NotificationHandler::checkNotifications(DNotificationType::LOG_ERROR, new DataSet(array(DPayloadKeys::LOG_ENTRY => $entry)));
+        break;
+      case DLogEntry::FATAL:
+        NotificationHandler::checkNotifications(DNotificationType::LOG_FATAL, new DataSet(array(DPayloadKeys::LOG_ENTRY => $entry)));
+        break;
+      case DLogEntry::WARN:
+        NotificationHandler::checkNotifications(DNotificationType::LOG_WARN, new DataSet(array(DPayloadKeys::LOG_ENTRY => $entry)));
+        break;
+    }
+  }
+  
+  /**
+   * Scan the report template directory for templates. If no type is specified it will return all found.
+   *
+   * @param string $type
+   * @param bool $pretty
+   * @return string[] found report template file names
+   */
+  public static function scanReportDirectory(string $type = "", bool $pretty = false): array {
+    $directory = dirname(__FILE__) . "/../templates/report/";
+    if (file_exists($directory) && is_dir($directory)) {
+      $reportDir = opendir($directory);
+      $reports = array();
+      while ($file = readdir($reportDir)) {
+        if ($file[0] != '.' && $file != "." && $file != ".." && !is_dir($file) && str_contains($file, ".tex")) {
+          if (strlen($type) > 0 && !str_starts_with($file, $type . "-")) {
+            continue;
+          }
+          if ($pretty) {
+            $reports[] = ucfirst(substr(str_replace(".template.tex", "", $file), strlen($type) + 1));
+          }
+          else {
+            $reports[] = $file;
+          }
+        }
+      }
+      return $reports;
+    }
+    return [];
+  }
+  
+  /**
+   * Escapes special chars before they can be entered into the report template to avoid mess-up with latex
+   *
+   * @param string $string
+   * @return string
+   * @deprecated
+   */
+  public static function texEscape(string $string): string {
+    $output = "";
+    for ($i = 0; $i < strlen($string); $i++) {
+      if ($string[$i] == '#') {
+        $output .= "\\#";
+      }
+      else if ($string[$i] == '\\') {
+        $output .= "\\textbackslash";
+      }
+      else if ($string[$i] == '_') {
+        $output .= "\\_";
+      }
+      else {
+        $output .= $string[$i];
+      }
+    }
+    return $output;
+  }
+  
+  /**
+   * Scans the import-directory for files. Directories are ignored.
+   * @return array of all files in the top-level directory /../import
+   * @throws Exception
+   */
+  public static function scanImportDirectory(): array {
+    $directory = Factory::getStoredValueFactory()->get(DDirectories::IMPORT)->getVal() . "/";
+    if (file_exists($directory) && is_dir($directory)) {
+      $importDirectory = opendir($directory);
+      $importFiles = array();
+      while ($file = readdir($importDirectory)) {
+        if ($file[0] != '.' && $file != "." && $file != ".." && !is_dir($file)) {
+          $importFiles[] = new DataSet(array("file" => $file, "size" => Util::filesize($directory . "/" . $file)));
+        }
+      }
+      sort($importFiles);
+      return $importFiles;
+    }
+    return array();
+  }
+  
+  /**
+   * Calculates variable. Used in Templates.
+   * @param $in mixed calculation to be done
+   * @return mixed
+   */
+  public static function calculate(mixed $in): mixed {
+    return $in;
+  }
+  
+  /**
+   * Saves a file into the DB using the FileFactory.
+   * @param $path string
+   * @param $name string
+   * @param $type string
+   * @param $accessGroupId int
+   * @return bool true if the save of the file model succeeded
+   * @throws Exception
+   */
+  public static function insertFile(string $path, string $name, string $type, int $accessGroupId): bool {
+    $fileType = DFileType::OTHER;
+    if ($type == 'rule') {
+      $fileType = DFileType::RULE;
+    }
+    else if ($type == 'dict') {
+      $fileType = DFileType::WORDLIST;
+    }
+    
+    // check if there is an old deletion request for the same filename
+    $qF = new QueryFilter(FileDelete::FILENAME, $name, "=");
+    Factory::getFileDeleteFactory()->massDeletion([Factory::FILTER => $qF]);
+    if ($fileType == DFileType::RULE) {
+      $file = new File(null, $name, Util::filesize($path), 1, $fileType, $accessGroupId, Util::rulefileLineCount($path));
+    }
+    else {
+      $file = new File(null, $name, Util::filesize($path), 1, $fileType, $accessGroupId, Util::fileLineCount($path));
+    }
+    $file = Factory::getFileFactory()->save($file);
+    if ($file == null) {
+      return false;
+    }
+    return true;
+  }
+  
+  /**
+   * @param $task Task
+   * @return array
+   * @throws Exception
+   */
+  public static function getTaskInfo(Task $task): array {
+    $qF1 = new QueryFilter(Chunk::TASK_ID, $task->getId(), "=");
+    
+    $agg1 = new Aggregation(Chunk::CHECKPOINT, Aggregation::SUM);
+    $agg2 = new Aggregation(Chunk::SKIP, Aggregation::SUM);
+    $agg3 = new Aggregation(Chunk::CRACKED, Aggregation::SUM);
+    $agg4 = new Aggregation(Chunk::SPEED, Aggregation::SUM);
+    $agg5 = new Aggregation(Chunk::DISPATCH_TIME, Aggregation::MAX);
+    $agg6 = new Aggregation(Chunk::SOLVE_TIME, Aggregation::MAX);
+    $agg7 = new Aggregation(Chunk::CHUNK_ID, Aggregation::COUNT);
+    $agg8 = new Aggregation(Chunk::SOLVE_TIME, Aggregation::SUM);
+    $agg9 = new Aggregation(Chunk::DISPATCH_TIME, Aggregation::SUM);
+    
+    $results = Factory::getChunkFactory()->multicolAggregationFilter([Factory::FILTER => $qF1], [$agg1, $agg2, $agg3, $agg4, $agg5, $agg6, $agg7, $agg8, $agg9]);
+    
+    $totalTimeSpent = $results[$agg8->getName()] - $results[$agg9->getName()];
+    
+    $progress = $results[$agg1->getName()] - $results[$agg2->getName()];
+    $cracked = $results[$agg3->getName()];
+    $speed = $results[$agg4->getName()];
+    $maxTime = max($results[$agg5->getName()], $results[$agg6->getName()]);
+    $numChunks = $results[$agg7->getName()];
+    
+    $isActive = false;
+    if (time() - $maxTime < SConfig::getInstance()->getVal(DConfig::CHUNK_TIMEOUT) && ($progress < $task->getKeyspace() || $task->getUsePreprocessor() && $task->getKeyspace() == DPrince::PRINCE_KEYSPACE)) {
+      $isActive = true;
+    }
+    return array($progress, $cracked, $isActive, $numChunks, ($totalTimeSpent > 0) ? round($cracked * 60 / $totalTimeSpent, 2) : 0, $speed);
+  }
+  
+  /**
+   * @param $task Task
+   * @param $accessGroups AccessGroup[]
+   * @return array
+   * @throws Exception
+   */
+  public static function getFileInfo(Task $task, array $accessGroups): array {
+    $qF = new QueryFilter(FileTask::TASK_ID, $task->getId(), "=", Factory::getFileTaskFactory());
+    $jF = new JoinFilter(Factory::getFileTaskFactory(), FileTask::FILE_ID, File::FILE_ID);
+    $joinedFiles = Factory::getFileFactory()->filter([Factory::FILTER => $qF, Factory::JOIN => $jF]);
+    /** @var File[] $files */
+    $files = $joinedFiles[Factory::getFileFactory()->getModelName()];
+    $sizeFiles = 0;
+    $fileSecret = false;
+    $noAccess = false;
+    foreach ($files as $file) {
+      if ($file->getIsSecret() == 1) {
+        $fileSecret = true;
+      }
+      if (!in_array($file->getAccessGroupId(), Util::arrayOfIds($accessGroups))) {
+        $noAccess = true;
+      }
+      $sizeFiles += $file->getSize();
+    }
+    return array(sizeof($files), $fileSecret, $sizeFiles, $files, $noAccess);
+  }
+  
+  /**
+   * @param $task Task
+   * @return array
+   * @throws Exception
+   */
+  public static function getChunkInfo(Task $task): array {
+    $qF = new QueryFilter(Chunk::TASK_ID, $task->getId(), "=");
+    $agg1 = new Aggregation(Chunk::CRACKED, "SUM");
+    $agg2 = new Aggregation(Chunk::CHUNK_ID, "COUNT");
+    $results = Factory::getChunkFactory()->multicolAggregationFilter([Factory::FILTER => $qF], [$agg1, $agg2]);
+    
+    $cracked = $results[$agg1->getName()];
+    $numChunks = $results[$agg2->getName()];
+    
+    $qF = new QueryFilter(Assignment::TASK_ID, $task->getId(), "=");
+    $numAssignments = Factory::getAssignmentFactory()->countFilter([Factory::FILTER => $qF]);
+    
+    return array($numChunks, $cracked, $numAssignments);
+  }
+  
+  /**
+   * @param $userId int
+   * @return array
+   * @throws Exception
+   */
+  public static function getAccessGroupIds(int $userId): array {
+    $qF = new QueryFilter(AccessGroupUser::USER_ID, $userId, "=", Factory::getAccessGroupUserFactory());
+    $jF = new JoinFilter(Factory::getAccessGroupUserFactory(), AccessGroup::ACCESS_GROUP_ID, AccessGroupUser::ACCESS_GROUP_ID);
+    $joined = Factory::getAccessGroupFactory()->filter([Factory::FILTER => $qF, Factory::JOIN => $jF]);
+    /** @var AccessGroup[] $accessGroups */
+    $accessGroups = $joined[Factory::getAccessGroupFactory()->getModelName()];
+    return Util::arrayOfIds($accessGroups);
+  }
+  
+  /**
+   * @param bool $archived
+   * @return void
+   * @throws Exception
+   */
+  public static function loadTasks(bool $archived = false): void {
+    $accessGroupIds = Util::getAccessGroupIds(Login::getInstance()->getUserID());
+    $accessGroups = AccessUtils::getAccessGroupsOfUser(Login::getInstance()->getUser());
+    
+    $qF1 = new ContainFilter(TaskWrapper::ACCESS_GROUP_ID, $accessGroupIds);
+    $qF2 = new QueryFilter(TaskWrapper::IS_ARCHIVED, ($archived) ? 1 : 0, "=");
+    $oF1 = new OrderFilter(TaskWrapper::PRIORITY, "DESC");
+    $oF2 = new OrderFilter(TaskWrapper::TASK_WRAPPER_ID, "DESC");
+    $taskWrappers = Factory::getTaskWrapperFactory()->filter([Factory::FILTER => [$qF1, $qF2], Factory::ORDER => [$oF1, $oF2]]);
+    
+    $taskList = array();
+    foreach ($taskWrappers as $taskWrapper) {
+      $set = new DataSet();
+      $set->addValue('taskType', $taskWrapper->getTaskType());
+      
+      $qF = new QueryFilter(Task::TASK_WRAPPER_ID, $taskWrapper->getId(), "=");
+      if ($taskWrapper->getTaskType() == DTaskTypes::SUPERTASK) {
+        // supertask
+        $set->addValue('supertaskName', $taskWrapper->getTaskWrapperName());
+        
+        $hashlist = Factory::getHashlistFactory()->get($taskWrapper->getHashlistId());
+        
+        $set->addValue('hashlistId', $hashlist->getId());
+        $set->addValue('taskWrapperId', $taskWrapper->getId());
+        $set->addValue('hashlistName', $hashlist->getHashlistName());
+        $set->addValue('hashlistSecret', $hashlist->getIsSecret());
+        $set->addValue('hashCount', $hashlist->getHashCount());
+        $set->addValue('hashlistCracked', $hashlist->getCracked());
+        $set->addValue('priority', $taskWrapper->getPriority());
+        $set->addValue('maxAgents', $taskWrapper->getMaxAgents());
+        $set->addValue('cracked', $taskWrapper->getCracked());
+        
+      }
+      else {
+        // normal task
+        $task = Factory::getTaskFactory()->filter([Factory::FILTER => $qF], true);
+        if ($task == null) {
+          Util::createLogEntry(DLogEntryIssuer::USER, Login::getInstance()->getUserID(), DLogEntry::WARN, "TaskWrapper (" . $taskWrapper->getId() . ") for normal task existing with containing no task!");
+          continue;
+        }
+        $taskInfo = Util::getTaskInfo($task);
+        $fileInfo = Util::getFileInfo($task, $accessGroups);
+        if ($fileInfo[4]) {
+          continue;
+        }
+        
+        $chunkInfo = Util::getChunkInfo($task);
+        $hashlist = Factory::getHashlistFactory()->get($taskWrapper->getHashlistId());
+        $set->addValue('taskId', $task->getId());
+        $set->addValue('color', $task->getColor());
+        $set->addValue('hasColor', !(($task->getColor() == null || strlen($task->getColor()) == 0)));
+        $set->addValue('attackCmd', $task->getAttackCmd());
+        $set->addValue('taskName', $task->getTaskName());
+        $set->addValue('isCpu', $task->getIsCpuTask());
+        $set->addValue('isSmall', $task->getIsSmall());
+        $set->addValue('hashlistId', $taskWrapper->getHashlistId());
+        $set->addValue('hashlistName', $hashlist->getHashlistName());
+        $set->addValue('hashCount', $hashlist->getHashCount());
+        $set->addValue('hashlistCracked', $hashlist->getCracked());
+        $set->addValue('chunkTime', $task->getChunkTime());
+        $set->addValue('isSecret', $hashlist->getIsSecret());
+        $set->addValue('usePreprocessor', $task->getUsePreprocessor());
+        $set->addValue('priority', $task->getPriority());
+        $set->addValue('maxAgents', $task->getMaxAgents());
+        $set->addValue('keyspace', $task->getKeyspace());
+        $set->addValue('isActive', $taskInfo[2]);
+        $set->addValue('sumProgress', $taskInfo[0]);
+        $set->addValue('numFiles', $fileInfo[0]);
+        $set->addValue('taskProgress', $task->getKeyspaceProgress());
+        $set->addValue('fileSecret', $fileInfo[1]);
+        $set->addValue('fileSizes', $fileInfo[2]);
+        $set->addValue('numAssignments', $chunkInfo[2]);
+        $set->addValue('crackedCount', $chunkInfo[1]);
+        $set->addValue('numChunks', $chunkInfo[0]);
+        $set->addValue('performance', $taskInfo[4]);
+        $set->addValue('speed', $taskInfo[5]);
+      }
+      $taskList[] = $set;
+    }
+    UI::add('taskList', $taskList);
+  }
+  
+  /**
+   * @param $taskWrapper TaskWrapper
+   * @return bool
+   * @throws Exception
+   */
+  public static function checkTaskWrapperCompleted(TaskWrapper $taskWrapper): bool {
+    $qF = new QueryFilter(Task::TASK_WRAPPER_ID, $taskWrapper->getId(), "=");
+    $tasks = Factory::getTaskFactory()->filter([Factory::FILTER => $qF]);
+    foreach ($tasks as $task) {
+      $qF = new QueryFilter(Chunk::TASK_ID, $task->getId(), "=");
+      $chunks = Factory::getChunkFactory()->filter([Factory::FILTER => $qF]);
+      $sumProg = 0;
+      foreach ($chunks as $chunk) {
+        if ($chunk->getProgress() < 10000) {
+          return false;
+        }
+        else {
+          $sumProg += $chunk->getLength();
+        }
+      }
+      if ($task->getKeyspace() == 0 || $sumProg < $task->getKeyspace()) {
+        return false;
+      }
+    }
+    return true;
+  }
+  
+  /**
+   * @throws Exception
+   */
+  public static function cleaning(): void {
+    $entry = Factory::getStoredValueFactory()->get(DCleaning::LAST_CLEANING);
+    if ($entry == null) {
+      $entry = new StoredValue(DCleaning::LAST_CLEANING, 0);
+      Factory::getStoredValueFactory()->save($entry);
+    }
+    $time = time();
+    if ($time - $entry->getVal() > 600) {
+      self::agentStatCleaning();
+      self::zapCleaning();
+      self::tusFileCleaning();
+      Factory::getStoredValueFactory()->set($entry, StoredValue::VAL, $time);
+    }
+  }
+  
+  /**
+   * Checks if it is longer than 10 mins since the last time it was checked if there are
+   * any old agent statistic entries which can be deleted. If necessary, check is executed
+   * and old entries are deleted.
+   * @throws Exception
+   */
+  public static function agentStatCleaning(): void {
+    $lifetime = intval(SConfig::getInstance()->getVal(DConfig::AGENT_DATA_LIFETIME));
+    if ($lifetime <= 0) {
+      $lifetime = 3600;
+    }
+    $qF = new QueryFilter(AgentStat::TIME, time() - $lifetime, "<=");
+    Factory::getAgentStatFactory()->massDeletion([Factory::FILTER => $qF]);
+    
+    $qF = new QueryFilter(Speed::TIME, time() - $lifetime, "<=");
+    Factory::getSpeedFactory()->massDeletion([Factory::FILTER => $qF]);
+    
+  }
+  
+  /**
+   * Used by the solver. Cleans the zap-queue
+   * @throws Exception
+   */
+  public static function zapCleaning(): void {
+    $zapFilter = new QueryFilter(Zap::SOLVE_TIME, time() - 600, "<=");
+    
+    // delete dependencies on AgentZap
+    $zaps = Factory::getZapFactory()->filter([Factory::FILTER => $zapFilter]);
+    $zapIds = Util::arrayOfIds($zaps);
+    $uS = new UpdateSet(AgentZap::LAST_ZAP_ID, null);
+    $qF = new ContainFilter(AgentZap::LAST_ZAP_ID, $zapIds);
+    Factory::getAgentZapFactory()->massUpdate([Factory::FILTER => $qF, Factory::UPDATE => $uS]);
+    
+    Factory::getZapFactory()->massDeletion([Factory::FILTER => $zapFilter]);
+  }
+  
+  /**
+   * Cleans up stale TUS upload files.
+   *
+   * This method scans the TUS metadata directory for .meta files, reads their
+   * metadata to determine upload expiration, and removes expired metadata files
+   * together with their corresponding upload (.part) files. It performs file
+   * system operations and may delete files on disk.
+   * @throws Exception
+   */
+  public static function tusFileCleaning(): void {
+    $tusDirectory = Factory::getStoredValueFactory()->get(DDirectories::TUS);
+    
+    if ($tusDirectory !== null) {
+      $tusDirectory = $tusDirectory->getVal();
+      $uploadDirectory = $tusDirectory . DIRECTORY_SEPARATOR . "uploads" . DIRECTORY_SEPARATOR;
+      $metaDirectory = $tusDirectory . DIRECTORY_SEPARATOR . "meta" . DIRECTORY_SEPARATOR;
+      $expiration_time = time() + 3600;
+      if (file_exists($metaDirectory) && is_dir($metaDirectory)) {
+        if ($metaDirectoryHandler = opendir($metaDirectory)) {
+          while ($file = readdir($metaDirectoryHandler)) {
+            if (str_ends_with($file, ".meta")) {
+              $metaFile = $metaDirectory . $file;
+              $metadata = (array)json_decode(file_get_contents($metaFile), true);
+              if (!isset($metadata['upload_expires'])) {
+                continue;
+              }
+              if ($metadata['upload_expires'] > $expiration_time) {
+                $uploadFile = $uploadDirectory . pathinfo($file, PATHINFO_FILENAME) . ".part";
+                if (file_exists($metaFile)) {
+                  unlink($metaFile);
+                }
+                if (file_exists($uploadFile)) {
+                  unlink($uploadFile);
+                }
+              }
+            }
+          }
+          closedir($metaDirectoryHandler);
+        }
+      }
+    }
+  }
+  
+  /**
+   * This filesize is able to determine the file size of a given file, also if it's bigger than 4GB which causes
+   * some problems with the built-in filesize() function of PHP.
+   * @param $file string Filepath you want to get the size from
+   * @return int -1 if the file doesn't exist, else filesize
+   */
+  public static function filesize(string $file): int {
+    if (!file_exists($file)) {
+      return -1;
+    }
+    $fp = fopen($file, "rb");
+    if ($fp === false) {
+      return -1;
+    }
+    $pos = 0;
+    $size = 1073741824;
+    fseek($fp, 0);
+    while ($size > 1) {
+      fseek($fp, $size, SEEK_CUR);
+      
+      if (fgetc($fp) === false) {
+        fseek($fp, -$size, SEEK_CUR);
+        $size = (int)($size / 2);
+      }
+      else {
+        fseek($fp, -1, SEEK_CUR);
+        $pos += $size;
+      }
+    }
+    
+    while (fgetc($fp) !== false) {
+      $pos++;
+    }
+    
+    return $pos;
+  }
+  
+  /**
+   * This counts the number of lines in a given file
+   * @param $file string Filepath you want to get the size from
+   * @return int -1 if the file doesn't exist, else filesize
+   */
+  public static function fileLineCount(string $file): int {
+    if (!file_exists($file)) {
+      return -1;
+    }
+    // find out what a prettier solution for this would be, as opposed to setting the max execution time to an arbitrary two hours
+    ini_set('max_execution_time', '7200');
+    if (str_ends_with($file, '.gz')) {
+      // gzip files are counted on the decompressed stream. It is assumed that the archive contains exactly one file.
+      $raw = @fopen($file, 'rb');
+      if ($raw === false) {
+        return -1;
+      }
+      $magic = fread($raw, 2);
+      fclose($raw);
+      if ($magic !== "\x1f\x8b") {
+        return -1;
+      }
+      $handle = @fopen('compress.zlib://' . $file, 'rb');
+      if ($handle === false) {
+        return -1;
+      }
+      $count = 0;
+      while (($line = @fgets($handle)) !== false) {
+        $count++;
+      }
+      if (!feof($handle)) {
+        fclose($handle);
+        return -1;
+      }
+      fclose($handle);
+      return $count;
+    }
+    $file = new SplFileObject($file, 'r');
+    $file->seek(PHP_INT_MAX);
+    
+    return $file->key();
+  }
+  
+  /**
+   * This counts the number of lines in a rule file, excluding lines starting with # and empty lines
+   * @param $file string Filepath you want to get the size from
+   * @return int -1 if the file doesn't exist, else filesize
+   */
+  public static function rulefileLineCount(string $file): int {
+    if (!file_exists($file)) {
+      return -1;
+    }
+    // find out what a prettier solution for this would be, as opposed to setting the max execution time to an arbitrary two hours
+    ini_set('max_execution_time', '7200');
+    $lineCount = 0;
+    $handle = fopen($file, "r");
+    while (!feof($handle)) {
+      $line = fgets($handle);
+      if (!(str_starts_with($line, '#') or trim($line) == "")) {
+        $lineCount = $lineCount + 1;
+      }
+    }
+    
+    fclose($handle);
+    return $lineCount;
+  }
+  
+  /**
+   * Refreshes the page with the current url, also includes the query string.
+   */
+  public static function refresh(): void {
+    global $_SERVER;
+    
+    $url = $_SERVER['PHP_SELF'];
+    if (strlen($_SERVER['QUERY_STRING']) > 0) {
+      $url .= "?" . $_SERVER['QUERY_STRING'];
+    }
+    header("Location: $url");
+    die();
+  }
+  
+  /**
+   * Checks if the given list is a superhashlist and returns an array containing all hashlists belonging to this superhashlist.
+   * If the hashlist is not a superhashlist it just returns an array containing the list itself.
+   *
+   * @param $hashlist Hashlist
+   * @return Hashlist[] of all superhashlists belonging to the $list
+   * @throws Exception
+   */
+  public static function checkSuperHashlist(Hashlist $hashlist): array {
+    if ($hashlist->getFormat() == DHashlistFormat::SUPERHASHLIST) {
+      $jF = new JoinFilter(Factory::getHashlistFactory(), HashlistHashlist::HASHLIST_ID, Hashlist::HASHLIST_ID);
+      $qF = new QueryFilter(HashlistHashlist::PARENT_HASHLIST_ID, $hashlist->getId(), "=");
+      $joined = Factory::getHashlistHashlistFactory()->filter([Factory::JOIN => $jF, Factory::FILTER => $qF]);
+      return $joined[Factory::getHashlistFactory()->getModelName()];
+    }
+    return array($hashlist);
+  }
+  
+  /**
+   * @param $hashlist Hashlist
+   * @return Hashlist[] all superhashlists which the hashlist is part of
+   * @throws Exception
+   */
+  public static function getParentSuperHashlists(Hashlist $hashlist): array {
+    if ($hashlist->getFormat() == DHashlistFormat::SUPERHASHLIST) {
+      return [];
+    }
+    $jF = new JoinFilter(Factory::getHashlistFactory(), HashlistHashlist::PARENT_HASHLIST_ID, Hashlist::HASHLIST_ID);
+    $qF = new QueryFilter(HashlistHashlist::HASHLIST_ID, $hashlist->getId(), "=", Factory::getHashlistHashlistFactory());
+    $joined = Factory::getHashlistHashlistFactory()->filter([Factory::JOIN => $jF, Factory::FILTER => $qF]);
+    return $joined[Factory::getHashlistFactory()->getModelName()];
+  }
+  
+  /**
+   * Tries to determine the IP of the client.
+   * @return string 0.0.0.0 or the client IP
+   */
+  public static function getIP(): string {
+    if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
+      $ip = $_SERVER['HTTP_CLIENT_IP'];
+    }
+    else if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+      $ip = $_SERVER['HTTP_X_FORWARDED_FOR'];
+    }
+    else {
+      $ip = $_SERVER['REMOTE_ADDR'];
+    }
+    if (!$ip) {
+      return "0.0.0.0";
+    }
+    return $ip;
+  }
+  
+  /**
+   * Checks if files are writable. If at least one of the files in the list is not writable it returns false.
+   * @param $arr array of files to check
+   * @return bool
+   */
+  public static function checkWriteFiles(array $arr): bool {
+    foreach ($arr as $path) {
+      if (!is_writable($path)) {
+        return false;
+      }
+    }
+    return true;
+  }
+  
+  /**
+   * Iterates through all chars, converts them to 0x__ and concats the hexes
+   * @param $binString String you want to convert
+   * @return string Hex-String
+   */
+  public static function bintohex(string $binString): string {
+    $return = "";
+    for ($i = 0; $i < strlen($binString); $i++) {
+      $hex = dechex(ord($binString[$i]));
+      while (strlen($hex) < 2) {
+        $hex = "0" . $hex;
+      }
+      $return .= $hex;
+    }
+    return $return;
+  }
+  
+  /**
+   * Checks if the task is completed and returns the html tick image if this is the case.
+   * @param int|null $prog int progress so far
+   * @param int|null $total int total to be done
+   * @return string either the check.png with Finished or an empty string
+   */
+  public static function tickdone(int|null $prog, int|null $total): string {
+    if ($prog === null || $total === null) {
+      return "";
+    }
+    // show tick of progress is done
+    if ($total > 0 && $prog >= $total) {
+      return ' <span class="fas fa-check" aria-hidden="true"></span>';
+    }
+    return "";
+  }
+  
+  /**
+   * Returns the username from the given userId
+   * @param $id int ID for the user
+   * @return string username or unknown-id
+   * @throws Exception
+   */
+  public static function getUsernameById(int $id): string {
+    $user = Factory::getUserFactory()->get($id);
+    if ($user === null) {
+      return "Unknown" . ((strlen("" . $id) > 0) ? "-$id" : "");
+    }
+    return $user->getUsername();
+  }
+  
+  /**
+   * Used in Template. Converts seconds to human readable format
+   * @param int $seconds
+   * @return string
+   */
+  public static function sectotime(int $seconds): string {
+    $return = "";
+    if ($seconds > 86400) {
+      $days = floor($seconds / 86400);
+      $return = $days . "d ";
+      $seconds = $seconds % 86400;
+    }
+    $return .= gmdate("H:i:s", $seconds);
+    return $return;
+  }
+  
+  /**
+   * Escapes some special string which should be put as value in form fields to avoid breaking. This function should still be used
+   * together with htmlentities(), this function just cares about some special cases which are not handled by htmlentities().
+   * @param $string string to check
+   * @return string escaped string
+   */
+  public static function escapeSpecial(string $string): string {
+    $string = htmlentities($string, ENT_QUOTES, "UTF-8");
+    $string = str_replace('"', '&#34;', $string);
+    $string = str_replace("'", "&#39;", $string);
+    return str_replace('`', '&#96;', $string);
+  }
+  
+  /**
+   * Checks if the given string contains characters which are blacklisted
+   * @param $string string
+   * @return bool true if at least one character is in the blacklist
+   * @throws Exception
+   */
+  public static function containsBlacklistedChars(string $string): bool {
+    $blacklisted = SConfig::getInstance()->getVal(DConfig::BLACKLIST_CHARS);
+    for ($i = 0; $i < strlen($blacklisted); $i++) {
+      if (str_contains($string, $blacklisted[$i])) {
+        return true;
+      }
+    }
+    return false;
+  }
+  
+  /**
+   * Used in Template
+   * TODO: this should be made a bit better
+   * @param int $val index of the array
+   * @param string $id identifier of the array to request
+   * @return string the element or empty string
+   */
+  public static function getStaticArray(int $val, string $id): string {
+    $platforms = array(
+      "unknown",
+      "NVidia",
+      "AMD",
+      "CPU"
+    );
+    $oses = array(
+      '<span class="fab fa-linux" aria-hidden="true"></span>',
+      '<span class="fab fa-windows" aria-hidden="true"></span>',
+      '<span class="fab fa-apple" aria-hidden="true"></span>'
+    );
+    $formats = array(
+      "Text",
+      "HCCAPX / PMKID",
+      "Binary",
+      "Superhashlist"
+    );
+    $formattables = array(
+      "hashes",
+      "hashes_binary",
+      "hashes_binary"
+    );
+    $states = array(
+      "New",
+      "Init",
+      "Running",
+      "Paused",
+      "Exhausted",
+      "Cracked",
+      "Aborted",
+      "Quit",
+      "Bypass",
+      "Trimmed",
+      "Aborting..."
+    );
+    switch ($id) {
+      case 'os':
+        if ($val == -1) {
+          return $platforms[0];
+        }
+        return $oses[$val];
+      case 'states':
+        return $states[$val];
+      case 'formats':
+        return $formats[$val];
+      case 'formattables':
+        return $formattables[$val];
+      case 'platforms':
+        if ($val == -1) {
+          return $platforms[0];
+        }
+        return $platforms[$val];
+    }
+    return "";
+  }
+  
+  /**
+   * @param $binary1 CrackerBinary
+   * @param $binary2 CrackerBinary
+   * @return int
+   */
+  public static function versionComparisonBinary(CrackerBinary $binary1, CrackerBinary $binary2): int {
+    if (Comparator::greaterThan($binary1->getVersion(), $binary2->getVersion())) {
+      return 1;
+    }
+    else if (Comparator::lessThan($binary1->getVersion(), $binary2->getVersion())) {
+      return -1;
+    }
+    return 0;
+  }
+  
+  /**
+   * @param string $versionString1
+   * @param string $versionString2
+   * @return int 1 if version2 is newer, 0 if equal and -1 if version1 is newer
+   * @deprecated semver should be used for version comparison
+   */
+  public static function updateVersionComparison(string $versionString1, string $versionString2): int {
+    if (!str_starts_with($versionString1, "update_v") || !str_starts_with($versionString2, "update_v")) {
+      return str_starts_with($versionString1, "update_v") ? -1 : 1;
+    }
+    $version1 = substr($versionString1, 8, strpos($versionString1, "_", 7) - 8);
+    $version2 = substr($versionString2, 8, strpos($versionString2, "_", 7) - 8);
+    
+    if (Comparator::greaterThan($version2, $version1)) {
+      return 1;
+    }
+    else if (Comparator::lessThan($version2, $version1)) {
+      return -1;
+    }
+    return 0;
+  }
+  
+  /**
+   * Shows big numbers with the right suffixes (k, M, G)
+   * @param int $num integer you want formatted
+   * @param int $threshold default 1024
+   * @param int $divider default 1024
+   * @return string Formatted Integer
+   */
+  public static function nicenum(int $num, int $threshold = 1024, int $divider = 1024): string {
+    $r = 0;
+    while ($num > $threshold) {
+      $num /= $divider;
+      $r++;
+    }
+    $scales = array(
+      "",
+      "k",
+      "M",
+      "G"
+    );
+    return Util::niceround($num, 2) . " " . $scales[$r];
+  }
+  
+  /**
+   * Formats percentage nicely
+   * @param $part int progress
+   * @param $total int total value
+   * @param int $decs decimals you want rounded
+   * @return string formatted percentage
+   */
+  public static function showperc(int $part, int $total, int $decs = 2): string {
+    if ($total > 0) {
+      $percentage = round(($part / $total) * 100, $decs);
+      if ($percentage == 100 && $part < $total) {
+        $percentage -= 1 / (pow(10, $decs));
+      }
+      if ($percentage == 0 && $part > 0) {
+        $percentage += 1 / (pow(10, $decs));
+      }
+    }
+    else {
+      $percentage = 0;
+    }
+    return Util::niceround($percentage, $decs);
+  }
+  
+  /**
+   * Puts a given file at the right place, depending on which action is used to add a file.
+   * TODO: this function can be improved, some else blocks can be removed when handling a bit differently
+   * @param $target string File you want to write to
+   * @param $type string paste, upload, import or url
+   * @param $sourcedata array|string
+   * @return array (boolean, string) success, msg detailing what happened
+   * @throws Exception
+   */
+  public static function uploadFile(string $target, string $type, array|string $sourcedata): array {
+    $success = false;
+    $msg = "ALL_OK";
+    if (!file_exists($target)) {
+      switch ($type) {
+        case "paste":
+          if (file_put_contents($target, $sourcedata)) {
+            $success = true;
+          }
+          else {
+            $msg = "Unable to save pasted content!";
+          }
+          break;
+        
+        case "upload":
+          $hashfile = $sourcedata;
+          if ($hashfile["error"] == 0) {
+            if (move_uploaded_file($hashfile["tmp_name"], $target) && file_exists($target)) {
+              $success = true;
+            }
+            else {
+              $msg = "Failed to move uploaded file to right place!";
+            }
+          }
+          else {
+            $msg = "File upload failed: " . $hashfile['error'];
+          }
+          break;
+        
+        case "import":
+          if (file_exists(Factory::getStoredValueFactory()->get(DDirectories::IMPORT)->getVal() . "/" . $sourcedata)) {
+            if (is_readable(Factory::getStoredValueFactory()->get(DDirectories::IMPORT)->getVal() . "/" . $sourcedata)) {
+              rename(Factory::getStoredValueFactory()->get(DDirectories::IMPORT)->getVal() . "/" . $sourcedata, $target);
+              if (file_exists($target)) {
+                $success = true;
+              }
+              else {
+                $msg = "Renaming of file from import directory failed!";
+              }
+            }
+            else {
+              $msg = "Incorrect permissions of import file, Hashtopolis server can't read the file";
+            }
+          }
+          else {
+            $msg = "Source file in import directory does not exist!";
+          }
+          break;
+        
+        case "url":
+          error_clear_last();
+          $furl = @fopen($sourcedata, "rb");
+          if (!$furl) {
+            $msg = "Could not open url at source data!";
+            $lastError = error_get_last();
+            if ($lastError !== null) {
+              $msg .= " (" . $lastError['message'] . ")";
+            }
+          }
+          else {
+            $contentLength = null;
+            $meta = stream_get_meta_data($furl);
+            foreach ($meta['wrapper_data'] ?? [] as $header) {
+              if (preg_match('/^Content-Length:\s*(\d+)\s*$/i', $header, $matches)) {
+                $contentLength = (int)$matches[1];
+              }
+            }
+            $fileLocation = fopen($target, "w");
+            if (!$fileLocation) {
+              $msg = "Could not open target file!";
+            }
+            else {
+              $buffersize = 131072;
+              $last_logged = time();
+              $failed = false;
+              $received = 0;
+              while (!feof($furl)) {
+                $data = fread($furl, $buffersize);
+                if ($data === false) {
+                  $msg = "READ ERROR on download";
+                  $failed = true;
+                  break;
+                }
+                if ($data === '') {
+                  break;
+                }
+                if (fwrite($fileLocation, $data) !== strlen($data)) {
+                  $msg = "Failed to write downloaded data to the target file!";
+                  $failed = true;
+                  break;
+                }
+                $received += strlen($data);
+                if ($last_logged < time() - 10) {
+                  $last_logged = time();
+                }
+              }
+              fclose($fileLocation);
+              if (!$failed && $contentLength !== null && $received !== $contentLength) {
+                $msg = "Download incomplete, received " . $received . " of " . $contentLength . " bytes!";
+                $failed = true;
+              }
+              if ($failed) {
+                if (file_exists($target)) {
+                  unlink($target);
+                }
+              }
+              else {
+                $success = true;
+              }
+            }
+            fclose($furl);
+          }
+          break;
+        
+        default:
+          $msg = "Unknown import type!";
+          break;
+      }
+    }
+    else {
+      $msg = "File already exists!";
+    }
+    return array($success, $msg);
+  }
+  
+  public static function getFileExtension(int $os): string {
+    return match ($os) {
+      DOperatingSystem::LINUX => ".bin",
+      DOperatingSystem::WINDOWS => ".exe",
+      DOperatingSystem::OSX => ".osx",
+      default => "",
+    };
+  }
+  
+  /**
+   * This function determines the protocol, domain and port of the webserver and puts it together as baseurl.
+   * @return string basic server url
+   * @throws Exception
+   */
+  public static function buildServerUrl(): string {
+    // when the server hostname is set on the config, use this
+    if (strlen(SConfig::getInstance()->getVal(DConfig::BASE_HOST)) > 0) {
+      return SConfig::getInstance()->getVal(DConfig::BASE_HOST);
+    }
+    
+    $protocol = (isset($_SERVER['HTTPS']) && (strcasecmp('off', $_SERVER['HTTPS']) !== 0)) ? "https://" : "http://";
+    $hostname = $_SERVER['HTTP_HOST'];
+    $port = $_SERVER['SERVER_PORT'];
+    
+    if ($protocol == "https://" && $port == 443 || $protocol == "http://" && $port == 80) {
+      $port = "";
+    }
+    else {
+      $port = ":$port";
+      $hostname = substr($hostname, 0, strrpos($hostname, ":")); //Needs to use strrpos in case of ipv6 because of multiple ':' characters
+    }
+    return $protocol . $hostname . $port;
+  }
+  
+  /**
+   * Determines the base URL of the backend as it is reachable from the outside.
+   * If HASHTOPOLIS_BACKEND_URL is set in the environment, scheme, host, port and
+   * the deployment prefix are taken from it. The API is always mounted at the
+   * fixed path "/api/v2", so the URL path must be empty or end with that mount;
+   * everything before the mount is kept as deployment prefix (e.g.
+   * "https://example.com/api/v2" results in "https://example.com" and
+   * "https://example.com/hashtopolis/api/v2" in
+   * "https://example.com/hashtopolis"). Otherwise, the explicitly configured
+   * baseHost and baseUrl are used. Request headers are never used because this URL
+   * may be persisted and later receive agent credentials.
+   * Used to generate agent reachable URLs for locally hosted files, e.g. the
+   * download URL of an uploaded cracker binary archive.
+   * @return string backend base url without trailing slash
+   * @throws Exception
+   */
+  public static function buildBackendBaseUrl(): string {
+    $backendUrl = getenv('HASHTOPOLIS_BACKEND_URL');
+    $fromEnvironment = $backendUrl !== false && strlen($backendUrl) > 0;
+    if (!$fromEnvironment) {
+      $backendUrl = SConfig::getInstance()->getVal(DConfig::BASE_HOST);
+    }
+    if (!is_string($backendUrl) || strlen($backendUrl) == 0) {
+      throw new Exception("A valid HASHTOPOLIS_BACKEND_URL or baseHost must be configured");
+    }
+    if ($backendUrl !== trim($backendUrl) || preg_match('/[\x00-\x20\x7f]/', $backendUrl)) {
+      throw new Exception("The configured backend URL is invalid");
+    }
+    $parts = parse_url($backendUrl);
+    if ($parts === false || !isset($parts['scheme'], $parts['host'])
+      || !in_array(strtolower($parts['scheme']), ['http', 'https'], true)
+      || isset($parts['user']) || isset($parts['pass'])
+      || isset($parts['query']) || isset($parts['fragment'])
+      || (!$fromEnvironment && isset($parts['path']) && $parts['path'] !== '' && $parts['path'] !== '/')) {
+      throw new Exception("The configured backend URL is invalid");
+    }
+    $url = strtolower($parts['scheme']) . '://' . $parts['host'];
+    if (isset($parts['port'])) {
+      $url .= ':' . $parts['port'];
+    }
+    if (filter_var($url, FILTER_VALIDATE_URL) === false) {
+      throw new Exception("The configured backend URL is invalid");
+    }
+    if ($fromEnvironment) {
+      /* The API is mounted at the fixed path "/api/v2", so the path of the
+       * configured URL is a deployment prefix followed by the mount. Only the
+       * mount is removed and the prefix is kept, so that servers reachable
+       * under a subpath build download URLs which point to the right location. */
+      $path = (isset($parts['path'])) ? rtrim($parts['path'], '/') : '';
+      if ($path !== '') {
+        if (!str_ends_with($path, '/api/v2')) {
+          throw new Exception("The configured backend URL ('$backendUrl') is invalid: its path must be empty or end with the api mount path '/api/v2' (e.g. 'https://hashtopolis.example.com/api/v2' or 'https://hashtopolis.example.com/hashtopolis/api/v2')");
+        }
+        $url .= substr($path, 0, -strlen('/api/v2'));
+      }
+    }
+    else {
+      $baseUrl = SConfig::getInstance()->getVal(DConfig::BASE_URL);
+      $url .= '/' . ltrim((string)$baseUrl, '/');
+    }
+    return rtrim($url, '/');
+  }
+  
+  /**
+   * Round to a specific amount of decimal points
+   * @param $num Number
+   * @param $dec Number of decimals
+   * @return string Rounded value
+   */
+  public static function niceround($num, $dec): string {
+    $return = strval(round($num, $dec));
+    if ($dec > 0) {
+      $pointPosition = strpos($return, ".");
+      if ($pointPosition === false) {
+        $return .= ".";
+        $return .= str_repeat("0", $dec);
+      }
+      else {
+        while (strlen($return) - $pointPosition <= $dec) {
+          $return .= "0";
+        }
+      }
+    }
+    return $return;
+  }
+  
+  /**
+   * Cut a string to a certain number of letters. If the string is too long, instead replaces the last three letters with ...
+   * @param string $string String you want to short
+   * @param int $length Number of Elements you want the string to have
+   * @return string Formatted string
+   */
+  public static function shortenstring(string $string, int $length): string {
+    // shorten string that would be too long
+    $return = "<span title='$string'>";
+    if (strlen($string) > $length) {
+      $return .= substr($string, 0, $length - 3) . "...";
+    }
+    else {
+      $return .= $string;
+    }
+    $return .= "</span>";
+    return $return;
+  }
+  
+  /**
+   * Adds 0s to the beginning of a number until it reaches size.
+   * @param int $number
+   * @param int $size
+   * @return string
+   */
+  public static function prefixNum(int $number, int $size): string {
+    $formatted = "" . $number;
+    while (strlen($formatted) < $size) {
+      $formatted = "0" . $formatted;
+    }
+    return $formatted;
+  }
+  
+  /**
+   * Converts a given string to hex code.
+   *
+   * @param string $string
+   *          string to convert
+   * @return string converted string into hex
+   */
+  public static function strToHex(string $string): string {
+    return implode(unpack("H*", $string));
+  }
+  
+  /**
+   * @param $a Chunk
+   * @param $b Chunk
+   * @return int
+   */
+  public static function compareChunksTime(Chunk $a, Chunk $b): int {
+    if ($a->getDispatchTime() == $b->getDispatchTime()) {
+      return 0;
+    }
+    return ($a->getDispatchTime() < $b->getDispatchTime()) ? -1 : 1;
+  }
+  
+  /**
+   * Check if email sending is configured by looking for config file
+   * @return bool true if configured, false if not.
+   */
+  public static function isMailConfigured(): bool {
+    $path = '/etc/ssmtp/ssmtp.conf';
+    return is_file($path);
+  }
+  
+  /**
+   * This sends a given email with text and subject to the address.
+   *
+   * @param string $address
+   *          email address of the receiver
+   * @param string $subject
+   *          subject of the email
+   * @param string $text
+   *          html content of the email
+   * @param string $plaintext plaintext version of the email content
+   * @return bool true on success, false on failure
+   * @throws Exception
+   */
+  public static function sendMail(string $address, string $subject, string $text, string $plaintext): bool {
+    if (!self::isMailConfigured()) {
+      error_log(("Mail notification is not configured. No message sent."));
+      return false;
+    }
+    
+    $boundary = uniqid('np');
+    
+    $headers = "MIME-Version: 1.0\r\n";
+    $headers .= "From: " . SConfig::getInstance()->getVal(DConfig::EMAIL_SENDER_NAME) . " <" . SConfig::getInstance()->getVal(DConfig::EMAIL_SENDER) . ">\r\n";
+    $headers .= "Content-Type: multipart/alternative;boundary=" . $boundary . "\r\n";
+    
+    $plainMessage = "\r\n\r\n--" . $boundary . "\r\n";
+    $plainMessage .= "Content-type: text/plain;charset=utf-8\r\n\r\n";
+    $plainMessage .= $plaintext;
+    
+    $htmlMessage = "\r\n\r\n--" . $boundary . "\r\n";
+    $htmlMessage .= "Content-type: text/html;charset=utf-8\r\n\r\n";
+    $htmlMessage .= $text;
+    $htmlMessage .= "\r\n\r\n--" . $boundary . "--";
+    
+    if (!mail($address, $subject, $plainMessage . $htmlMessage, $headers)) {
+      return false;
+    }
+    return true;
+  }
+  
+  /**
+   * Generates a random string with mixedalphanumeric chars
+   *
+   * @param int $length
+   *          length of random string to generate
+   * @param string $charset
+   * @return string random string
+   * @throws RandomException
+   */
+  public static function randomString(int $length, string $charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"): string {
+    $result = "";
+    for ($x = 0; $x < $length; $x++) {
+      $result .= $charset[random_int(0, strlen($charset) - 1)];
+    }
+    return $result;
+  }
+  
+  /**
+   * @param $search
+   * @param $pattern
+   * @return bool
+   * @deprecated php standard library now offers this
+   *
+   * Checks if $search starts with $pattern. Shortcut for strpos==0
+   */
+  public static function startsWith($search, $pattern): bool {
+    if (str_starts_with($search, $pattern)) {
+      return true;
+    }
+    return false;
+  }
+  
+  /**
+   * @param $search
+   * @param $pattern
+   * @return bool
+   * @deprecated php standard library now offers this
+   *
+   * if pattern is empty or if pattern is at the end of search
+   */
+  public static function endsWith($search, $pattern): bool {
+    return str_ends_with($search, $pattern);
+  }
+  
+  /**
+   * Converts a hex to binary
+   * @param string $data
+   * @return string
+   */
+  public static function hextobin(string $data): string {
+    $res = "";
+    for ($i = 0; $i < strlen($data) - 1; $i += 2) {
+      $res .= chr(hexdec(substr($data, $i, 2)));
+    }
+    return $res;
+  }
+  
+  /**
+   * @param $limit int limit for hash length
+   * @return bool true on success
+   * @throws Exception
+   *
+   * @deprecated this should NOT be used anymore, hash is a text field!
+   *
+   * Sets the max length of hashes in the database
+   */
+  public static function setMaxHashLength(int $limit): bool {
+    if ($limit < 1) {
+      return false;
+    }
+    
+    $DB = Factory::getAgentFactory()->getDB();
+    $result = $DB->query("SELECT MAX(LENGTH(" . Hash::HASH . ")) as maxLength FROM " . Factory::getHashFactory()->getModelTable());
+    $maxLength = $result->fetch()['maxLength'];
+    if ($limit >= $maxLength) {
+      // TODO: this is not database agnostic and may have to be removed anyway as the datatype is different now
+      if ($DB->query("ALTER TABLE " . Factory::getHashFactory()->getModelTable() . " MODIFY " . Hash::HASH . " VARCHAR($limit) NOT NULL;") === false) {
+        return false;
+      }
+      else if ($DB->query("ALTER TABLE " . Factory::getZapFactory()->getModelTable() . " MODIFY " . Hash::HASH . " VARCHAR($limit) NOT NULL;") === false) {
+        return false;
+      }
+    }
+    else {
+      return false;
+    }
+    return true;
+  }
+  
+  /**
+   * Sets the max length of plaintexts in the database
+   * @param $limit int limit for hash length
+   * @return bool true on success
+   *
+   * @throws Exception
+   * @deprecated this should NOT be used anymore, plain is a text field!
+   */
+  public static function setPlaintextMaxLength(int $limit): bool {
+    if ($limit < 1) {
+      return false;
+    }
+    
+    $DB = Factory::getAgentFactory()->getDB();
+    $result = $DB->query("SELECT MAX(LENGTH(" . Hash::PLAINTEXT . ")) as maxLength FROM " . Factory::getHashFactory()->getModelTable());
+    $maxLength = $result->fetch()['maxLength'];
+    if ($limit >= $maxLength) {
+      // TODO: this is not database agnostic and may have to be removed anyway as the datatype is different now
+      if ($DB->query("ALTER TABLE " . Factory::getHashFactory()->getModelTable() . " MODIFY " . Hash::PLAINTEXT . " VARCHAR($limit);") === false) {
+        return false;
+      }
+    }
+    else {
+      return false;
+    }
+    return true;
+  }
+  
+  /**
+   * @param $array AbstractModel[]
+   * @return array
+   */
+  public static function arrayOfIds(array $array): array {
+    $arr = array();
+    foreach ($array as $entry) {
+      $arr[] = $entry->getId();
+    }
+    return $arr;
+  }
+  
+  /**
+   * @param string $tmpfile
+   * @return int
+   * @deprecated fileLineCount() should be used
+   *
+   */
+  public static function countLines(string $tmpfile): int {
+    if (stripos(PHP_OS, "WIN") === 0) {
+      // windows line count
+      $ret = exec('find /c /v "" "' . $tmpfile . '"');
+      $ret = str_replace('-', '', str_ireplace($tmpfile . ':', '', $ret));
+      return intval($ret);
+    }
+    return intval(exec("wc -l '$tmpfile'"));
+  }
+  
+  /**
+   * Checks a given array of device names to see if they can be shortened with the defined patterns and replacements.
+   *
+   * @param $deviceArray string[]
+   * @return string[]
+   */
+  public static function compressDevices(array $deviceArray): array {
+    $compressed = array();
+    foreach ($deviceArray as $device) {
+      foreach (DDeviceCompress::COMPRESSION as $pattern => $replacement) {
+        if (str_contains($device, $pattern)) {
+          $device = str_replace($pattern, $replacement, $device);
+        }
+      }
+      $compressed[] = $device;
+    }
+    return $compressed;
+  }
+  
+  /**
+   * @param string $version
+   * @return string
+   * @deprecated use semver functions
+   *
+   */
+  public static function getMinorVersion(string $version): string {
+    $split = explode(".", $version);
+    return $split[0] . "." . $split[1];
+  }
+  
+  /**
+   * Does not use prepared statements, make sure input is sanitized!
+   *
+   * @throws Exception
+   */
+  public static function databaseColumnExists(string $table, string $column): bool {
+    $result = Factory::getAgentFactory()->getDB()->query("SHOW COLUMNS FROM `$table` LIKE '$column'");
+    return $result->rowCount() > 0;
+  }
+  
+  /**
+   * Does not use prepared statements, make sure input is sanitized!
+   *
+   * @throws Exception
+   */
+  public static function databaseTableExists(string $table): bool {
+    $result = Factory::getAgentFactory()->getDB()->query("SHOW TABLES LIKE '$table';");
+    return $result->rowCount() > 0;
+  }
+  
+  /**
+   * Does not use prepared statements, make sure input is sanitized!
+   *
+   * @throws Exception
+   */
+  public static function databaseIndexExists(string $table, string $column): bool {
+    $result = Factory::getAgentFactory()->getDB()->query("SHOW INDEX FROM `$table` WHERE Column_name='$column'");
+    return $result->rowCount() > 0;
+  }
+  
+  /**
+   * @throws Exception
+   */
+  public static function checkDataDirectory($key, $dir): void {
+    $entry = Factory::getStoredValueFactory()->get($key);
+    if ($entry == null) {
+      $entry = new StoredValue($key, $dir);
+      Factory::getStoredValueFactory()->save($entry);
+    }
+    else {
+      // update if needed
+      if ($entry->getVal() != $dir) {
+        $entry->setVal($dir);
+        Factory::getStoredValueFactory()->update($entry);
+      }
+    }
+  }
+  
+  /**
+   * Checks if a given initial object data with this ID exists and if not, creates it.
+   *
+   * @throws Exception
+   */
+  public static function checkOrCreateInitialObject(AbstractModelFactory $factory, array $data): void {
+    $object = $factory->createObjectFromDict($data);
+    $check = $factory->get($object->getId());
+    if ($check !== null) {
+      return;
+    }
+    $factory->save($object);
+  }
+}

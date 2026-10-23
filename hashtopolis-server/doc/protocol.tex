@@ -1,0 +1,604 @@
+\documentclass{article}
+\author{s3in!c $\langle$s3inlc@hashes.org$\rangle$ }
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[left=10mm, right=10mm]{geometry}
+\usepackage[english]{babel}
+\begin{document}
+	\title{Hashtopolis Communication Protocol (V2)}
+	\maketitle
+	\section*{Introduction}
+	The communication between Hashtopolis Clients (Agents) and Server is always in JSON formatted values. When sending a request to the server, it should be a POST containing the JSON data.
+
+	A machine-readable OpenAPI 3.1 specification of this protocol is available at \texttt{/api/server\_openapi.php} on the running server. It is generated from the server's source code and always reflects the current implementation. The examples in this document remain the canonical human-readable reference.
+
+	\section*{Errors}
+	In case of an error with the query which the client sends to the server, the response will have following format with the corresponding action which was requested and the error message which should help in getting information about this error.
+	\begin{verbatim}
+	{
+	  "action":"register",
+	  "response":"ERROR",
+	  "message":"Provided voucher does not exist."
+	}
+	\end{verbatim}
+	\pagebreak
+	\section*{Commands}
+	
+	\subsection*{Connection Check}
+	To test the connection to the server or to test if an URL is valid, you can issue a test action where the server just should respond with success.
+	\begin{verbatim}
+	{
+	  "action":"testConnection"
+	}
+	\end{verbatim}
+	Response:
+	\begin{verbatim}
+	{
+	  "action":"testConnection",
+	  "response":"SUCCESS"
+	} 
+	\end{verbatim}
+
+	\subsection*{Register}
+	When registering a new client to the server, following query should be used:
+	\begin{verbatim}
+	{
+	  "action":"register",
+	  "voucher":"89GD78tf",
+	  "name":"client name"
+	}
+	\end{verbatim}
+	Optionally, an agent can be registered as CPU only agent by providing \texttt{``cpu-only'': true}.
+
+	\noindent As response the server will send following on success:
+	\begin{verbatim}
+	{
+	  "action":"register",
+	  "response":"SUCCESS",
+	  "token":"GHhgdf(/&"
+	} 
+	\end{verbatim}
+	The token will be the one, the client should use for his following connections on this server.
+	
+	\subsection*{Send Client Information}
+	To send information about the client operating system and the available hardware. (Important: To make sure an agent will be recognized as GPU agent, you have to get some info in the 'gpus' field. The server searches for keywords like 'ati', 'nvidia' etc.)\\ \\
+	All values are required and must not be empty. The operating system should be set as following: 0 => Linux, 1 => Windows, 2 => Mac OS X.\\
+	This command should be issued on client startup to update if any hardware changes occurred since the last connect.
+	\begin{verbatim}
+	{
+	  "action":"updateInformation",
+	  "token":"GHhgdf(/&",
+	  "uid":"230-34-345-345",
+	  "os":0,
+	  "devices":[
+	    "ATI HD7970",
+	    "ATI HD7970"
+	  ]
+	}
+	\end{verbatim}
+	
+	\noindent The response says if the update was successful.
+	\begin{verbatim}
+	{
+	  "action":"updateInformation",
+	  "response":"SUCCESS",
+	  "token":"GHhgdf(/&"
+	} 
+	\end{verbatim}
+	
+	\subsection*{Login}
+	The client logs in to the server.
+	\begin{verbatim}
+	{
+	  "action":"login",
+	  "clientSignature":"generic-python",
+	  "token":"GHhgdf(/&"
+	}
+	\end{verbatim}
+	As response, the client will get back the agent timeout setting of the server (in seconds) if the login
+	was successful.
+	\begin{verbatim}
+	{
+	  "action":"login",
+	  "response":"SUCCESS",
+	  "timeout":30
+	}
+	\end{verbatim}
+	
+	\subsection*{Check Client Version}
+	This is used by the client to check if there is an update available for the client script. Type specifies the type of the client.
+	\begin{verbatim}
+	{
+	  "action":"checkClientVersion",
+	  "version":"0.43.5",
+	  "type":"csharp",
+	  "token":"GHhgdf(/&"
+	}
+	\end{verbatim}
+	The server responds either with
+	\begin{verbatim}
+	{
+	  "action":"checkClientVersion",
+	  "response":"SUCCESS",
+	  "version":"OK"
+	}
+	\end{verbatim}
+	if the client has the newest version. Or he sends
+	\begin{verbatim}
+	{
+	  "action":"update",
+	  "response":"SUCCESS",
+	  "version":"NEW",
+	  "url":"https://example.com/getclient.php"
+	}
+	\end{verbatim}
+	with 'url' providing the download URL for the new version.
+	
+	\subsection*{Download Binary}
+	This command is used to either download the 7z binary to extract Hashcat, Preprocessors, or to get information where to download the newest Hashcat/Cracker version and some additional information about it.
+	\begin{verbatim}
+	{
+	  "action":"downloadBinary",
+	  "type":"7zr",
+	  "token":"GHhgdf(/&"
+	}
+	\end{verbatim}
+	The server then will send a URL where to download the binary:
+	\begin{verbatim}
+	{
+	  "action":"downloadBinary",
+	  "response":"SUCCESS",
+	  "url":"https://example.com/getapp.php"
+	}
+	\end{verbatim}
+	The PRINCE download link must be configured on the server, then the client can retrieve the URL. This function is DEPRECATED.
+	\begin{verbatim}
+	{
+	  "action":"downloadBinary",
+	  "type":"prince",
+	  "token":"GHhgdf(/&"
+	}
+	\end{verbatim}
+	The server then will send a URL where to download the binary:
+	\begin{verbatim}
+	{
+	  "action":"downloadBinary",
+	  "response":"SUCCESS",
+	  "url":"https://github.com/hashcat/princeprocessor/releases/download/v0.22/princeprocessor-0.22.7z"
+	}
+	\end{verbatim}
+	The preprocessor settings must be configured on the server, then the client can retrieve the required information.
+	\begin{verbatim}
+	{
+	  "action":"downloadBinary",
+	  "type":"preprocessor",
+	  "preprocessorId": 1,
+	  "token":"GHhgdf(/&"
+	}
+	\end{verbatim}
+	The server then will send a URL where to download the binary and the corresponding binary names to call. Also including the information which flags are used for the required chunking parameters:
+	\begin{verbatim}
+	{
+	  "action":"downloadBinary",
+	  "response":"SUCCESS",
+	  "url":"https://github.com/hashcat/princeprocessor/releases/download/v0.22/princeprocessor-0.22.7z"
+	  "name": "Prince",
+	  "executable": "pp.bin",
+	  "keyspaceCommand": "--keyspace",
+	  "skipCommand": "--limit",
+	  "limitCommand": "--skip"
+	}
+	\end{verbatim}
+	To download the Hashcat/Cracker binary, following command is used.
+	\begin{verbatim}
+	{
+	  "action":"downloadBinary",
+	  "type":"cracker",
+	  "binaryVersionId": 45
+	  "token":"GHhgdf(/&"
+	}
+	\end{verbatim}
+	'force' is optional and is be used when the server should send version information anyway, even if the client already has the newest version. 'version' contains the current version the client has.\\
+	The server will respond with following information:
+	\begin{verbatim}
+	{
+	  "action":"downloadBinary",
+	  "response":"SUCCESS",
+	  "name":"Hashcat",
+	  "url":"https://hashcat.net/files/hashcat-3.01.7z",
+	  "executable":"hashcat64.bin"
+	}
+	\end{verbatim}
+	
+	\subsection*{Client Error}
+	In case there happens an error with Hashcat/Cracker on the client, he can submit the error message to the server where it will be assigned to the agent and shown on the page. The chunk ID is optional and can be null if not available.
+	\begin{verbatim}
+	{
+	  "action":"clientError",
+	  "taskId":45,
+	  "token":"GHhgdf(/&",
+	  "chunkId": 1,
+	  "message":"This is a sample error message!"
+	}
+	\end{verbatim}
+	The server will confirm the error messages:
+	\begin{verbatim}
+	{
+	  "action":"clientError",
+	  "response":"SUCCESS"
+	}
+	\end{verbatim}
+	
+	\subsection*{Get File}
+	If the client needs a file for running a task (Wordlist or Rule File) he needs to request the url for downloading it.
+	\begin{verbatim}
+	{
+	  "action":"getFile",
+	  "token":"GHhgdf(/&",
+	  "taskId":56,
+	  "file":"rockyou.txt"
+	}
+	\end{verbatim}
+	The server sends then the url, where the client can download the file from.
+	\begin{verbatim}
+	{
+	  "action":"getFile",
+	  "response":"SUCCESS",
+	  "extension": ".txt",
+	  "url":"get.php?file=5&token=GHhgdf(/&",
+	  "filesize": 267729
+	}
+	\end{verbatim}
+	
+	\subsection*{Get Hashlist}
+	The client can download a Hashlist/Superhashlist.
+	\begin{verbatim}
+	{
+	  "action":"getHashlist",
+	  "token":"GHhgdf(/&",
+	  "hashlistId":23
+	}
+	\end{verbatim}
+	If there occurs any error with this request, the server will respond in JSON format with error information. If everything is correct, it will send the url for the raw download of the hashes.\\\\
+	\begin{verbatim}
+	{
+	  "action":"getHashlist",
+	  "response":"SUCCESS",
+	  "url":"get.php?hashlist=5&token=GHhgdf(/&"
+	}
+	\end{verbatim}
+	where 'url' contains the download link for the raw data.
+	
+	\subsection*{Get Task}
+	The client requests the current task he should work on.
+	\begin{verbatim}
+	{
+	  "action":"getTask",
+	  "token":"GHhgdf(/&"
+	}
+	\end{verbatim}
+	The server will send then a task to do (benchType can be 'speed' or 'run'). The preprocessor values are only filled with information if the flag is set to true, otherwise the values will be empty.
+	\begin{verbatim}
+	{
+	  "action":"getTask",
+	  "response":"SUCCESS",
+	  "taskId": 25,
+	  "attackcmd": "#HL# -a 3 ?a?a?a?a --hash-type=0",
+	  "hashlistId": 13,
+	  "bench": 30,
+	  "statustimer": 5,
+	  "benchType":"speed",
+	  "crackerId":45
+	  "hashlistAlias":"#HL#",
+	  "files": [
+	    "rockyou.txt",
+	    "wordlist.txt"
+	  ],
+	  "keyspace":0,
+	  "usePreprocessor": true,
+	  "preprocessor": 2,
+	  "preprocessorCommand": "wordlist.txt"
+	  "enforcePipe": false,
+	  "slowHash": false,
+	  "useBrain": false
+	}
+	\end{verbatim}
+	or send this if there is no task available:
+	\begin{verbatim}
+	{
+	  "action":"getTask",
+	  "response":"SUCCESS",
+	  "taskId": null,
+	  "reason": "No task available!"
+	}
+	\end{verbatim}
+	In case the hashcat brain is used, further settings are sent:
+	\begin{verbatim}
+	{
+	  "action":"getTask",
+	  "response":"SUCCESS",
+	  "taskId": 25,
+	  "attackcmd": "#HL# -a 3 ?a?a?a?a --hash-type=0",
+	  "hashlistId": 13,
+	  "bench": 30,
+	  "statustimer": 5,
+	  "benchType":"speed",
+	  "crackerId":45
+	  "hashlistAlias":"#HL#",
+	  "files": [
+	    "rockyou.txt",
+	    "wordlist.txt"
+	  ],
+	  "keyspace":0,
+	  "usePrince": false,
+	  "enforcePipe": false,
+	  "slowHash": false,
+	  "useBrain": true,
+	  "brainHost": "10.20.30.40",
+	  "brainPort": 1234,
+	  "brainPass": "password",
+	  "brainFeatures": 3
+	}
+	\end{verbatim}
+	
+	\subsection*{Get Chunk}
+	The client requests the current task he should work on.
+	\begin{verbatim}
+	{
+	  "action":"getChunk", 
+	  "token":"GHhgdf(/&",
+	  "taskId": 5
+	}
+	\end{verbatim}
+	The server will send then a chunk to work on:
+	\begin{verbatim}
+	{
+	  "action":"getChunk",
+	  "response":"SUCCESS",
+	  "status":"OK",
+	  "chunkId": 13,
+	  "skip": 45000,
+	  "length": 10000
+	}
+	\end{verbatim}
+	or he can send one of the following answers which should be done then:
+	
+	In case it is required to measure the keyspace of the corresponding task.
+	\begin{verbatim}
+	{
+	  "action":"getChunk",
+	  "response":"SUCCESS",
+	  "status":"keyspace_required"
+	}
+	\end{verbatim}
+	
+	In case the current task is already fully dispatched and the agent should request for a new task.
+	\begin{verbatim}
+	{
+	  "action":"getChunk",
+	  "response":"SUCCESS",
+	  "status":"fully_dispatched"
+	}
+	\end{verbatim}
+	
+	In case there is an update of the cracker binary available, the server sends this:
+	\begin{verbatim}
+	{
+	  "action":"getChunk",
+	  "response":"SUCCESS",
+	  "status":"cracker_update"
+	}
+	\end{verbatim}
+	
+	In case there is no benchmark for this task on the current agent. So it should start benchmarking then.
+	\begin{verbatim}
+	{
+	  "action":"getChunk",
+	  "response":"SUCCESS",
+	  "status":"benchmark"
+	}
+	\end{verbatim}
+	
+	In case there was a health check requested on the server, it will notify the client.
+	\begin{verbatim}
+	{
+	  "action":"getChunk",
+	  "response":"SUCCESS",
+	  "status":"health_check"
+	}
+	\end{verbatim}
+	
+	
+	\subsection*{Send Keyspace}
+	The client sends the calculated keyspace of a task.
+	\begin{verbatim}
+	{
+	  "action":"sendKeyspace",
+	  "token":"GHhgdf(/&",
+	  "taskId":35,
+	  "keyspace":568000
+	}
+	\end{verbatim}
+	The server should reply following on success:
+	\begin{verbatim}
+	{
+	  "action":"sendKeyspace",
+	  "response":"SUCCESS",
+	  "keyspace": "OK"
+	}
+	\end{verbatim}
+	
+	\subsection*{Send Benchmark}
+	The client sends the tested benchmark of a task. Benchmark type can be 'speed' or 'run'. If the 'speed' benchmark type is used, there are two values to be sent separated by ':'. \\
+	The 'speed' benchmark type is using the --progress-only switch of hashcat. \\
+	The 'run' benchmark type uses the old method of Hashtopolis to benchmark a task in running the given task for some time.
+	\begin{verbatim}
+	{
+	  "action":"sendBenchmark",
+	  "token":"GHhgdf(/&",
+	  "taskId":35,
+	  "type": "run",
+	  "result": "674"
+	}
+	\end{verbatim}
+	\begin{verbatim}
+	{
+	  "action":"sendBenchmark",
+	  "token":"GHhgdf(/&",
+	  "taskId":35,
+	  "type": "speed",
+	  "result": "674:674.74"
+	}
+	\end{verbatim}
+	The server should reply following on success:
+	\begin{verbatim}
+	{
+	  "action":"sendBenchmark",
+	  "response":"SUCCESS",
+	  "benchmark": "OK"
+	}
+	\end{verbatim}
+	
+	
+	\subsection*{Send Progress}
+	In the given interval of the task, the client is working on, it should report the progress in following way:
+	\begin{verbatim}
+	{
+	  "action":"sendProgress",
+	  "token":"GHhgdf(/&",
+	  "chunkId":35,
+	  "keyspaceProgress":568000,
+	  "relativeProgress":"4545"
+	  "speed":570000,
+	  "state": 3,
+	  "cracks": [
+	    [
+	      "7fde65673fd28736423f23423786f",
+	      "thisisplain",
+	      "746869736973706c61696e",
+	      "787523889"
+	    ],
+	    [
+	      "7fde65673f28987f7423f2342378f",
+	      "otherplain",
+	      "6f74686572706c61696e",
+	      "78652"
+	    ]
+	  ],
+	  "gpuTemp": [
+	    67
+	  ], 
+	  "gpuUtil": [
+	    99
+	  ]
+	}
+	\end{verbatim}
+	RelativeProgress is the progress of the current chunk between 0 and 10'000 (in percent * 100). The cracks are sent as array resulting from hashcat's output format 15.
+	
+	The server will reply with following:
+	\begin{verbatim}
+	{
+	  "action":"sendProgress",
+	  "response":"SUCCESS",
+	  "cracked": 2,
+	  "skipped": 0
+	}
+	\end{verbatim}
+	If there were cracks on the same hashlist from some other clients or view the web-interface, the server will send the hashes which should be zapped from the hashlist
+	\begin{verbatim}
+	{
+	  "action":"sendProgress",
+	  "response":"SUCCESS",
+	  "cracked": 2,
+	  "skipped": 0,
+	  "zap": [
+	    "87634876fe7f7df5e76f56a757",
+	    "7863487563874ffefe67575745"
+	  ]
+	}
+	\end{verbatim}
+
+	\subsection*{Get deleted files}
+	The client can request a list of deleted filenames from the server to be able to clean up unused files.
+	\begin{verbatim}
+	{
+	  "action":"getFileStatus",
+	  "token":"GHhgdf(/&",
+	}
+	\end{verbatim}
+	The server will then provide a list of filenames:
+	\begin{verbatim}
+	{
+	  "action": "getFileStatus",
+	  "response": "SUCCESS",
+	  "filenames": [
+	    "top10000.txt"
+	  ]
+	}
+	\end{verbatim}
+	
+	\subsection*{Get health check}
+	When the client got notified that the server wants to do a health check, it should request the data.
+	\begin{verbatim}
+	{
+	  "action": "getHealthCheck", 
+	  "token": "GHhgdf(/&"
+	}
+	\end{verbatim}
+	The server will provide the task to run and the hashes to use for it.
+	\begin{verbatim}
+	{
+	  "action": "getHealthCheck",
+	  "response": "SUCCESS",
+	  "attack": "#HL# -a 3 -1 ?l?u?d ?1?1?1?1?1",
+	  "crackerBinaryId": 1,
+	  "hashes": [
+	    "9f650d4ef70eead895e7a03ce0f83e88",
+	    "24a7bdfd14bca7f9d14154c0800a833d"
+	  ],
+	  "checkId": 7,
+	  "hashlistAlias": "#HL#"
+	}
+	\end{verbatim}
+	
+	\subsection*{Send health check}
+	When the client executed a health check it should send back the results.
+	\begin{verbatim}
+	{
+	  "action": "sendHealthCheck", 
+	  "token": "GHhgdf(/&", 
+	  "numCracked": 23, 
+	  "start": 1536306884, 
+	  "end": 1536306902, 
+	  "numGpus": 1, 
+	  "errors": [
+	    "nvmlDeviceGetTemperatureThreshold(): Not Supported", 
+	    "nvmlDeviceGetTemperatureThreshold(): Not Supported"
+	  ], 
+	  "checkId": 7
+	}
+	\end{verbatim}
+	On success the server will just reply with OK.
+	\begin{verbatim}
+	{
+	  "action": "sendHealthCheck",
+	  "response": "SUCCESS"
+	}
+	\end{verbatim}
+	
+	\subsection*{De-Registration}
+	If the flag is set on the client to de-register on quitting, he sends following command to the server. In case this is not allowed, it will report an error.
+	\begin{verbatim}
+	{
+	  "action": "deregister", 
+	  "token": "GHhgdf(/&"
+	}
+	\end{verbatim}
+	On success the server will just reply with OK.
+	\begin{verbatim}
+	{
+	  "action": "deregister",
+	  "response": "SUCCESS"
+	}
+	\end{verbatim}
+\end{document}

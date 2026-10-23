@@ -1,0 +1,64 @@
+name: Generate MkDocs and upload
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'doc/**'
+      - '.github/workflows/docs-build.yml'
+      - '.github/workflows/docs.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out the repository
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r doc/requirements.txt
+        sudo apt-get update
+        sudo apt-get install php
+        sudo apt-get install -y lftp
+        sudo apt-get install nodejs
+        sudo apt-get install npm
+    - name: Start Hashtopolis server
+      uses: ./.github/actions/start-hashtopolis
+      with:
+        db_system: "mysql"
+    - name: Download newest apiv2 spec
+      run: |
+        wget http://localhost:8080/api/v2/openapi.json -P /tmp/
+        cat /tmp/openapi.json
+        mv /tmp/openapi.json ./doc/
+    - name: Cache phpDocumentor
+      uses: actions/cache@v4
+      with:
+        path: /tmp/phpDocumentor.phar
+        key: phpdocumentor-3.10.0
+    - name: Download phpDocumentor if not cached
+      run: |
+        if [ ! -f /tmp/phpDocumentor.phar ]; then
+          wget https://github.com/phpDocumentor/phpDocumentor/releases/download/v3.10.0/phpDocumentor.phar -P /tmp/
+        fi
+    - name: Create function level documentation with phpdocumentor
+      run: sudo php /tmp/phpDocumentor.phar --ignore vendor/ -d . -t ./doc/php-documentor/
+    - name: Build MkDocs site
+      run: |
+        mkdocs build
+    - name: Upload HTML files to FTP server
+      env:
+        FTP_SERVER: ${{ secrets.FTP_SERVER }}
+        FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+        FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+      run: |
+        lftp -e "mirror -R site/ /; quit" -u $FTP_USERNAME,$FTP_PASSWORD $FTP_SERVER

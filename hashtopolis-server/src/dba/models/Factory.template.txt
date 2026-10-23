@@ -1,0 +1,17 @@
+<?php
+
+namespace Hashtopolis\dba;
+
+__MODEL_INCLUDE__
+
+class Factory {
+  __MODEL_STATIC__
+  
+  __MODEL_FUNCTIONS__
+  
+  const FILTER = "filter";
+  const JOIN = "join";
+  const ORDER = "order";
+  const UPDATE = "update";
+  const LIMIT = "limit";
+}

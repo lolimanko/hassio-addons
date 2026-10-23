@@ -1,0 +1,60 @@
+services:
+  hashtopolis-backend:
+    container_name: hashtopolis-backend
+    image: hashtopolis/backend:latest
+    restart: always
+    volumes:
+      - hashtopolis:/usr/local/share/hashtopolis:Z
+      # - ./ssmtp.conf:/etc/ssmtp/ssmtp.conf
+      # - ./jwks.json:/keys/jwks.json:ro
+    environment:
+      HASHTOPOLIS_DB_TYPE: mysql
+      HASHTOPOLIS_DB_USER: $MYSQL_USER
+      HASHTOPOLIS_DB_PASS: $MYSQL_PASSWORD
+      HASHTOPOLIS_DB_HOST: $HASHTOPOLIS_DB_HOST
+      HASHTOPOLIS_DB_DATABASE: $MYSQL_DATABASE
+      HASHTOPOLIS_ADMIN_USER: $HASHTOPOLIS_ADMIN_USER
+      HASHTOPOLIS_ADMIN_PASSWORD: $HASHTOPOLIS_ADMIN_PASSWORD
+      HASHTOPOLIS_BACKEND_URL: $HASHTOPOLIS_BACKEND_URL
+      # Origins the API shares authenticated responses with, beyond its own. Needed when the frontend
+      # is served from a different host; see env.*.example. Same-origin setups need neither this nor
+      # HASHTOPOLIS_FRONTEND_PORT.
+      HASHTOPOLIS_FRONTEND_URLS: $HASHTOPOLIS_FRONTEND_URLS
+      # Shorthand for "the backend's own host and scheme, on this port". Set HASHTOPOLIS_FRONTEND_PORT=
+      # in the .env file to switch it off and let HASHTOPOLIS_FRONTEND_URLS be the whole story. The
+      # default must use ${VAR-default} and not ${VAR:-default}: the latter treats an explicitly empty
+      # value as absent and would put 4200 straight back.
+      HASHTOPOLIS_FRONTEND_PORT: ${HASHTOPOLIS_FRONTEND_PORT-4200}
+      # How the refresh cookie is written. Both are optional and only needed when the frontend sits on
+      # a different domain (SAMESITE=None) or behind a proxy that terminates TLS without announcing it
+      # through X-Forwarded-Proto (SECURE=true). Leaving them empty keeps the safe defaults.
+      HASHTOPOLIS_REFRESH_COOKIE_SAMESITE: $HASHTOPOLIS_REFRESH_COOKIE_SAMESITE
+      HASHTOPOLIS_REFRESH_COOKIE_SECURE: $HASHTOPOLIS_REFRESH_COOKIE_SECURE
+    depends_on:
+      - db
+    ports:
+      - "8080:80"
+  db:
+    container_name: hashtopolis-db
+    image: mysql:9.7
+    restart: always
+    volumes:
+      - db:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: $MYSQL_ROOT_PASS
+      MYSQL_DATABASE: $MYSQL_DATABASE
+      MYSQL_USER: $MYSQL_USER
+      MYSQL_PASSWORD: $MYSQL_PASSWORD
+  hashtopolis-frontend:
+    container_name: hashtopolis-frontend
+    image: hashtopolis/frontend:latest
+    environment:
+      HASHTOPOLIS_BACKEND_URL: $HASHTOPOLIS_BACKEND_URL
+    restart: always
+    depends_on:
+      - hashtopolis-backend
+    ports:
+      - "4200:80" # When changing the host port don't forget to also update the HASHTOPOLIS_FRONTEND_PORT variable above
+volumes:
+  db:
+  hashtopolis:

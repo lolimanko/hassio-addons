@@ -1,0 +1,724 @@
+# Changelogs
+
+The release changelogs are available at the corresponding release for the backend and frontent at:
+
+- **Backend:** [https://github.com/hashtopolis/server/releases](https://github.com/hashtopolis/server/releases)
+- **Frontend:** [https://github.com/hashtopolis/web-ui/releases](https://github.com/hashtopolis/web-ui/releases)
+
+## Backend Legacy Changelog
+
+The following was the legacy changelog for the backend used until before the 1.0.0 release.
+
+### v1.0.0-rc3 -> v1.0.0-rc4
+
+**Bugfixes**
+
+- Set the content-type header to application/json (https://github.com/hashtopolis/server/pull/2372)
+- Fixed sorting to tie breaker key ascend (https://github.com/hashtopolis/server/pull/2375)
+
+**Enhancements**
+
+- Added helper to retrieve counts of completed tasks and supertasks (https://github.com/hashtopolis/server/pull/2357)
+- Add fallback when checking for public fields in AbstractBaseAPI (https://github.com/hashtopolis/server/pull/2370)
+- Change from meta to data where results are delivered on helper (https://github.com/hashtopolis/server/pull/2358)
+- Added helper to retrieve config for all logged in users (https://github.com/hashtopolis/server/pull/2366)
+- Added aggregation 'cracked' to TaskAPI (https://github.com/hashtopolis/server/pull/2367)
+- Added aggregate to Assignment to retrieve the current chunk an agent is working on (https://github.com/hashtopolis/server/pull/2371)
+- Added skipped states to tasks that are not finshed but are archived(https://github.com/hashtopolis/server/pull/2381)
+- Fixed inconsistent success value (https://github.com/hashtopolis/server/pull/2368)
+
+### v1.0.0-rc2 -> v1.0.0-rc3
+
+**Bugfixes**
+
+- Fixed small typo in config.php (#2066)
+- Fixed include in dba/init (#2272)
+- Fixed LikeFilterInsensitive to cast integer columns to text before LIKE (#2285)
+- Check for task completion by using task progress (#2290)
+- Fixed installation docs: broken download URLs and outdated upgrade guide (#2311)
+- Remove encoding of HTML entities by the API (#2296)
+- Fix cursor pagination documentation in OpenAPI docs (#2351)
+
+**Enhancements**
+
+- Added migrations generations (#2237)
+- Removed environment variable to selectively enable new API (#2275)
+- Upgrading to mysql:9.7 and test also upgrades with different versions (#2286)
+- Adding initial data insertion into setup script (#2293)
+- Removed the legacy install script (#2299)
+- Upgraded all composer packages (#2301)
+- Removed obselete version attribute from dockerfiles (#2314)
+- Updated actions for linting workflow and added npm min age (#2334)
+- Replace PECL with PIE (as PECL is deprecated and may be removed in the future) (#2352)
+- Also make task status finished when hashlist has been cracked (#2321)
+
+### v1.0.0-rc1 -> v1.0.0-rc2
+
+**Bugfixes**
+
+- Removed outdated includes from dba init (#2234)
+- Added migration to add backtick to postgres default blacklist charaters (#2236)
+- Fixed pagination bug (#2231)
+- Setting the default admin email to a valid address (#2244)
+- Fixed filter ACL returning duplicate elements for agents (#2250)
+
+**Enhancements**
+
+- Aggregation improvements (#2230)
+- Added basic contribution guidelines (#2243)
+- Attribute useNewBench is made patchable (#2245)
+- Refactored queries in order to fetch Chunk and Hash entities at once (#2258)
+- Additional unittests and removal of legacy openssl calls (#2259)
+- Added documentation for versioning, branch handling and release process (#2263)
+
+### v1.0.0-rainbow6 -> v1.0.0-rc1
+
+**Bugfixes**
+
+- Get correct intersection of legacy api permissions instead of new CRUD (#2067)
+- Setting alias properly for right group primary key (#2085)
+- Fixed missing color labeling of tasks (#2053)
+- Fixed float cast warnings on the old UI for dev builds (#2087)
+- Fixed chunk count missing on task details and percentage sign missing (#2099)
+- Fixed CORS errors (#2080)
+- Fixed file upload metadata handling (#2126)
+- Check for existing of array key before accessing it (#2122)
+- Fixed pagination with reverse sort on no unique keys (#2127)
+- Check for null value before strlen (#2155)
+- Correctly use task object to aggregate task information (#2169)
+- Fixed URL-encode and shell-escape sqlx migration DSN (#2175)
+- Adding migration to fix mysql silently altering table entries on autoincrement (#2192)
+- Fixed apitoken permission check by correctly parsing the permissions (#2196)
+
+**Enhancements**
+
+- Removed rule splitting (#1992)
+- Upgrade composer packages (#2056)
+- Configured sendmail in dev/ci environments to return immediately (#2055)
+- Removed isChunkingAvilable references (#2075)
+- Moved display error handling to dockerfile (#2002)
+- Added enhancement backend endpoint for hash heatmap (#2068)
+- Added estimated time, timespent, currentspeed and currentprogress to taskwrapper view (#2101)
+- Access groups also should be enforced on admin permissions (#2116)
+- Update time filter to use one year from current time (#2133)
+- Added assigned agents to taskwrapperdisplay (#2154)
+
+### v1.0.0-rainbow5 -> v1.0.0-rainbow6
+
+**Bugfixes**
+
+- Fixed tusFileCleaning error (#1949)
+- Catch a migration running error and prevent docker-entrypoint to continue further on failure (#1951)
+- Fixed bug where PATCHING and POST was not checked for permissions (#1957)
+- Fixed patch current user to change own user without permissions (#1958)
+- Fixed bug in content length calculation (#1984)
+- Parse comma in filter (#1985)
+- Fixed creation of task by using correct parameter for cracker binary (#2012)
+- fix user object argument for supertask builder helper (#2032)
+- Fixed access issues where users could access chunk and hash info from other access groups they were not member of. Thanks to Mateo Hahn from the Red Team Ops of Bureau Veritas Cybersecurity for finding and reporting this issue. (#2031)
+- Fix subtask loading where wrong use statement was used (#2036)
+- Correct cracked count of task wrappers if needed (#2037)
+- Made a taskwrapperview to be able to properly sort in the task view (#2034) 
+
+**Enhancements**
+
+
+- Update the basic install manual according to the latest release (#1946)
+- Update of the manual- - fixing style (#1947)
+- Large Rework on Codebase (#1929)
+- Made CrackerBinaryType.typeName unique (#1950)
+- Improve IPv6 handling on about page (#1943)
+- Removed taskExtraDetails endpoint (#1945)
+- made classpath calls to usort consistent (#1952)
+- Added helper for getting available tasks for agent (#1953)
+- Api tokens (#1965)
+- Removed not working transaction for updating hash length (#1979)
+- Made it possible to update a single config (#1981)
+- Better error message when login in with invalid user (#1991)
+- Fixed class names by removing the package from the name (#1987)
+- Updated nginx docs to recent syntax and status code 308 for redirect (#2003)
+- Added a flag isActive to tasks api response to show whether a task is active (#2005)
+- Check if the total hash count of a hashlist needs to be fixed (#2033)
+
+### v1.0.0-rainbow4 -> v1.0.0-rainbow5
+
+**Bugfixes**
+
+- Replace random function for random string generation fixing a critical vulnerability (#1944). Thanks to Philipp Tekeser-Glasz from HvS-Consulting GmbH for finding and reporting this vulnerability.
+
+- Fixed bug that included errors where not added to response (#1752)
+- Fix statement building in DBA on empty filters (#1760)
+- Fixed bug in legacy agentbinary update (#1802)
+- Added additional check to avoid log entries if a hash just was already cracked (#1858)
+
+**Enhancements**
+
+- Add `hashtopolis-` prefix to db Docker container name (#1572)
+- Made responses smaller by not pretty printing the json (#1733)
+- DBA mapping rework (#1762)
+- Upgraded deprecated jwt library to maintained jwt library (#1785)
+- Added index for timeCracked on Hash table (#1786)
+- Added an improved CORS implementation(#1725)
+- Implemented sparse fieldsets support on the backend (#1715)
+- DBA migrations and postgres support (#1795)
+- Made dockerfile smaller by using smaller slim base image (#1826)
+- Refactored load.php into different use case startup parts (#1853)
+- Added OAUTH authentication to backend (#1859)
+- Added helper to retrieve files in the import directory (#1877)
+
+**Full Changelog**: https://github.com/hashtopolis/server/compare/v1.0.0-rainbow4...v1.0.0-rainbow5
+
+### v1.0.0-rainbow3 -> v1.0.0-rainbow4
+
+**Bugfixes**
+
+- Fixed status calculation in backend (#1716)
+- Fixed upgrade of agentbinary to new binaryType (#1722)
+
+### v1.0.0-rainbow2 -> v1.0.0-rainbow3
+
+**Enhancements**
+
+- No hard error when permission is missing from includes (#1627)
+
+**Bugfixes**
+
+- Only use the mask as subtask name in supertask import to avoid too long names (#1681)
+- Fixed error in tests by removing deprecated {extension} from new confidence version (#1677)
+
+### v1.0.0-rainbow -> v1.0.0-rainbow2
+
+**Enhancements**
+
+- Return cprogress from TaskExtraDetailHelper, required for frontend's Visual Graph component (#1674)
+
+**Bugfixes**
+
+- Fixed searchHashes helper to return the objects properly (#1662)
+
+### v0.14.6 -> v1.0.0-rainbow
+
+**Enhancements**
+
+- Updated OpenAPI docs to latest API updates
+- Improved version comparison to avoid update script issues
+- Many more enhancements to improve functionality on new frontend
+
+**Bugfixes**
+
+- Fixed missing .htaccess to avoid access to install directory on docker setups
+- Many more bugfixes to work correctly with the new frontend
+
+### v0.14.5 -> v0.14.6
+
+**Bugfixes**
+
+- Fixed upate script v0.14.4 -> v0.14.5 where some hash types were incorrectly named due to double quotes and dollar signs in names
+
+### v0.14.4 -> v0.14.5
+
+**Enhancements**
+
+- Include new agent compatible with hashcat 7.0.0+ (note 7.1.0 and 7.1.1 are not compatible due to an issue in hashcat, see https://github.com/hashcat/hashcat/issues/4446)
+- Added three more indexes in MySQL to improve the task view drastically (Note: these are not created on update due to performance issues, only on new installs)
+- Added an additional multi-column index in MySQL on the chunk table to increase performance for agents getting tasks (Note: these are not created on update due to performance issues, only on new installs)
+
+
+### v0.14.3 -> v0.14.4
+
+**Enhancements**
+
+- Use utf8mb4 as default encoding in order to support the full unicode range
+- Log hashes when they are skipped. This way the administrator can detect when Hashcat rebuilds the hashes incorrectly 
+
+**Bugfixes**
+
+- Fixed a bug where creating a new preprocessor would copy the configured limit command over the configured skip command
+- Implemented sending emails inside docker container
+
+
+### v0.14.2 -> v0.14.3
+
+**Tech Preview New API**
+
+Release 0.14.3 comes with an update to the tech preview of the new API. Be aware, it is a preview, it contains bugs and it will change; To use it, please see https://github.com/hashtopolis/server/wiki/Installation.
+
+Changes/Bugfixes on new UI:
+
+- After updating a task, the tasks table is also updated
+- Files can now be deleted via the context menu of the files-table
+- Step sequence corrected according to agent registration
+- Standardization of the headline styles and customization of the DarkTheme
+- Selected preprocessor value is now processed correctly when creating new tasks
+- Checkbox values on the config page are now displayed correctly
+- New Help/Contact Menu
+- The hashlists are now displayed correctly according to the tasks on the tasks page
+- Encoding bug fixed, Unicode characters were displayed incorrectly
+
+**Bugfixes**
+
+- Fixed a bug in the user API where a hash in binary format did not return the plain text when cracked
+- Increase the limit of the attack command length
+
+
+### v0.14.1 -> v0.14.2
+
+**Tech Preview New API**
+
+Release 0.14.2 comes with an update to the tech preview of APIv2. Be aware, it is a preview, it contains bugs and it will change; To use it, please see https://github.com/hashtopolis/server/wiki/Installation.
+
+**Bugfixes**
+
+- Setting maxAgent after creating doesn't update the maxAgents of the taskwrapper. This only causes issues when the maxAgents was set at creation time. #1013
+
+
+### v0.14.0 -> v0.14.1
+
+**Tech Preview New API**
+
+Release 0.14.1 comes with an update to the tech preview of APIv2. Be aware, it is a preview, it contains bugs and it will change; To use it, please see https://github.com/hashtopolis/server/wiki/Installation.
+
+**Bugfixes**
+
+- Clicking pretask in Supertask create screen now directs correctly to the pretask and not a task with the same id (#945)
+- Pretask attackCmd parameter was not checked for maximum length of 256 on creation (#963)
+- Creating supertask fails when provided crackerType != pretask.crackerType (#969)
+- Searching for hashes and plaintext now also searches non archived hashlists (#974)
+
+**Features**
+
+- Number of agents per supertask/taskwrapper can be limited (#769).
+
+
+### v0.13.1 -> v0.14.0
+
+**Tech Preview New API**
+
+Release 0.14.0 comes with a tech preview of APIv2. This is the starting point of the seperating of the frontend and the backend and gives 
+insight into what the future brings for Hashtopolis. We invite you to test it with the new web-ui and provide us with feedback. Be aware, 
+it is a preview, it contains bugs and it will change; also it does not contain any permission checking. To use it, please see 
+https://github.com/hashtopolis/server/wiki/Installation.
+
+**Default installation method changed to Dockerimage**
+
+With the release 0.14.0 the default installation method changed to Docker. Docker images are now available at https://hub.docker.com/u/hashtopolis
+
+**Bugfixes**
+
+- Setting 'Salt is in hex' during Hashlist creation will not set the --hex-salt flag (#892)
+
+
+### v0.13.0 -> v0.13.1
+
+**Bugfixes**
+
+- When deleting a supertask that was created from an import, pretasks that were removed from this supertask should also be deleted (issue #865).
+- Setting config values to false using the user API now works as intended.
+- When using the rulesplit function an internal server error was thrown. (#836)
+- Deleting the last Hashlist resulted in an fatal error issue #888.
+
+**Enhancements**
+
+- Hash.hash is now of type MEDIUMTEXT to avoid issues with longer hashes (e.g. LUKS, issue #851).
+
+
+### v0.12.0 -> v0.13.0
+
+**Features**
+
+- Added monitoring of CPU utilization of agents.
+- Cracked hashes for all hashlists can be shown together (caution: only use when having smaller hashlists).
+- Allow abort all chunks of a specific access group from the User API.
+- Tasks can be set to top priority (to be first in the list) by the User API.
+- Supertask runtime can be estimated on the supertask detail page by entering expected attack speeds for hashcat wordlist and bruteforce attacks.
+- Number of agents per task can be limited (pull request #764).
+- Hashlists can be archived.
+- Added hashtype dropdown autocompletion for creating new hashlists (pull request #781).
+- Allow agents to register as CPU agents only (feature request #805).
+
+**Bugfixes**
+
+- Fixed search hash function.
+- Fixed possible path traversal vulnerability on filename check.
+- Fixed pre-crack import of lists with >1000 lines.
+- Fixed availability of cracked hashes link on restrained permissions.
+- Fixed access controls for owners of agents.
+- Fixed improper updating of superhashlist counts on deletion of hashlists.
+- Fixed missing .map files for javascript dependencies.
+- Fixed users being able to access tasks with hashlists they would not be allowed to view.
+- Fixed users being able to access hashlists they are not allowed to see.
+- Adjusted handling to be able to deal with changed mode 22000 output.
+- Fixed pagination of hashes on cracks page.
+- Time of Zaps inserted is now saved.
+- Fixed unable to unassign agent from the task detail screen.
+- Fixed speed graph incorrect when status timer is different from servers default.
+- Fixed sending two to headers when sending emails (issue #751).
+- Fixed access group not being changed on Hashlist detailed screen (issue #765).
+- Fixed missing check on permissions for sending notifications (issue #757).
+- Fixed unassignable agents are shown as assignable (issue #777).
+- Fixed not deleting all references (related to zaps) when deleting hashlist (issue #747).
+- Added check for max length of the attack command (issue #668).
+- Fixed missing flag isArchived on User API getTask requests (issue #794).
+
+**Enhancements**
+
+- Cracker version and name are shown on task details.
+- Task notes and cracker version are copied.
+- Agent activity is also shown on the agent status page.
+- Chunks for a task can be all view, instead of only the last 100.
+- Allow changing the status interval for created tasks.
+- Permissions for managing access groups is separate from the permission to manage users.
+- The agent status page shows more detailed information on temperature and usage.
+- JQuery updated to v3.6.0.
+- Print database connection error in UI theme.
+- Agent detail page now has a hide/show button for the config parameters.
+- Agents overview page and agent detail page now show counter for repeating devices.
+- Increase size of database column for storing agentstats.
+
+
+### v0.11.0 -> v0.12.0
+
+**Features**
+
+- Generic preprocessor integration to allow inclusion of any preprocessor supporting chunking.
+- Dark mode added.
+
+**Bugfixes**
+
+- Fixed increasing the superhashlist cracked count if there are cracks running one of the hashlists alone.
+- Fixed hidden superhashlists on task creation page due to filtering.
+- Fixed reporting result of health check which resulted in endless loop depending on the used IDs.
+- Fixed reporting outdated speed on tasks page when agent is put inactive directly.
+- Fixed recalculation of benchmark when changing chunk time.
+- Fixed discord notification to work again.
+- Fixed missing index structure on speed measurements table.
+
+**Enhancements**
+
+- Agents can be assigned to tasks via user API.
+- Server can be configured to provide 'isComplete' flag on the user API when requesting all tasks.
+- Certain agent errors can be whitelisted to be completely ignored (for such who don't affect the running).
+- Hashlists can be moved to other Access Groups after creation.
+- Health checks can now be deleted.
+- API keys can get masked if admin is not assigned to them.
+- Agent data for temperature and util are split into separate graphs and have more different colors.
+- Files can now be selected for either the cracker task or the preprocessor and are filled in the corresponding field.
+- Included new Hashcat modes included in newest beta.
+- Adjusted to new format of Hashcat printing cracked WPA hashes.
+- Adjusted to PMKID handling of Hashcat.
+
+
+### v0.10.1 -> v0.11.0
+
+**Bugfixes**
+
+- Fixed wrong task speed summation for task overview page.
+- Fixed error on hashlist hash retrieval.
+- Fixed XSS on hashes view page when printing a hashlist.
+- Fixed missing check for blacklisted characters when editing task.
+- Fixed issue with creating a preconfigured task from the API.
+- Fixed wrong rendering of forms when showing supertasks on hashlist pages.
+- Fixed wrong reporting of speed on tasks overview due to cached speeds.
+- Fixed wrong search value of tasks list on hashlist details page.
+- Fixed missing update of cracked count for superhashlists.
+- Fixed listing of hashlists and hashes of lists which should not be accessible by user.
+
+**Enhancements**
+
+- Temperature and util thresholds for agent status page can be configured.
+- User API can provide all cracks for a given task.
+- User API provides information if task is complete or not.
+- User API can provide all cracks for a given hashlist.
+- Support for new Hashcat versions without 32/64-bit naming.
+
+
+### v0.10.0 -> v0.10.1
+
+**Bugfixes**
+
+- Fixed createHashlist API call with wrong brain parameter conversion.
+- Fixed createUser API call with wrong amount of parameters.
+- Fixed applying supertasks directly from hashlist view.
+- Fixed wrong saving of build number if it didn't exist.
+
+
+### v0.9.0 -> v0.10.0
+
+**Features**
+
+- Integration of Hashcat Brain feature.
+- Speed data is kept and can be shown in graphs for tasks.
+- Agents can automatically de-register if allowed on the server.
+- Agent updates can now automatically be retrieved, based on selected update track.
+- Update scripts in the future can be handled differently. Applying updates is easier as there is a build number.
+
+**Bugfixes**
+
+- Fixed wrong percentage in case of big tasks where percentage was close to 0.
+- Rule splitting can only happen if at least two subparts get created afterwards.
+- Fixed filesize calculation for temporary files after rule splitting.
+
+**Enhancements**
+
+- In case of client errors the corresponding chunk now also is saved if available.
+- Make more clear naming on rule splitting tasks, rules have an empty line at the end to increase readability.
+
+
+### v0.8.0 -> v0.9.0
+
+**Features**
+
+- The server saves the crackpos for hash founds given by hashcat.
+- Trimming of chunks can be disabled so a chunk is always run fully again (or splitted if it is too large).
+- Supertasks can now can be created by specifying a base command and iterate over a selection of files to be placed in the command.
+- Notes can be added to hashlists.
+- Added optional trace logging of actions from the client API to get more information in case of failures.
+- Slow hashes are marked, so the client can decide if piping could make sense for this hash type.
+- Agents can run health checks to determine if all agents are running correctly.
+
+**Bugfixes**
+
+- Fixed GPU data graph when having multiple agents.
+- Fixed assignment issue with subtasks of supertasks if they were in the same supertask.
+- Fixed that cracker types cannot be deleted when there are supertasks using this type.
+
+**Enhancements**
+
+- Telegram notifications can now completely be configured via server config and also can be used through proxies.
+- Peppers of Encryption.class.php and CSRF.class.php were moved out of the files to make updating easier.
+- When importing supertasks it can be selected if they should use the optimized flag and which benchmark type should be used.
+- Subtasks are only loaded when being viewed to speed up loading of the tasks page.
+- Changed type of the hash column to TEXT to make sure to handle all the long hashes. It should not affect speed as long as there is not a multi-million hashlist.
+- Preconfigured task attack commands can be edited after creation.
+- If needed it can be set that the server should also distribute tasks with priority 0.
+
+
+### v0.7.1 -> v0.8.0
+
+**Features**
+
+- The server can store sent debug output from Hashcat sent by the agent.
+- Files now also are associated to an Access Group to control the visibility of files.
+- Agent data about device temperature and util is collected and can be viewed on the server.
+- Notes can be added to tasks.
+- Static chunking (if for some reasone a fixed number of chunks or static chunk size should be used for a task)
+- The server can provide a list of deleted filenames to the agent when he asks for.
+- Tasks can now be copied to preconfigured tasks and preconfigured tasks can also be copied to preconfigured tasks.
+- A test framework was added to run automated tests on Travis.
+- To make sure rules are applied before rejecting, piping can be enforced.
+- Added Notification type for Slack.
+
+**Enhancements**
+
+- Task attack commands can be changed after creation, e.g. to fix typos
+- Switch between tasks and archived ones is easier
+- Archived tasks can be deleted at once
+- Task priority can now be set directly in the task creation form.
+
+**Bugfixes**
+
+- New task creation page now also shows the other file type.
+- New file creation with the user API now takes the right file type.
+- Vouchers are tested for uniqueness on creation to avoid duplicated ones.
+- Disabling rule splitting when having a prince task.
+- Fixed non-working secret checkbox for hashlists.
+
+
+### v0.7.0 -> v0.7.1
+
+**Bugfixes**
+
+- Fixed permission check for file downloads with URLs from the user API
+- Fixed issue with creating supertasks from preconfigured task list
+- Fixed creation of tasks from preconfigured tasks out of the hashlist view
+- Fixed mask import
+- Fixed hiding of mask imports in preconfigured task list on hashlist page
+
+
+### v0.6.0 -> v0.7.0
+
+**Features**
+
+- Tasks which are recognized containing large rule files and not giving good benchmarks result in splitting into subtasks
+- Most of the tables can now be easily ordered and searched with the datatables plugin
+- Agent Errors can be handled better
+- New User API allowing access to all functions without the webinterface via simple JSON commands.
+- Added new filetype (Other) for all non rules/wordlist files like hashcat charsets etc.
+- File types can be edited of existing files.
+- Tasks can now be archived instead of being deleted.
+
+**Enhancements**
+
+- Width of the container is increased to have more space on large screens.
+- Standard buttons have now icons instead of text to use less space.
+- Hashcat is configured already as crack to make it easier for users to get started.
+
+**Bugfixes**
+
+- Using correct function to get superhashlistId on zapping from webinterface.
+- Zapping from the website will now also issue zaps for non-salted hashlists.
+- Fixed zapping querying on progress sending from agent to also match for agent null values.
+
+
+### v0.5.1 -> v0.6.0
+
+**Features**
+
+- Added autofocus for login field
+- Added fine grained permission management
+- Updated Bootstrap and jQuery to newest versions
+- Added Icons instead of images
+
+**Bugfixes**
+
+- Export of founds of binary hashlists fixed
+- DB Connection check during installation is now tested correctly
+
+
+### v0.5.0 -> v0.5.1
+
+**Bugfixes**
+
+- Fixed missing file assignments when applying preconfigured tasks from hashlists view (issue #354)
+- Fixed cracker binary relation error when applying supertasks from hashlist view
+- Fixed XSS vulnerability with the login forward variable
+- Session cookies have the httpOnly flag set
+- Fixed file upload which allowed upload of file:// data and reading it
+- Fixed renaming of files which allowed renaming them to other directories and execute them
+- Fixed renaming/uploading of files which allowed to override hidden files (e.g. .htaccess file)
+
+
+### v0.4.3 -> v0.5.0
+
+**Large Update**
+
+- Complete task management backend rewritten
+- Improved performance when handling cracked hashes
+- Added Groups for more detailed access control
+- Including new python client
+- Compatibility with generic crackers
+- More configuration options added
+- Cracker version management changed
+
+**Features**
+
+- Tasks now have a cracks per minute performance based on total spent time
+
+**Bugfixes**
+
+- Fixed dependency problem on user deletion
+- Fixed issue when agents got deleted which had completed at least one chunk
+- Fixed conflicts on $_POST data agent vs. agentId
+- Fixed ETA and spent time for tasks
+- Error message which was always shown when adding new hash types fixed
+
+
+### v0.4.2 -> v0.4.3
+
+**Features**
+
+- Added telegram bot notification
+- Supertasks can now also be applied when viewing hashlist details (similar to preconfigured tasks)
+
+**Bugfixes**
+
+- Notification display fixed
+- Updated problem where agents were looping when tasks go over 100%
+
+**Technical**
+
+- Fixed warnings during found import
+- Fixed edge case where it could happen that agents started to loop after a task when no new task was available
+- Pre-crack import warns when too long plaintexts are in the import file
+- Implemented missing ownAgentError notification execution
+
+
+### v0.4.1 -> v0.4.2
+
+**Features**
+
+- Supertask imports can now be set to be small tasks for every subtask
+
+**Bugfixes**
+
+- Fixed broken agent download
+
+**Technical**
+
+- Typos in constants fixed
+- Tasks can also be deleted from the detailed view
+- Fixed update to 0.4.0 when adding taskType column
+- Supertasks are getting default priority from the subtasks
+- Fixed DBA issue with handling invalid input
+- Fixed additional vulnerabilities reported
+- Fixed remaining fragments when deleting finished supertasks
+
+
+### v0.4.0 -> v0.4.1
+
+**Bugfixes**
+
+- Various vulnerabilities (CVE-2017-11680, CVE-2017-11681, CVE-2017-11682) fixed, see [issue #241](https://github.com/hashtopolis/server/issues/241)
+
+**Technical**
+
+- Improved code handling, constants can be used in templates.
+
+
+### v0.3.2 -> v0.4.0
+
+**Features**
+
+- Renewed status page, gives now JSON formatted information which can be parsed however the user wants to.
+- added search page to search for hashes and plains
+- '-r' is now automatically prepended when selecting rule files on task creation
+- added help page with some helpful links
+- Left hashlists can be downloaded now
+- Added Yubikey OTP login
+- Supertasks added
+- HCmask style can be imported
+
+**Technical**
+
+- DB connection details now are stored in a file which is not in repository (a template is provided instead). This avoids conflicts on updates in `inc/load.php`
+- Hash length is increased to 1024 (old 512)
+- Added special case when handling pre-crack import of WPA as they are not matched via the hash but the ESSID instead.
+- Added new hashtypes from Hashcat
+- Server hostname can be overridden in config
+
+**Client**
+
+- Client updated to version 0.43.19 
+- Fixed debug not showing hashcat parameters on calls
+- Improve error handling on keyspace measuring, client will now signal the server to pause agent instead of crash
+- Added more information for task assigning, client will now display task and hashlist on task get
+- Fixed slow file downloading issue
+- Changed the way hashcat version is queried (should work properly on linux/mac)
+
+
+### v0.3.1 -> v0.3.2
+
+**Client**
+
+- Client updated to version 0.43.13
+
+**Bugfixes**
+
+- fixed not sending notifications when using pre-task creation from hashlist details view
+- 'Delete Finished' button now deletes also tasks of hashlists which are completely cracked
+- on user deletion depending sessions now also get deleted
+- fixed problems on task assignment where priorities were compared wrong
+- clear all doesn't fail anymore when task list is empty
+- fixed problem that on small tasks multiple agents got assigned and assignments were deleted immediately
+- fixed issue that some agents suddenly got a very large chunk
+
+**Features**
+
+- Added possibility to change isCpuOnly and isSmall on tasks after creation
+- DB details are now saved separately to the other loading part, so conflicts on updates are avoided
+
+**Technical**
+
+- removed old installation code which was used to upgrade Hashtopus to Hashtopolis 0.1.0
+- reduced size of task progress image
+

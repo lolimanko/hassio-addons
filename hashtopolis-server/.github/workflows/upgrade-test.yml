@@ -1,0 +1,315 @@
+name: Upgrade Test
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+env:
+  DB_NAME: hashtopolis
+  DB_USER: hashtopolis
+  DB_PASS: hashtopolis
+
+jobs:
+  upgrade-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - start-tag: v0.14.1
+            db-type: mysql
+            db-version: mysql:8.4
+          - start-tag: v0.14.2
+            db-type: mysql
+            db-version: mysql:8.4
+          - start-tag: v0.14.3
+            db-type: mysql
+            db-version: mysql:8.4
+          - start-tag: v0.14.4
+            db-type: mysql
+            db-version: mysql:8.4
+          - start-tag: v0.14.5
+            db-type: mysql
+            db-version: mysql:8.4
+          - start-tag: v0.14.6
+            db-type: mysql
+            db-version: mysql:8.4
+          - start-tag: v0.14.7
+            db-type: mysql
+            db-version: mysql:8.4
+          - start-tag: v0.14.8
+            db-type: mysql
+            db-version: mysql:8.4
+          - start-tag: v1.0.0-rainbow5
+            db-type: mysql
+            db-version: mysql:8.4
+          - start-tag: v1.0.0-rainbow5
+            db-type: postgres
+            db-version: postgres:18
+          - start-tag: v1.0.0-rc1
+            db-type: mysql
+            db-version: mysql:8.4
+          - start-tag: v1.0.0-rc1
+            db-type: postgres
+            db-version: postgres:18
+          - start-tag: v1.0.0
+            db-type: mysql
+            db-version: mysql:8.4
+          - start-tag: v1.0.0
+            db-type: mysql
+            db-version: mysql:9.7
+          - start-tag: v1.0.0
+            db-type: postgres
+            db-version: postgres:18
+          - start-tag: v1.0.1
+            db-type: mysql
+            db-version: mysql:9.7
+          - start-tag: v1.0.1
+            db-type: postgres
+            db-version: postgres:18
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build new image from repository
+        run: docker build -t hashtopolis/backend:test .
+
+      - name: Set up Docker network and volumes
+        run: |
+          docker network create ht-test-net
+          docker volume create ht-data
+          docker volume create ht-data-fresh
+          docker volume create ht-db
+
+      - name: Start database container ${{ matrix.db-version }}
+        run: |
+          if [ "${{ matrix.db-type }}" = "postgres" ]; then
+            docker run -d --network ht-test-net --name db \
+              -e POSTGRES_DB=${{ env.DB_NAME }} \
+              -e POSTGRES_USER=${{ env.DB_USER }} \
+              -e POSTGRES_PASSWORD=${{ env.DB_PASS }} \
+              -v ht-db:/var/lib/postgresql \
+              ${{ matrix.db-version }}
+          else
+            docker run -d --network ht-test-net --name db \
+              -e MYSQL_ROOT_PASSWORD=${{ env.DB_PASS }} \
+              -e MYSQL_DATABASE=${{ env.DB_NAME }} \
+              -e MYSQL_USER=${{ env.DB_USER }} \
+              -e MYSQL_PASSWORD=${{ env.DB_PASS }} \
+              -v ht-db:/var/lib/mysql \
+              ${{ matrix.db-version }}
+          fi
+
+      - name: Wait for database container to be running
+        run: |
+          timeout 120 bash -c '
+            until [ "$(docker container inspect -f "{{.State.Status}}" db 2>/dev/null)" = "running" ]; do
+              sleep 2
+            done
+          '
+          echo "Database container is running"
+
+      - name: Wait for database to accept connections
+        run: |
+          if [ "${{ matrix.db-type }}" = "postgres" ]; then
+            timeout 60 bash -c 'until docker exec db pg_isready -U ${{ env.DB_USER }} 2>/dev/null; do sleep 2; done'
+          else
+            timeout 60 bash -c 'until docker exec db mysqladmin ping -u root -p${{ env.DB_PASS }} --silent 2>/dev/null; do sleep 2; done'
+          fi
+          echo "Database ready"
+
+      - name: Start backend version ${{ matrix.start-tag }}
+        run: |
+          docker run -d --network ht-test-net --name backend \
+            -e HASHTOPOLIS_DB_TYPE=${{ matrix.db-type }} \
+            -e HASHTOPOLIS_DB_USER=${{ env.DB_USER }} \
+            -e HASHTOPOLIS_DB_PASS=${{ env.DB_PASS }} \
+            -e HASHTOPOLIS_DB_HOST=db \
+            -e HASHTOPOLIS_DB_DATABASE=${{ env.DB_NAME }} \
+            -e HASHTOPOLIS_ADMIN_USER=admin \
+            -e HASHTOPOLIS_ADMIN_PASSWORD=hashtopolis \
+            -v ht-data:/usr/local/share/hashtopolis \
+            hashtopolis/backend:${{ matrix.start-tag }}
+
+      - name: Wait for backend initialization
+        run: |
+          timeout 60 bash -c 'until docker logs backend 2>&1 | grep -q "Initialization complete!"; do sleep 3; done'
+          echo "Backend initialized"
+
+      - name: Stop backend ${{ matrix.start-tag }}
+        run: |
+          docker stop backend
+
+      - name: Show backend ${{ matrix.start-tag }} logs
+        if: always()
+        run: docker logs backend
+
+      - name: Remove backend
+        run: docker rm backend
+
+      # The cron scheduler is disabled so the seed comparison is deterministic:
+      # the background job runner would scan the seeded cracker binary, which
+      # creates hashtypes missing from the seed list at an unpredictable time
+      # relative to the dumps.
+      - name: Start new backend
+        run: |
+          docker run -d --network ht-test-net --name backend \
+            -e HASHTOPOLIS_DB_TYPE=${{ matrix.db-type }} \
+            -e HASHTOPOLIS_DB_USER=${{ env.DB_USER }} \
+            -e HASHTOPOLIS_DB_PASS=${{ env.DB_PASS }} \
+            -e HASHTOPOLIS_DB_HOST=db \
+            -e HASHTOPOLIS_DB_DATABASE=${{ env.DB_NAME }} \
+            -e HASHTOPOLIS_ADMIN_USER=admin \
+            -e HASHTOPOLIS_ADMIN_PASSWORD=hashtopolis \
+            -e HASHTOPOLIS_CRON_ENABLE=0 \
+            -v ht-data:/usr/local/share/hashtopolis \
+            hashtopolis/backend:test
+
+      - name: Wait for new backend initialization
+        run: |
+          timeout 60 bash -c 'until docker logs backend 2>&1 | grep -q "Initialization complete!"; do sleep 3; done'
+          echo "New backend initialized - upgrade test passed"
+
+      - name: Show new backend logs
+        if: always()
+        run: docker logs backend
+
+      - name: Verify python agent version matches bundled hashtopolis.zip
+        run: |
+          python3 -m venv /tmp/agent-check-venv
+          /tmp/agent-check-venv/bin/pip install --disable-pip-version-check --quiet psutil==7.2.2 requests==2.34.2
+          AGENT_VERSION="$(/tmp/agent-check-venv/bin/python src/bin/hashtopolis.zip --version --number-only)"
+          echo "Version reported by bundled src/bin/hashtopolis.zip: ${AGENT_VERSION}"
+          if [ "${{ matrix.db-type }}" = "postgres" ]; then
+            DB_VERSION="$(docker exec db psql -t -A -U ${{ env.DB_USER }} -d ${{ env.DB_NAME }} -c "SELECT version FROM agentbinary WHERE binarytype = 'python';")"
+          else
+            DB_VERSION="$(docker exec db mysql -N -u ${{ env.DB_USER }} -p${{ env.DB_PASS }} ${{ env.DB_NAME }} -e "SELECT version FROM AgentBinary WHERE binaryType = 'python';")"
+          fi
+          echo "Python agent version stored in upgraded DB: ${DB_VERSION}"
+          if [ "${AGENT_VERSION}" != "${DB_VERSION}" ]; then
+            echo "::error::Python agent version mismatch: upgraded DB has '${DB_VERSION}', but src/bin/hashtopolis.zip reports '${AGENT_VERSION}'"
+            exit 1
+          fi
+          echo "Python agent version matches bundled hashtopolis.zip."
+
+      - name: Show migration state
+        if: always()
+        run: |
+          if [ "${{ matrix.db-type }}" = "postgres" ]; then
+            docker exec db psql -U ${{ env.DB_USER }} -d ${{ env.DB_NAME }} -c "SELECT version, description, installed_on, success, encode(checksum, 'hex') AS checksum, execution_time FROM _sqlx_migrations ORDER BY version;"
+          else
+            docker exec db mysql -u ${{ env.DB_USER }} -p${{ env.DB_PASS }} ${{ env.DB_NAME }} -e "SELECT version, description, installed_on, success, HEX(checksum) AS checksum, execution_time FROM _sqlx_migrations ORDER BY version;"
+          fi
+
+      - name: Dump upgraded DB seed content
+        run: |
+          if [ "${{ matrix.db-type }}" = "postgres" ]; then
+            docker exec db pg_dump -U ${{ env.DB_USER }} -d ${{ env.DB_NAME }} \
+              --data-only --inserts --no-owner --no-privileges --no-comments \
+              -t accessgroup -t agentbinary -t apigroup -t configsection \
+              -t crackerbinarytype -t hashtype -t preprocessor -t rightgroup \
+              | grep '^INSERT' > upgraded.dump
+            docker exec db psql -t -A -U ${{ env.DB_USER }} -d ${{ env.DB_NAME }} \
+              -c "SELECT 'Config\t' || item || E'\t' || configsectionid || E'\t' || value FROM config ORDER BY item;" \
+              >> upgraded.dump
+          else
+            docker exec db mysqldump -u ${{ env.DB_USER }} -p${{ env.DB_PASS }} ${{ env.DB_NAME }} \
+              --no-create-info --skip-extended-insert --skip-comments --skip-triggers \
+              AccessGroup AgentBinary ApiGroup ConfigSection \
+              CrackerBinaryType HashType Preprocessor RightGroup \
+              | grep '^INSERT' > upgraded.dump
+            docker exec db mysql -N -u ${{ env.DB_USER }} -p${{ env.DB_PASS }} ${{ env.DB_NAME }} \
+              -e "SELECT CONCAT('Config\t', item, '\t', configSectionId, '\t', value) FROM Config ORDER BY item;" \
+              >> upgraded.dump
+          fi
+          sort -o upgraded.dump upgraded.dump
+          echo "Upgraded side dump ($(wc -l < upgraded.dump) rows):"
+          cat upgraded.dump
+
+      - name: Stop upgraded backend
+        run: |
+          docker stop backend
+          docker rm backend
+
+      - name: Reset database for fresh install
+        run: |
+          if [ "${{ matrix.db-type }}" = "postgres" ]; then
+            docker exec db psql -U ${{ env.DB_USER }} -d postgres -c "DROP DATABASE IF EXISTS ${{ env.DB_NAME }};"
+            docker exec db psql -U ${{ env.DB_USER }} -d postgres -c "CREATE DATABASE ${{ env.DB_NAME }} OWNER ${{ env.DB_USER }};"
+          else
+            docker exec db mysql -u root -p${{ env.DB_PASS }} -e "DROP DATABASE IF EXISTS ${{ env.DB_NAME }}; CREATE DATABASE ${{ env.DB_NAME }};"
+          fi
+
+      # See the comment on 'Start new backend' for why the scheduler is disabled.
+      - name: Start fresh backend (newest version)
+        run: |
+          docker run -d --network ht-test-net --name backend \
+            -e HASHTOPOLIS_DB_TYPE=${{ matrix.db-type }} \
+            -e HASHTOPOLIS_DB_USER=${{ env.DB_USER }} \
+            -e HASHTOPOLIS_DB_PASS=${{ env.DB_PASS }} \
+            -e HASHTOPOLIS_DB_HOST=db \
+            -e HASHTOPOLIS_DB_DATABASE=${{ env.DB_NAME }} \
+            -e HASHTOPOLIS_ADMIN_USER=admin \
+            -e HASHTOPOLIS_ADMIN_PASSWORD=hashtopolis \
+            -e HASHTOPOLIS_CRON_ENABLE=0 \
+            -v ht-data-fresh:/usr/local/share/hashtopolis \
+            hashtopolis/backend:test
+
+      - name: Wait for fresh backend initialization
+        run: |
+          timeout 60 bash -c 'until docker logs backend 2>&1 | grep -q "Initialization complete!"; do sleep 3; done'
+          echo "Fresh backend initialized"
+
+      - name: Show fresh backend logs
+        if: always()
+        run: docker logs backend
+
+      - name: Dump fresh DB seed content
+        run: |
+          if [ "${{ matrix.db-type }}" = "postgres" ]; then
+            docker exec db pg_dump -U ${{ env.DB_USER }} -d ${{ env.DB_NAME }} \
+              --data-only --inserts --no-owner --no-privileges --no-comments \
+              -t accessgroup -t agentbinary -t apigroup -t configsection \
+              -t crackerbinarytype -t hashtype -t preprocessor -t rightgroup \
+              | grep '^INSERT' > fresh.dump
+            docker exec db psql -t -A -U ${{ env.DB_USER }} -d ${{ env.DB_NAME }} \
+              -c "SELECT 'Config\t' || item || E'\t' || configsectionid || E'\t' || value FROM config ORDER BY item;" \
+              >> fresh.dump
+          else
+            docker exec db mysqldump -u ${{ env.DB_USER }} -p${{ env.DB_PASS }} ${{ env.DB_NAME }} \
+              --no-create-info --skip-extended-insert --skip-comments --skip-triggers \
+              AccessGroup AgentBinary ApiGroup ConfigSection \
+              CrackerBinaryType HashType Preprocessor RightGroup \
+              | grep '^INSERT' > fresh.dump
+            docker exec db mysql -N -u ${{ env.DB_USER }} -p${{ env.DB_PASS }} ${{ env.DB_NAME }} \
+              -e "SELECT CONCAT('Config\t', item, '\t', configSectionId, '\t', value) FROM Config ORDER BY item;" \
+              >> fresh.dump
+          fi
+          sort -o fresh.dump fresh.dump
+          echo "Fresh side dump ($(wc -l < fresh.dump) rows):"
+          cat fresh.dump
+
+      - name: Compare fresh vs upgraded DB seed content
+        run: |
+          if ! diff fresh.dump upgraded.dump > seed-drift.diff; then
+            echo "::error::Seed data drift detected between fresh and upgraded install"
+            echo "--- fresh.dump / +++ upgraded.dump"
+            cat seed-drift.diff
+            exit 1
+          fi
+          echo "No seed data drift detected."
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop backend 2>/dev/null || true
+          docker rm backend 2>/dev/null || true
+          docker stop db 2>/dev/null || true
+          docker rm db 2>/dev/null || true
+          docker network rm ht-test-net 2>/dev/null || true
+          docker volume rm ht-db ht-data ht-data-fresh 2>/dev/null || true

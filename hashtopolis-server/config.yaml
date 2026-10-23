@@ -1,0 +1,51 @@
+name: "hashtopolis-backend"
+description: "hashtopolis-backend"
+version: "1.0.1"
+slug: "hashtopolis-backend"
+#init: false
+#host_network: true
+ports:
+  80/tcp: 8080
+  443/tcp: 8081
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+map:
+  - type: ssl
+    read_only: False
+  - type: media
+    read_only: False
+  - type: share
+    read_only: false
+  - type: addon_config
+    read_only: false
+    path: /usr/local/share/hashtopolis
+#image: "redroid/redroid" 
+options:
+  hashtopolis_db_type: 
+  hashtopolis_db_user: 
+  hashtopolis_db_pass: 
+  hashtopolis_db_host: 
+  hashtopolis_db_port:
+  hashtopolis_db_database:
+  hashtopolis_admin_user:
+  hashtopolis_admin_password:
+  hashtopolis_backend_url:
+  hashtopolis_frontend_urls: 
+  SSL: false
+schema:
+
+  hashtopolis_db_type: str
+  hashtopolis_db_user: str
+  hashtopolis_db_pass: str
+  hashtopolis_db_host: str
+  hashtopolis_db_port: str
+  hashtopolis_db_database: str
+  hashtopolis_admin_user: str
+  hashtopolis_admin_password: str
+  hashtopolis_backend_url: str
+  hashtopolis_frontend_urls: str
+  SSL: bool

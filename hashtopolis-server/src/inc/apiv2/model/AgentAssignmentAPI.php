@@ -1,0 +1,190 @@
+<?php
+
+namespace Hashtopolis\inc\apiv2\model;
+
+use Exception;
+use Hashtopolis\dba\AbstractModel;
+use Hashtopolis\inc\utils\AccessUtils;
+use Hashtopolis\inc\utils\AgentUtils;
+use Hashtopolis\inc\utils\AssignmentUtils;
+use Hashtopolis\dba\models\AccessGroupAgent;
+use Hashtopolis\dba\ExistsFilter;
+use Hashtopolis\dba\ContainFilter;
+use Hashtopolis\dba\Factory;
+use Hashtopolis\dba\models\Hashlist;
+use Hashtopolis\dba\JoinFilter;
+use Hashtopolis\dba\models\Agent;
+use Hashtopolis\dba\models\Assignment;
+use Hashtopolis\dba\models\Task;
+use Hashtopolis\dba\models\TaskWrapper;
+use Hashtopolis\dba\models\User;
+use Hashtopolis\inc\apiv2\common\AbstractModelAPI;
+use Hashtopolis\inc\apiv2\error\HttpError;
+use Hashtopolis\inc\HTException;
+use Hashtopolis\inc\Util;
+use Hashtopolis\inc\utils\TaskUtils;
+
+
+/**
+ * @extends AbstractModelAPI<Assignment>
+ */
+class AgentAssignmentAPI extends AbstractModelAPI {
+  public static function getBaseUri(): string {
+    return "/api/v2/ui/agentassignments";
+  }
+  
+  public static function getAvailableMethods(): array {
+    return ['POST', 'GET', 'DELETE', 'PATCH'];
+  }
+  
+  public static function getDBAclass(): string {
+    return Assignment::class;
+  }
+  
+  /**
+   * @param Assignment $object
+   * @throws Exception
+   */
+  protected function getSingleACL(User $user, AbstractModel $object): bool {
+    $accessGroupsUser = Util::arrayOfIds(AccessUtils::getAccessGroupsOfUser($user));
+    $agent = Factory::getAgentFactory()->get($object->getAgentId());
+    $accessGroupsAgent = Util::arrayOfIds(AccessUtils::getAccessGroupsOfAgent($agent));
+    
+    return count(array_intersect($accessGroupsAgent, $accessGroupsUser)) > 0;
+  }
+  
+  /**
+   * @throws Exception
+   */
+  protected function getFilterACL(): array {
+    $accessGroups = Util::arrayOfIds(AccessUtils::getAccessGroupsOfUser($this->getCurrentUser()));
+    
+    return [
+      Factory::JOIN => [
+        new JoinFilter(Factory::getTaskFactory(), Assignment::TASK_ID, Task::TASK_ID),
+        new JoinFilter(Factory::getTaskWrapperFactory(), Task::TASK_WRAPPER_ID, TaskWrapper::TASK_WRAPPER_ID, Factory::getTaskFactory()),
+        new JoinFilter(Factory::getHashlistFactory(), TaskWrapper::HASHLIST_ID, Hashlist::HASHLIST_ID, Factory::getTaskWrapperFactory()),
+      ],
+      Factory::FILTER => [
+        new ExistsFilter(Factory::getAccessGroupAgentFactory(), AccessGroupAgent::AGENT_ID, Assignment::AGENT_ID, [new ContainFilter(AccessGroupAgent::ACCESS_GROUP_ID, $accessGroups, Factory::getAccessGroupAgentFactory())]),
+        new ContainFilter(Hashlist::ACCESS_GROUP_ID, $accessGroups, Factory::getHashlistFactory()),
+      ]
+    ];
+  }
+  
+  public static function getToOneRelationships(): array {
+    return [
+      'agent' => [
+        'key' => Assignment::AGENT_ID,
+        
+        'relationType' => Agent::class,
+        'relationKey' => Agent::AGENT_ID,
+      ],
+      'task' => [
+        'key' => Assignment::TASK_ID,
+        
+        'relationType' => Task::class,
+        'relationKey' => Task::TASK_ID,
+      ],
+    ];
+  }
+  
+  /**
+   * @throws HTException
+   * @throws HttpError
+   */
+  protected function createObject(array $data): int {
+    $assignment = AgentUtils::assign(
+      $data[Assignment::AGENT_ID],
+      $data[Assignment::TASK_ID],
+      $this->getCurrentUser(),
+      $data[Assignment::BENCHMARK]
+    );
+    
+    assert($assignment !== null);
+    
+    return $assignment->getId();
+  }
+  
+  protected function getUpdateHandlers($id, $current_user): array {
+    return [
+      Assignment::BENCHMARK => fn($value) => AssignmentUtils::setBenchmark($id, $value, $current_user)
+    ];
+  }
+  
+  public function getAggregateFieldsets(): array {
+    return [
+      'assignment' => [
+        'crackingTime' => [$this, 'getAggregateCrackingTime'],
+        'cracked' => [$this, 'getAggregateCracked'],
+        'currentSpeed' => [$this, 'getAggregateCurrentSpeed'],
+        'currentChunkId' => [$this, 'getAggregateCurrentChunkId'],
+        'searched' => [$this, 'getAggregateSearched'],
+      ]
+    ];
+  }
+
+  public static function getAggregateFeatures(): array {
+    return [
+      'crackingTime' => self::aggregateFeature('int', 'crackingTime'),
+      'cracked' => self::aggregateFeature('int', 'cracked'),
+      'currentSpeed' => self::aggregateFeature('int', 'currentSpeed'),
+      /* No chunk in progress yields no key rather than a null one */
+      'currentChunkId' => self::aggregateFeature('int', 'currentChunkId'),
+      'searched' => self::aggregateFeature('int', 'searched'),
+    ];
+  }
+
+  /**
+   * @param Assignment $object
+   * @return int
+   * @throws Exception
+   */
+  protected function getAggregateCrackingTime(AbstractModel $object): int {
+    return AgentUtils::getAggregateCrackingTime($object->getAgentId(), $object->getTaskId());
+  }
+  
+  /**
+   * @param Assignment $object
+   * @return int
+   * @throws Exception
+   */
+  protected function getAggregateCracked(AbstractModel $object): int {
+    return AgentUtils::getAggregateCracked($object->getAgentId(), $object->getTaskId());
+  }
+  
+  /**
+   * @param Assignment $object
+   * @throws Exception
+   */
+  protected function getAggregateCurrentSpeed(AbstractModel $object): int {
+    return TaskUtils::getCurrentSpeedOfTask($object->getTaskId(), $object->getAgentId());
+  }
+  
+  /**
+   * @param Assignment $object
+   * @return ?int
+   * @throws Exception
+   */
+  protected function getAggregateCurrentChunkId(AbstractModel $object): ?int {
+    $active_chunk = AgentUtils::getActiveChunk($object->getAgentId(), $object->getTaskId());
+    return $active_chunk?->getId();
+  }
+  
+  /**
+   * @param Assignment $object
+   * @throws Exception
+   */
+  protected function getAggregateSearched(AbstractModel $object): int {
+    return TaskUtils::getTaskProgress($object->getTaskId(), $object->getAgentId());
+  }
+  
+  /**
+   * @param Assignment $object
+   * @throws HTException
+   * @throws HttpError
+   */
+  protected function deleteObject(AbstractModel $object): void {
+    AgentUtils::assign($object->getAgentId(), 0, $this->getCurrentUser());
+  }
+}

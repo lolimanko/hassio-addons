@@ -1,0 +1,147 @@
+<?php
+
+namespace Hashtopolis\inc\apiv2\model;
+
+use Firebase\JWT\JWT;
+use Hashtopolis\dba\Factory;
+use Hashtopolis\dba\models\JwtApiKey;
+use Hashtopolis\dba\models\User;
+use Hashtopolis\dba\AbstractModel;
+use Hashtopolis\dba\QueryFilter;
+use Hashtopolis\inc\apiv2\common\AbstractModelAPI;
+use Hashtopolis\inc\apiv2\error\HttpError;
+use Hashtopolis\inc\apiv2\error\HttpForbidden;
+use Hashtopolis\inc\apiv2\error\ResourceNotFoundError;
+use Hashtopolis\inc\defines\DTokenType;
+use Hashtopolis\inc\StartupConfig;
+
+use Hashtopolis\inc\utils\AccessUtils;
+use Hashtopolis\inc\utils\JwtTokenUtils;
+
+class ApiTokenAPI extends AbstractModelAPI {
+  const API_AUD = "api_hashtopolis";
+  private ?string $jwtToken = null;
+  
+  private function setJwtToken(string $token): void {
+    $this->jwtToken = $token;
+  }
+  
+  private function getJwtToken(): ?string {
+    return $this->jwtToken;
+  }
+  
+  public static function getBaseUri(): string {
+    return "/api/v2/ui/apiTokens";
+  }
+  
+  public static function getAvailableMethods(): array {
+    return ['GET', 'POST', 'PATCH', 'DELETE'];
+  }
+  
+  public static function getDBAclass(): string {
+    return JwtApiKey::class;
+  }
+  
+  public static function getToOneRelationships(): array {
+    return [
+      'user' => [
+        'key' => JwtApiKey::USER_ID,
+        
+        'relationType' => User::class,
+        'relationKey' => User::USER_ID,
+      ]
+    ];
+  }
+  
+  public function getFormFields(): array {
+    // TODO Form declarations in more generic class to allow auto-generated OpenAPI specifications
+    return [
+      "scopes" => ['type' => 'array', 'subtype' => 'string']
+    ];
+  }
+  
+  /**
+   * @param JwtApiKey $object
+   */
+  protected function getSingleACL(User $user, AbstractModel $object): bool {
+    return ($object->getUserId() === $user->getId());
+  }
+  
+  protected function getFilterACL(): array {
+    $userId = $this->getCurrentUser()->getId();
+    return [
+      Factory::FILTER => [
+        new QueryFilter(User::USER_ID, $userId, "=")
+      ]
+    ];
+  }
+  
+  public static function getAggregateFeatures(): array {
+    return [
+      'token' => self::aggregateFeature('str', 'token'),
+    ];
+  }
+
+  /**
+   * @throws HttpError
+   * @throws ResourceNotFoundError
+   */
+  protected function createObject(array $data): int {
+    //Scopes is an array of permissions in format [permFileTaskUpdate, permAgentDelete]
+    $scopes = explode(",", $data["scopes"]);
+    
+    $userCrudPerms = AccessUtils::getPermissionArrayConverted(
+      $this->getRightGroup($this->getCurrentUser()->getRightGroupId())->getPermissions()
+    );
+    
+    // Modern CRUD scope dict: true if the perm was requested AND the user has it.
+    $requestedScopes = [];
+    foreach ($userCrudPerms as $perm => $granted) {
+      $requestedScopes[$perm] = $granted && in_array($perm, $scopes, true);
+    }
+    
+    $secret = StartupConfig::getInstance()->getPepper(0);
+    $iat = $data[JwtApiKey::START_VALID];
+    $expires = $data[JwtApiKey::END_VALID];
+    $tokenName = $data[JwtApiKey::TOKEN_NAME];
+    $token = JwtTokenUtils::createKey($this->getCurrentUser()->getId(), $iat, $expires, $tokenName, $data[JwtApiKey::IS_REVOKED]);
+    $jti = $token->getId();
+    
+    $payload = [
+      "iat" => $iat,
+      "exp" => $expires,
+      "jti" => $jti,
+      "userId" => $this->getCurrentUser()->getId(),
+      "scope" => json_encode($requestedScopes),
+      "iss" => "Hashtopolis",
+      "aud" => $this::API_AUD,
+      "kid" => hash("sha256", $secret),
+      // An API token authorises resource requests, the same as a login token does
+      "type" => DTokenType::ACCESS
+    ];
+    
+    $tokenEncoded = JWT::encode($payload, $secret, "HS256");
+    $this->setJwtToken($tokenEncoded);
+    
+    return $token->getId();
+  }
+  
+  function aggregateData(AbstractModel $object, array &$includedData = [], ?array $aggregateFieldsets = null): array {
+    // $token is only set in POST, this way the actual token is only returned after creation.
+    $aggregatedData = [];
+    $token = $this->getJwtToken();
+    if ($token !== null) {
+      $aggregatedData["token"] = $token;
+    }
+    
+    return array_merge_recursive($aggregatedData, parent::aggregateData($object, $includedData, $aggregateFieldsets));
+  }
+  
+  /**
+   * @param JwtApiKey $object
+   * @throws HttpForbidden
+   */
+  protected function deleteObject(AbstractModel $object): void {
+    JwtTokenUtils::deleteKey($object);
+  }
+}
