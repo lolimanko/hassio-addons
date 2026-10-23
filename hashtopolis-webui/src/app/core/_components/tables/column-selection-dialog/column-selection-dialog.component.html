@@ -1,0 +1,14 @@
+<h2 mat-dialog-title>Select Columns</h2>
+
+<mat-dialog-content>
+  <mat-selection-list [(ngModel)]="selectedColumns">
+    @for (key of getKeys(); track key) {
+      <mat-list-option [value]="key">{{ availableColumns[key] }}</mat-list-option>
+    }
+  </mat-selection-list>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button-submit type="cancel-dialog" name="Cancel" (click)="closeDialog()"></button-submit>
+  <button mat-flat-button cdkFocusInitial [mat-dialog-close]="selectedColumns">OK</button>
+</mat-dialog-actions>

@@ -1,0 +1,346 @@
+import { zGetCompletedCountHelperApiResponse, zGetCracksPerDayHelperApiResponse } from '@generated/api/zod';
+import { Observable, Subscription, catchError, forkJoin, map, of } from 'rxjs';
+
+import { Component, DestroyRef, OnDestroy, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+
+import { BuiltInTheme } from '@models/config-ui.model';
+import { TaskType } from '@models/task.model';
+
+import { PermissionService } from '@services/permission/permission.service';
+import { AutoRefreshService } from '@services/shared/refresh/auto-refresh.service';
+import { ThemeService } from '@services/shared/theme.service';
+
+import { Perm } from '@src/app/core/_constants/userpermissions.config';
+import { PageTitle } from '@src/app/core/_decorators/autotitle';
+import { UIConfig } from '@src/app/core/_models/config-ui.model';
+import { FilterType } from '@src/app/core/_models/request-params.model';
+import { ResponseWrapper } from '@src/app/core/_models/response.model';
+import { SERV } from '@src/app/core/_services/main.config';
+import { GlobalService } from '@src/app/core/_services/main.service';
+import { RequestParamBuilder } from '@src/app/core/_services/params/builder-implementation.service';
+import { LocalStorageService } from '@src/app/core/_services/storage/local-storage.service';
+import { UISettingsUtilityClass } from '@src/app/shared/utils/config';
+import { unixTimestampInPast } from '@src/app/shared/utils/datetime';
+
+@Component({
+  selector: 'app-home',
+  templateUrl: './home.component.html',
+  styleUrls: ['./home.component.scss'],
+  host: { class: 'block' },
+  standalone: false
+})
+@PageTitle(['Dashboard'])
+export class HomeComponent implements OnInit, OnDestroy {
+  private gs = inject(GlobalService);
+  protected autoRefreshService = inject(AutoRefreshService);
+  private service = inject<LocalStorageService<UIConfig>>(LocalStorageService);
+  private permissionService = inject(PermissionService);
+  private themeService = inject(ThemeService);
+
+  /**
+   * Utility class for UI settings retrieval and updates.
+   */
+  util: UISettingsUtilityClass;
+
+  /** Whether dark mode is enabled */
+  isDarkMode = false;
+  currentTheme: UIConfig['theme'] = BuiltInTheme.LIGHT;
+
+  /** Dashboard statistics counters */
+  activeAgents = 0;
+  totalAgents = 0;
+  totalTasks = 0;
+  completedTasks = 0;
+  totalCracks = 0;
+  completedSupertasks = 0;
+  totalSupertasks = 0;
+
+  /** Last data load timestamp */
+  lastUpdated!: Date;
+
+  /** Loading state */
+  loading = false;
+
+  /** Refreshing state */
+  refreshing = false;
+
+  /** User permission flags */
+  canReadAgents = false;
+  canReadTasks = false;
+  canReadCracks = false;
+
+  refreshFlash = false;
+
+  /**
+   * Heatmap chart data as array of tuples: [date string, count].
+   * Example: [['2025-07-01', 5], ['2025-07-02', 7], ...]
+   */
+  heatmapData: [string, number][] = [];
+
+  /** Fixed legend swatches matching the heatmap's bucket alphas. */
+  readonly legendColors: readonly string[] = [0.18, 0.32, 0.55, 0.85].map(
+    (alpha) => `color-mix(in oklch, var(--primary) ${Math.round(alpha * 100)}%, transparent)`
+  );
+
+  private destroyRef = inject(DestroyRef);
+  private uiSettings: UISettingsUtilityClass;
+  private pageReloadTimeout: NodeJS.Timeout;
+
+  /** Auto-refresh subscription */
+  private autoRefreshSubscription?: Subscription | undefined;
+
+  constructor() {
+    this.uiSettings = new UISettingsUtilityClass(this.service);
+    this.currentTheme = this.uiSettings.getSetting('theme') ?? BuiltInTheme.LIGHT;
+    this.isDarkMode = this.themeService.isDark(this.currentTheme);
+  }
+
+  /**
+   * Angular lifecycle hook: initializes permissions, UI utilities,
+   * loads initial data, and sets up auto-refresh if enabled.
+   */
+  ngOnInit(): void {
+    // Initialize permissions
+    this.canReadAgents = this.permissionService.hasPermissionSync(Perm.Agent.READ);
+    this.canReadTasks = this.permissionService.hasPermissionSync(Perm.Task.READ);
+    this.canReadCracks = this.permissionService.hasPermissionSync(Perm.Hash.READ);
+
+    this.loadData();
+
+    this.themeService.theme$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((theme) => {
+      this.currentTheme = theme ?? this.themeService.current;
+      this.isDarkMode = this.themeService.isDark(this.currentTheme);
+    });
+
+    // Start auto-refresh if enabled.
+
+    if (this.autoRefreshService.refreshPage) {
+      this.autoRefreshSubscription = this.autoRefreshService.refresh$
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe(() => this.loadData(true));
+      this.autoRefreshService.startAutoRefresh({ immediate: false });
+    }
+  }
+
+  /**
+   * Angular lifecycle hook: stops auto-refresh and clears any active timeout.
+   */
+  ngOnDestroy(): void {
+    this.autoRefreshService.stopAutoRefresh();
+    if (this.pageReloadTimeout) {
+      clearTimeout(this.pageReloadTimeout);
+    }
+  }
+
+  /**
+   * Loads dashboard data with loading state
+   * @param isRefresh Whether this is a refresh action (true) or initial load (false)
+   */
+  private loadData(isRefresh = false): void {
+    if (isRefresh) {
+      this.refreshing = true;
+    } else {
+      this.loading = true;
+    }
+
+    this.initData$().subscribe({
+      next: () => {},
+      error: (err) => console.error('Failed to load dashboard data:', err),
+      complete: () => {
+        this.lastUpdated = new Date();
+        if (isRefresh) {
+          this.refreshing = false;
+          this.flashDashboard(); // Flash effect on refresh
+        } else {
+          this.loading = false;
+        }
+      }
+    });
+  }
+
+  /**
+   * Fetches all dashboard data depending on user permissions using forkJoin for parallel execution.
+   * @returns Observable<void> completing when all requested data is loaded or errored
+   */
+  private initData$(): Observable<void> {
+    const observables: Observable<void>[] = [];
+
+    if (this.canReadAgents) observables.push(this.getAgents$());
+    if (this.canReadTasks) observables.push(this.getTasks$(), this.getSuperTasks$(), this.getCompletedCounts$());
+    if (this.canReadCracks) observables.push(this.getCracks$(), this.updateHeatmapData$());
+
+    if (observables.length === 0) return of(undefined);
+
+    return forkJoin(observables).pipe(map(() => undefined));
+  }
+
+  /**
+   * Enables or disables the auto-reload functionality and displays
+   * a corresponding success message.
+   *
+   * @param flag True to enable autoreload, false to pause it.
+   */
+  protected setAutoRefresh(flag: boolean): void {
+    // Unsubscribe existing
+    if (this.autoRefreshSubscription) {
+      this.autoRefreshSubscription.unsubscribe();
+      this.autoRefreshSubscription = undefined;
+    }
+    this.autoRefreshService.toggleAutoRefresh(flag, { immediate: true });
+    if (flag) {
+      this.autoRefreshService.refresh$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+        // Only reload if no load/refresh is in progress
+        if (!this.loading && !this.refreshing) {
+          this.loadData(true);
+        }
+      });
+    }
+  }
+
+  /**
+   * Fetches the number of active and total agents.
+   * @returns Observable<void> completing when data is loaded or errored
+   */
+  private getAgents$(): Observable<void> {
+    const params = new RequestParamBuilder()
+      .addFilter({ field: 'isActive', operator: FilterType.EQUAL, value: true })
+      .addIncludeTotal(true)
+      .create();
+
+    return this.gs.getAll(SERV.AGENTS_COUNT, params).pipe(
+      map((response: ResponseWrapper) => {
+        this.totalAgents = response.meta.total_count ?? 0;
+        this.activeAgents = response.meta.count ?? 0;
+      }),
+      catchError((err) => {
+        console.error('Failed to fetch agents:', err);
+        return of(undefined);
+      })
+    );
+  }
+
+  /**
+   * Fetches the total number of tasks. Archived tasks are excluded.
+   * The completed count is fetched separately, see {@link getCompletedCounts$}.
+   * @returns Observable<void> completing when data is loaded or errored
+   */
+  private getTasks$(): Observable<void> {
+    const params = new RequestParamBuilder()
+      .addInclude('tasks')
+      .addFilter({ field: 'taskType', operator: FilterType.EQUAL, value: 0 })
+      .addFilter({ field: 'isArchived', operator: FilterType.EQUAL, value: 0 })
+      .create();
+
+    return this.gs.getAll(SERV.TASKS_WRAPPER_COUNT, params).pipe(
+      map((res: ResponseWrapper) => {
+        this.totalTasks = res.meta.count ?? 0;
+      }),
+      catchError((err) => {
+        console.error('Failed to fetch total tasks:', err);
+        return of(undefined);
+      })
+    );
+  }
+
+  /**
+   * Fetches the total number of supertasks. Archived supertasks are excluded.
+   * The completed count is fetched separately, see {@link getCompletedCounts$}.
+   * @returns Observable<void> completing when data is loaded or errored
+   */
+  private getSuperTasks$(): Observable<void> {
+    const params = new RequestParamBuilder()
+      .addFilter({ field: 'taskType', operator: FilterType.EQUAL, value: TaskType.SUPERTASK })
+      .addFilter({ field: 'isArchived', operator: FilterType.EQUAL, value: 0 })
+      .create();
+
+    return this.gs.getAll(SERV.TASKS_WRAPPER_COUNT, params).pipe(
+      map((res: ResponseWrapper) => {
+        this.totalSupertasks = res.meta.count ?? 0;
+      }),
+      catchError((err) => {
+        console.error('Failed to fetch total supertasks:', err);
+        return of(undefined);
+      })
+    );
+  }
+
+  private getCompletedCounts$(): Observable<void> {
+    return this.gs.ghelper(SERV.HELPER, 'getCompletedCount').pipe(
+      map((res: ResponseWrapper) => {
+        const { meta } = zGetCompletedCountHelperApiResponse.parse(res);
+        this.completedTasks = meta.completedTasks;
+        this.completedSupertasks = meta.completedSupertasks;
+      }),
+      catchError((err) => {
+        console.error('Failed to fetch completed counts:', err);
+        return of(undefined);
+      })
+    );
+  }
+
+  /**
+   * Fetches cracks count for the past 7 days and updates the heatmap data.
+   * @returns Observable<void> completing when data is loaded or errored
+   */
+  private getCracks$(): Observable<void> {
+    const timestampInPast = unixTimestampInPast(7);
+    const params = new RequestParamBuilder()
+      .addFilter({ field: 'timeCracked', operator: FilterType.GREATER, value: timestampInPast })
+      .create();
+
+    return this.gs.getAll(SERV.HASHES_COUNT, params).pipe(
+      map((res: ResponseWrapper) => {
+        this.totalCracks = res.meta.count ?? 0;
+      }),
+      catchError((err) => {
+        console.error('Failed to fetch cracks count:', err);
+        return of(undefined);
+      }),
+      map(() => undefined)
+    );
+  }
+
+  /**
+   * Calls getCracksPerDay, validates the JSON:API response with Zod and builds
+   * heatmap data for every day across the trailing 12 months up to today,
+   * filling days with no cracks with a count of 0.
+   * @returns Observable<void> completing when data is loaded or errored
+   */
+  private updateHeatmapData$(): Observable<void> {
+    return this.gs.ghelper(SERV.HELPER, 'getCracksPerDay').pipe(
+      map((res: ResponseWrapper) => {
+        const parsed = zGetCracksPerDayHelperApiResponse.parse(res);
+        const rawData = parsed.meta;
+
+        const today = new Date();
+        const allDays: [string, number][] = [];
+        const cursor = new Date(today);
+        cursor.setFullYear(cursor.getFullYear() - 1);
+
+        while (cursor <= today) {
+          const dateStr = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
+          allDays.push([dateStr, rawData[dateStr] ?? 0]);
+          cursor.setDate(cursor.getDate() + 1);
+        }
+
+        this.heatmapData = allDays;
+      }),
+      catchError((err) => {
+        console.error('Failed to fetch heatmap data:', err);
+        return of(undefined);
+      })
+    );
+  }
+
+  /**
+   * Triggers a brief flash effect on the dashboard to indicate data refresh.
+   * @private
+   */
+  private flashDashboard(): void {
+    this.refreshFlash = true;
+    setTimeout(() => {
+      this.refreshFlash = false;
+    }, 500); // duration of the flash in ms
+  }
+}

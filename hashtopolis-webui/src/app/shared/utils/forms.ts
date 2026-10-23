@@ -1,0 +1,163 @@
+/**
+ * This module contains reusable functions used in forms
+ *
+ * Note: To use three-shaking is better do not use class
+ * Comments use: https://tsdoc.org/
+ */
+
+import { Buffer } from 'buffer';
+
+import { FieldMapping } from '@src/app/core/_constants/select.config';
+
+/**
+ * Interface definition for single select option
+ * @prop id ID of option
+ * @prop name Name of option
+ */
+export interface SelectOption<T extends string | number | boolean = string> {
+  id: T;
+  name: string;
+}
+
+/**
+ * Extract Ids
+ * Used extract ids after mat-autcomplete component
+ *
+ * @param dataArray
+ * @param idKey
+ * @returns Values [1,2,3]
+ * ```
+ * @public
+ */
+export function extractIds<TId extends number = number, T extends object = object>(
+  dataArray: T[],
+  idKey: keyof T & string
+): TId[] {
+  return dataArray
+    .map((item): unknown => (Object.prototype.hasOwnProperty.call(item, idKey) ? item[idKey] : null))
+    .filter((id): id is TId => typeof id === 'number');
+}
+
+/**
+ * Transforms API response options based on a field mapping configuration.
+ *
+ * The generic overload validates at compile time that the field mapping's
+ * values are actual keys of the source type `T`.
+ *
+ * @param apiOptions - The options received from an API response.
+ * @param fieldMapping - The field configuration that contains the mapping between form fields and API fields.
+ *
+ * @returns An array of transformed select options to be used in the form.
+ */
+export function transformSelectOptions<TId extends number = number, T extends object = object>(
+  apiOptions: T[],
+  fieldMapping: FieldMapping<Extract<keyof T, string>>
+): SelectOption<TId>[] {
+  if (!apiOptions) return [];
+
+  return apiOptions.map((apiOption) => ({
+    id: (apiOption[fieldMapping.id as keyof T] ?? 0) as TId,
+    name: String(apiOption[fieldMapping.name as keyof T] ?? '')
+  }));
+}
+
+/**
+ * https://axonflux.com/handy-rgb-to-hsl-and-rgb-to-hsv-color-model-c
+ *
+ * Converts an HSL color value to RGB. Conversion formula
+ * adapted from http://en.wikipedia.org/wiki/HSL_color_space.
+ * Assumes h, s, and l are contained in the set [0, 1] and
+ * returns r, g, and b in the set [0, 255].
+ *
+ * @param   Number  h       The hue
+ * @param   Number  s       The saturation
+ * @param   Number  l       The lightness
+ * @return  Array           The RGB representation
+ */
+function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+  let r, g, b;
+
+  if (s == 0) {
+    r = g = b = l; // achromatic
+  } else {
+    function hue2rgb(p: number, q: number, t: number) {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 1 / 2) return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+      return p;
+    }
+
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1 / 3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1 / 3);
+  }
+
+  return [r * 255, g * 255, b * 255];
+}
+
+function componentToHex(c: number): string {
+  const hex = Math.floor(c).toString(16);
+  return hex.length == 1 ? '0' + hex : hex;
+}
+
+export function randomColor(): string {
+  const rgb = hslToRgb(Math.random(), 0.6, Math.random() * 0.4 + 0.4);
+  return `#${componentToHex(rgb[0])}${componentToHex(rgb[1])}${componentToHex(rgb[2])}`;
+}
+
+/** Midpoint of the 0-255 brightness range that separates light from dark colors. */
+const BRIGHTNESS_MIDPOINT = 128;
+
+/**
+ * Returns true when black text reads better than white on `hex`.
+ * Uses the W3C AERT YIQ brightness formula (https://www.w3.org/TR/AERT/#color-contrast).
+ *
+ * @param hex - A 7-character hex color string (e.g. "#FF0000"). Empty or
+ *   malformed input returns false.
+ */
+export function isColorLight(hex: string | null | undefined): boolean {
+  if (!hex || hex.length < 7) {
+    return false;
+  }
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) {
+    return false;
+  }
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+  return brightness > BRIGHTNESS_MIDPOINT;
+}
+
+/**
+ * Removes the fake path prefix from the given file path.
+ *
+ * @param {string} originalPath - The original file path that may contain a fake path prefix.
+ * @returns {string} The file path with the fake path prefix removed.
+ * @throws {Error} Throws an error if the provided path is not a string.
+ */
+export function removeFakePath(originalPath: string): string {
+  const fakePathPrefix = 'C:\\fakepath\\';
+
+  // Ensure originalPath is a string
+  if (typeof originalPath !== 'string') {
+    throw new Error('Input must be a string.');
+  }
+
+  // Remove fake path prefix if it exists
+  return originalPath.startsWith(fakePathPrefix) ? originalPath.slice(fakePathPrefix.length) : originalPath;
+}
+
+/**
+ * Handles the encoding of source data based on the selected file type.
+ *
+ * @param {string} fileSource - The source data to be encoded.
+ * @returns {string} The encoded source data in base64 format.
+ */
+export function handleEncode(fileSource: string): string {
+  return Buffer.from(fileSource).toString('base64');
+}

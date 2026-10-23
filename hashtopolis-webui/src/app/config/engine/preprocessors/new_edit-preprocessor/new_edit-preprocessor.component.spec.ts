@@ -1,0 +1,319 @@
+import { zPreprocessorResponse } from '@generated/api/zod';
+import { of, throwError } from 'rxjs';
+
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
+import { ActivatedRoute, Router } from '@angular/router';
+
+import { ValidationPatterns } from '@services/main.config';
+import { GlobalService } from '@services/main.service';
+import { PreprocessorRoleService } from '@services/roles/binaries/preprocessor-role.service';
+import { AlertService } from '@services/shared/alert.service';
+
+import { NewEditPreprocessorComponent } from '@src/app/config/engine/preprocessors/new_edit-preprocessor/new_edit-preprocessor.component';
+import { mockResponse, mockValidResponse } from '@src/app/testing/mock-response';
+
+describe('NewEditPreprocessorComponent', () => {
+  let component: NewEditPreprocessorComponent;
+  let fixture: ComponentFixture<NewEditPreprocessorComponent>;
+
+  let mockGlobalService: jasmine.SpyObj<GlobalService>;
+  let mockRouter: jasmine.SpyObj<Router>;
+  let mockAlertService: jasmine.SpyObj<AlertService>;
+  let mockRoleService: jasmine.SpyObj<PreprocessorRoleService>;
+  let httpMock: HttpTestingController;
+
+  const preprocessorResponse = mockValidResponse(zPreprocessorResponse, {
+    data: {
+      id: 9,
+      type: 'preprocessor',
+      attributes: {
+        name: 'Test Preprocessor',
+        binaryName: 'test-preprocessor.bin',
+        url: 'https://example.com/preprocessor-1.0.0.7z',
+        keyspaceCommand: '--keyspace',
+        skipCommand: '--skip',
+        limitCommand: '--limit'
+      }
+    }
+  });
+
+  beforeEach(async () => {
+    mockGlobalService = jasmine.createSpyObj('GlobalService', ['getAll', 'create', 'get', 'update']);
+    mockRouter = jasmine.createSpyObj('Router', ['navigate']);
+    mockAlertService = jasmine.createSpyObj('AlertService', ['showSuccessMessage', 'showErrorMessage']);
+    mockRoleService = jasmine.createSpyObj('CrackerBinaryRoleService', ['hasRole']);
+
+    await TestBed.configureTestingModule({
+      imports: [NewEditPreprocessorComponent],
+      providers: [
+        { provide: GlobalService, useValue: mockGlobalService },
+        { provide: Router, useValue: mockRouter },
+        { provide: AlertService, useValue: mockAlertService },
+        { provide: PreprocessorRoleService, useValue: mockRoleService },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: { params: {} },
+            paramMap: of({ get: () => null })
+          }
+        },
+        provideHttpClient(),
+        provideHttpClientTesting()
+      ]
+    }).compileComponents();
+
+    httpMock = TestBed.inject(HttpTestingController);
+  });
+
+  beforeEach(() => {
+    fixture = TestBed.createComponent(NewEditPreprocessorComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges(); // triggers ngOnInit and loads permissions
+  });
+
+  afterEach(() => {
+    httpMock.verify();
+  });
+
+  function flushEditPreprocessorRequest() {
+    const req = httpMock.expectOne(
+      (request) => request.method === 'GET' && request.url.includes('/ui/preprocessors/9')
+    );
+    req.flush(preprocessorResponse);
+  }
+
+  /**
+   * Helper to check page title and button text
+   * @param title Title text
+   * @param buttonText Button text
+   */
+  /**
+   * Helper to check page title and button text
+   * @param title Title text
+   * @param buttonText Button text
+   */
+  function expectPageTitleAndButton(title: string, buttonText: string) {
+    const hostElement: HTMLElement = fixture.nativeElement;
+
+    let buttonEl = hostElement.querySelector('[data-testid="submit-button-newPreprocessor"]') as HTMLElement | null;
+
+    if (!buttonEl) {
+      buttonEl = hostElement.querySelector('button[type="submit"]') as HTMLElement | null;
+    }
+
+    expect(buttonEl).withContext('Submit button not found').not.toBeNull();
+
+    if (buttonEl) {
+      expect(buttonEl.textContent).toContain(buttonText);
+    }
+
+    const titleEl = hostElement.querySelector('.page__title') as HTMLElement | null;
+
+    expect(titleEl).withContext('Page title not found').not.toBeNull();
+
+    if (titleEl) {
+      expect(titleEl.textContent).toContain(title);
+    }
+  }
+
+  it('should create component and form', () => {
+    expect(component).toBeTruthy();
+    expect(component.newEditPreprocessorForm).toBeTruthy();
+  });
+
+  it('should initialize form with default values', () => {
+    expect(component.newEditPreprocessorForm).toBeDefined();
+
+    expect(component.newEditPreprocessorForm.controls.name.value).toBeDefined();
+    expect(component.newEditPreprocessorForm.controls.binaryName.value).toBeDefined();
+    expect(component.newEditPreprocessorForm.controls.url.value).toBeDefined();
+
+    expect(component.newEditPreprocessorForm.controls.keyspaceCommand.value).toBe('--keyspace');
+    expect(component.newEditPreprocessorForm.controls.skipCommand.value).toBe('--skip');
+    expect(component.newEditPreprocessorForm.controls.limitCommand.value).toBe('--limit');
+  });
+
+  it('should not submit if form is invalid', async () => {
+    const payload = {
+      name: '',
+      binaryName: '',
+      url: '',
+      keyspaceCommand: component.newEditPreprocessorForm.controls.keyspaceCommand.value,
+      skipCommand: component.newEditPreprocessorForm.controls.skipCommand.value,
+      limitCommand: component.newEditPreprocessorForm.controls.limitCommand.value
+    };
+
+    component.newEditPreprocessorForm.patchValue(payload); // invalid
+    await component.onSubmit();
+    expect(mockGlobalService.create).not.toHaveBeenCalled();
+  });
+
+  it('should show error if create fails', async () => {
+    component.newEditPreprocessorForm.patchValue({
+      name: 'Test Preprocessor Fail',
+      binaryName: 'Test Preprocessor',
+      url: 'https://example.com/preprocessor-1.0.0.7z',
+      keyspaceCommand: '--keyspace',
+      skipCommand: '--skip',
+      limitCommand: '--limit'
+    });
+
+    // Simulate create failure
+    mockGlobalService.create.and.returnValue(throwError(() => new Error('Create failed')));
+
+    await component.onSubmit();
+    expect(mockAlertService.showErrorMessage).toHaveBeenCalledWith('Error creating preprocessor!');
+  });
+
+  it('should show required field error message if fields are empty', () => {
+    component.newEditPreprocessorForm.patchValue({
+      name: '',
+      binaryName: '',
+      url: '',
+      keyspaceCommand: '--keyspace',
+      skipCommand: '--skip',
+      limitCommand: '--limit'
+    });
+    component.newEditPreprocessorForm.markAllAsTouched();
+    fixture.detectChanges();
+
+    // The validation-error span should be visible if the form is invalid and touched
+    const helpBlock = fixture.nativeElement.querySelector('[data-testid="form-validation-error"]');
+    expect(helpBlock).toBeTruthy();
+    expect(helpBlock.textContent).toContain('Please complete all required fields!');
+  });
+
+  it('should keep the submit button enabled if form is invalid', () => {
+    // Make form invalid by clearing required fields
+    component.newEditPreprocessorForm.patchValue({
+      name: '',
+      binaryName: '',
+      url: '',
+      keyspaceCommand: '--keyspace',
+      skipCommand: '--skip',
+      limitCommand: '--limit'
+    });
+    component.newEditPreprocessorForm.markAllAsTouched();
+    fixture.detectChanges();
+
+    // Query the submit button and check if it is enabled
+    const buttonDebugEl = fixture.debugElement.query(By.css('[data-testid="submit-button-newPreprocessor"]'));
+    expect(buttonDebugEl).toBeTruthy();
+    const buttonInstance = buttonDebugEl.componentInstance;
+    expect(buttonInstance.disabled).toBeFalse();
+  });
+
+  it('should enable the submit button if form is valid', () => {
+    component.newEditPreprocessorForm.patchValue({
+      name: 'Test Preprocessor',
+      binaryName: 'Test Preprocessor',
+      url: 'https://example.com/preprocessor-1.0.0.7z',
+      keyspaceCommand: '--keyspace',
+      skipCommand: '--skip',
+      limitCommand: '--limit'
+    });
+    mockRoleService.hasRole.and.returnValue(true);
+    component.newEditPreprocessorForm.markAllAsTouched();
+    fixture.detectChanges();
+
+    // Query the submit button and check if it is enabled
+    const buttonDebugEl = fixture.debugElement.query(By.css('[data-testid="submit-button-newPreprocessor"]'));
+    expect(buttonDebugEl).toBeTruthy();
+    const buttonInstance = buttonDebugEl.componentInstance;
+    expect(buttonInstance.disabled).toBeFalse();
+  });
+
+  it('should call the urlValidator and return an error, if the url is invalid', () => {
+    component.newEditPreprocessorForm.patchValue({
+      name: 'Test Preprocessor',
+      binaryName: 'Test Preprocessor',
+      url: 'ThisIsAnInvalidURL',
+      keyspaceCommand: '--keyspace',
+      skipCommand: '--skip',
+      limitCommand: '--limit'
+    });
+    component.newEditPreprocessorForm.markAllAsTouched();
+    fixture.detectChanges();
+
+    const errors = component.newEditPreprocessorForm.controls.url.errors;
+    expect(errors).toBeTruthy();
+    expect(errors!['pattern']).toEqual({
+      requiredPattern: ValidationPatterns.URL,
+      actualValue: 'ThisIsAnInvalidURL'
+    });
+  });
+
+  it('should call the urlValidator and return an null, if the url is valid', () => {
+    component.newEditPreprocessorForm.patchValue({
+      name: 'Test Preprocessor',
+      binaryName: 'Test Preprocessor',
+      url: 'https://example.com/preprocessor-1.0.0.7z',
+      keyspaceCommand: '--keyspace',
+      skipCommand: '--skip',
+      limitCommand: '--limit'
+    });
+    component.newEditPreprocessorForm.markAllAsTouched();
+    fixture.detectChanges();
+
+    const errors = component.newEditPreprocessorForm.controls.url.errors;
+    expect(errors).toBeNull();
+  });
+
+  it('should call create and navigate on valid form if no id is present in route', async () => {
+    const activatedRoute = TestBed.inject(ActivatedRoute);
+
+    // simulate new-modus (no id)
+    activatedRoute.snapshot.params = {};
+
+    fixture = TestBed.createComponent(NewEditPreprocessorComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    component.newEditPreprocessorForm.patchValue({
+      name: 'Test Preprocessor',
+      binaryName: 'Test Preprocessor',
+      url: 'https://example.com/preprocessor-1.0.0.7z',
+      keyspaceCommand: '--keyspace',
+      skipCommand: '--skip',
+      limitCommand: '--limit'
+    });
+
+    mockGlobalService.create.and.returnValue(of(mockResponse()));
+
+    await component.onSubmit();
+
+    expect(mockGlobalService.create).toHaveBeenCalled();
+    expect(mockGlobalService.update).not.toHaveBeenCalled();
+  });
+
+  it('should call update and navigate on valid form if id is present in route', async () => {
+    const activatedRoute = TestBed.inject(ActivatedRoute);
+
+    // simulate edit-modus route with id=9
+    activatedRoute.snapshot.params = { id: '9' };
+
+    fixture = TestBed.createComponent(NewEditPreprocessorComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    flushEditPreprocessorRequest();
+
+    component.newEditPreprocessorForm.patchValue({
+      name: 'Test Preprocessor',
+      binaryName: 'Test Preprocessor',
+      url: 'https://example.com/preprocessor-1.0.0.7z',
+      keyspaceCommand: '--keyspace',
+      skipCommand: '--skip',
+      limitCommand: '--limit'
+    });
+
+    mockGlobalService.update.and.returnValue(of({}));
+
+    await component.onSubmit();
+
+    expect(mockGlobalService.update).toHaveBeenCalled();
+    expect(mockGlobalService.create).not.toHaveBeenCalled();
+  });
+});

@@ -1,0 +1,198 @@
+@reference './tailwind.css';
+
+.mat-mdc-form-field .mdc-text-field--filled {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition:
+    border-color var(--duration-fast) var(--easing-standard),
+    box-shadow var(--duration-fast) var(--easing-standard);
+}
+
+.mat-mdc-form-field .mdc-text-field--filled:hover:not(.mdc-text-field--disabled):not(.mdc-text-field--focused) {
+  border-color: var(--border-strong);
+}
+
+.mat-mdc-form-field .mdc-text-field--filled.mdc-text-field--focused {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-muted);
+}
+
+.mat-mdc-form-field .mdc-line-ripple {
+  display: none;
+}
+
+.mat-mdc-form-field .mat-mdc-form-field-focus-overlay {
+  display: none;
+}
+
+.mat-mdc-form-field .mdc-text-field--filled.mdc-text-field--disabled {
+  border-color: var(--border-faint);
+}
+
+.field-stack.is-invalid .mat-mdc-form-field .mdc-text-field--filled:not(.mdc-text-field--disabled),
+mat-form-field.mat-form-field-invalid .mdc-text-field--filled:not(.mdc-text-field--disabled) {
+  border-color: var(--destructive);
+}
+
+.field-stack.is-invalid .mat-mdc-form-field .mdc-text-field--filled.mdc-text-field--focused,
+mat-form-field.mat-form-field-invalid .mdc-text-field--filled.mdc-text-field--focused {
+  border-color: var(--destructive);
+  box-shadow: 0 0 0 2px var(--destructive-ring);
+}
+
+.form-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+form,
+.form-layout,
+app-form-row {
+  mat-form-field {
+    width: 100%;
+  }
+}
+
+.mat-select-value-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.field-stack {
+  display: block;
+
+  &__label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: fit-content;
+    font-size: var(--text-md);
+    font-weight: 500;
+    line-height: 1.2;
+    color: var(--muted-foreground);
+    margin-bottom: 6px;
+
+    mat-icon {
+      font-size: var(--text-lg);
+      width: 16px;
+      height: 16px;
+      line-height: 1;
+      vertical-align: middle;
+      color: var(--subtle-foreground);
+      cursor: help;
+    }
+  }
+
+  &__label-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--primary);
+
+    mat-icon {
+      color: var(--primary);
+      cursor: pointer;
+    }
+
+    &:hover mat-icon {
+      color: var(--primary-hover, var(--primary));
+    }
+  }
+
+  &__required {
+    color: var(--primary);
+    margin-left: 2px;
+  }
+
+  &.is-invalid &__label {
+    color: var(--destructive);
+  }
+
+  &__field.mat-mdc-form-field {
+    width: 100%;
+
+    .mdc-floating-label,
+    .mat-mdc-floating-label {
+      display: none;
+    }
+
+    .mat-mdc-text-field-wrapper {
+      padding-top: 0;
+    }
+
+    .mat-mdc-form-field-infix {
+      padding-top: var(--space-sm);
+      padding-bottom: var(--space-sm);
+      min-height: auto;
+    }
+  }
+
+  // Row-aligned textareas fold the row padding into line-height (see
+  // _material.scss), so the infix must not add its own vertical padding.
+  &--row-aligned &__field.mat-mdc-form-field .mat-mdc-form-field-infix {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+
+input-check,
+mat-form-field {
+  display: block;
+}
+
+.input--readonly {
+  .field-stack__required {
+    display: none;
+  }
+
+  .mat-mdc-form-field .mdc-text-field--filled,
+  .mat-mdc-form-field .mdc-text-field--filled.mdc-text-field--disabled {
+    background-color: var(--well);
+    border-color: var(--border-faint);
+    box-shadow: none;
+  }
+
+  .mat-mdc-form-field .mdc-text-field--disabled .mat-mdc-form-field-input-control,
+  .mat-mdc-form-field .mdc-text-field--disabled .mat-mdc-input-element,
+  .mat-mdc-select-disabled .mat-mdc-select-value,
+  .mat-mdc-chip-set-disabled .mat-mdc-chip {
+    color: var(--foreground);
+    opacity: 1;
+  }
+
+  .mat-mdc-chip-set-disabled .mat-mdc-chip {
+    cursor: default;
+  }
+
+  mat-checkbox.mat-mdc-checkbox-disabled {
+    opacity: 1;
+    cursor: default;
+
+    .mdc-label {
+      color: var(--foreground);
+    }
+  }
+
+  .field-stack__label a {
+    color: var(--primary);
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}

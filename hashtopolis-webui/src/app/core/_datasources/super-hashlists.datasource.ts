@@ -1,0 +1,84 @@
+import { HashListFormat } from '@constants/hashlist.config';
+import { HTTP_SKIP_ERROR_HEADER_CONFIG } from '@constants/http.config';
+import { zHashlistListResponse } from '@generated/api/zod';
+import { EMPTY, catchError, finalize } from 'rxjs';
+
+import { HttpHeaders } from '@angular/common/http';
+
+import { JHashlist } from '@models/hashlist.model';
+import { Filter, FilterType } from '@models/request-params.model';
+import { ResponseWrapper } from '@models/response.model';
+
+import { SERV } from '@services/main.config';
+
+import { BaseDataSource } from '@datasources/base.datasource';
+
+import { RequestParamBuilder } from '@src/app/core/_services/params/builder-implementation.service';
+
+export class SuperHashlistsDataSource extends BaseDataSource<JHashlist> {
+  private isArchived = false;
+  private _currentFilter: Filter | null = null;
+  setIsArchived(isArchived: boolean): void {
+    this.isArchived = isArchived;
+  }
+  loadAll(query?: Filter): void {
+    this.loading = true;
+    // Store the current filter if provided
+    if (query) {
+      this._currentFilter = query;
+    }
+
+    // Use stored filter if no new filter is provided
+    const activeFilter = query || this._currentFilter;
+
+    let params = new RequestParamBuilder().addInitial(this).addInclude('hashType').addInclude('hashlists').addFilter({
+      field: 'format',
+      operator: FilterType.EQUAL,
+      value: HashListFormat.SUPERHASHLIST
+    });
+    params = this.applyFilterWithPaginationReset(params, activeFilter, query);
+
+    // Create headers to skip error dialog for filter validation errors
+    const httpOptions = { headers: new HttpHeaders(HTTP_SKIP_ERROR_HEADER_CONFIG) };
+    const hashLists$ = this.service.getAll(SERV.HASHLISTS, params.create(), httpOptions);
+
+    this.subscriptions.push(
+      hashLists$
+        .pipe(
+          catchError((error) => {
+            this.handleFilterError(error);
+            return EMPTY;
+          }),
+          finalize(() => (this.loading = false))
+        )
+        .subscribe((response: ResponseWrapper) => {
+          const superHashlists: JHashlist[] = this.serializer.deserialize(response, zHashlistListResponse);
+
+          const rows: JHashlist[] = [];
+          superHashlists.forEach((superHashlist) => {
+            superHashlist.hashTypeDescription = superHashlist.hashType?.description;
+            rows.push(superHashlist);
+          });
+
+          const length = response.meta.page.total_elements;
+          const nextLink = response.links.next;
+          const prevLink = response.links.prev;
+          const after = nextLink ? new URL(nextLink).searchParams.get('page[after]') : null;
+          const before = prevLink ? new URL(prevLink).searchParams.get('page[before]') : null;
+
+          this.setPaginationConfig(this.pageSize, length, after, before, this.index);
+          this.setData(rows);
+        })
+    );
+  }
+
+  reload(): void {
+    this.clearSelection();
+    this.loadAll();
+  }
+  clearFilter(): void {
+    this._currentFilter = null;
+    this.setPaginationConfig(this.pageSize, undefined, undefined, undefined, 0);
+    this.reload();
+  }
+}

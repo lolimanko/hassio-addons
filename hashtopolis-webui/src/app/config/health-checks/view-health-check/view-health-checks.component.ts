@@ -1,0 +1,82 @@
+import { zHealthCheckResponse } from '@generated/api/zod';
+
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute } from '@angular/router';
+
+import { UIConfig } from '@models/config-ui.model';
+import { JHealthCheck } from '@models/health-check.model';
+import { ResponseWrapper } from '@models/response.model';
+import { zIdRouteParams } from '@models/routes.schema';
+
+import { JsonAPISerializer } from '@services/api/serializer-service';
+import { SERV } from '@services/main.config';
+import { GlobalService } from '@services/main.service';
+import { AutoTitleService } from '@services/shared/autotitle.service';
+import { LocalStorageService } from '@services/storage/local-storage.service';
+
+import { UISettingsUtilityClass } from '@src/app/shared/utils/config';
+import { TimePrecision, formatUnixTimestamp } from '@src/app/shared/utils/datetime';
+
+@Component({
+  selector: 'app-view-health-checks',
+  templateUrl: './view-health-checks.component.html',
+  standalone: false
+})
+export class ViewHealthChecksComponent implements OnInit {
+  // The index of the edited health check.
+  viewedHealthCIndex: number;
+  // The health check object.
+  public healthc: JHealthCheck;
+
+  //Date format
+  protected uiSettings: UISettingsUtilityClass;
+  formatUnixTimestamp = formatUnixTimestamp;
+  protected dateTimeFormat: string;
+
+  /**
+   * Constructs a new instance of the YourComponentName class.
+   * @param {AutoTitleService} titleService - The service for managing auto titles.
+   * @param {ActivatedRoute} route - The activated route.
+   * @param {GlobalService} gs - The global service.
+   */
+  protected settingsService = inject<LocalStorageService<UIConfig>>(LocalStorageService);
+  private destroyRef = inject(DestroyRef);
+  private titleService = inject(AutoTitleService);
+  private route = inject(ActivatedRoute);
+  private gs = inject(GlobalService);
+
+  constructor() {
+    this.onInitialize();
+    this.titleService.set(['View Health Checks']);
+  }
+
+  /**
+   * Component initialization get ID to use in Table component
+   */
+  onInitialize(): void {
+    this.viewedHealthCIndex = zIdRouteParams.parse(this.route.snapshot.params).id;
+    this.uiSettings = new UISettingsUtilityClass(this.settingsService);
+    this.dateTimeFormat = this.uiSettings.getDateTimeFormat(TimePrecision.SECONDS);
+  }
+
+  /**
+   * Lifecycle hook called after component initialization.
+   */
+  ngOnInit(): void {
+    this.loadData();
+  }
+
+  /**
+   * Loads data, specifically health checks, for the view component.
+   */
+  loadData(): void {
+    this.gs
+      .get(SERV.HEALTH_CHECKS, this.viewedHealthCIndex)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((response: ResponseWrapper) => {
+        const healthCheck: JHealthCheck = new JsonAPISerializer().deserialize(response, zHealthCheckResponse);
+        this.healthc = healthCheck;
+      });
+  }
+}

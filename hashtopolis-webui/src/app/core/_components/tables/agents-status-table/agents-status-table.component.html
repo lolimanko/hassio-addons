@@ -1,0 +1,20 @@
+<ht-table
+  #table
+  name="agentStatusTable"
+  [columnLabels]="columnLabels"
+  dataType="agents-status"
+  [dataSource]="dataSource"
+  [tableColumns]="tableColumns"
+  [isSelectable]="isSelectable"
+  [isFilterable]="isFilterable"
+  [contextMenuService]="contextMenuService"
+  [supportsAutoRefresh]="true"
+  [hasTemperatureInformation]="hasTemperatureInformation"
+  [isPageable]="true"
+  (bulkActionClicked)="bulkActionClicked($event)"
+  (rowActionClicked)="rowActionClicked($event)"
+  (exportActionClicked)="exportActionClicked($event)"
+  (temperatureInformationClicked)="openStatDialog()"
+  (selectedFilterColumnChanged)="selectedFilterColumn = $event"
+  (backendSqlFilter)="handleBackendSqlFilter($event)"
+/>

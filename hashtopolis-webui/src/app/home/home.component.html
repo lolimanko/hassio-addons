@@ -1,0 +1,208 @@
+<app-page title="Dashboard" subtitle="Overview of your resources.">
+  <ng-template #spinner>
+    <div class="inline-flex items-center min-h-9">
+      <mat-progress-spinner mode="indeterminate" diameter="20"></mat-progress-spinner>
+    </div>
+  </ng-template>
+
+  <ng-template #noPermission let-testid="testid">
+    <div class="text-sm font-medium text-subtle-foreground italic" [attr.data-testid]="testid">No permission</div>
+  </ng-template>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-md">
+    <mat-card appearance="outlined" class="metric-card cursor-pointer" [routerLink]="['/agents/show-agents']">
+      <mat-card-content>
+        <div class="flex items-center gap-sm">
+          <div class="icon-box w-9 h-9 rounded-md bg-primary-muted flex items-center justify-center shrink-0">
+            <mat-icon>dns</mat-icon>
+          </div>
+          <span class="metric-label">Agents</span>
+        </div>
+        <div class="flex-1 min-h-0"></div>
+        @if (canReadAgents) {
+          <div class="metric-value" [class.refreshflash]="refreshFlash">
+            @if (loading) {
+              <ng-container *ngTemplateOutlet="spinner"></ng-container>
+            } @else {
+              {{ activeAgents.toLocaleString() }}
+              <span class="text-subtle-foreground font-normal">/</span>
+              {{ totalAgents.toLocaleString() }}
+            }
+          </div>
+          <div class="metric-suffix">Active / Total Agents</div>
+        } @else {
+          <ng-container *ngTemplateOutlet="noPermission; context: { testid: 'agents-no-perm' }"></ng-container>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined" class="metric-card cursor-pointer" [routerLink]="['/tasks/show-tasks']">
+      <mat-card-content>
+        <div class="flex items-center gap-sm">
+          <div class="icon-box w-9 h-9 rounded-md bg-primary-muted flex items-center justify-center shrink-0">
+            <mat-icon>checklist</mat-icon>
+          </div>
+          <span class="metric-label">Tasks</span>
+        </div>
+        <div class="flex-1 min-h-0"></div>
+        @if (canReadTasks) {
+          <div class="metric-value" [class.refreshflash]="refreshFlash">
+            @if (loading) {
+              <ng-container *ngTemplateOutlet="spinner"></ng-container>
+            } @else {
+              {{ completedTasks.toLocaleString() }}
+              <span class="text-subtle-foreground font-normal">/</span>
+              {{ totalTasks.toLocaleString() }}
+            }
+          </div>
+          <div class="metric-suffix">Completed / Total Tasks</div>
+        } @else {
+          <ng-container *ngTemplateOutlet="noPermission; context: { testid: 'tasks-no-perm' }"></ng-container>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined" class="metric-card cursor-pointer" [routerLink]="['/tasks/show-tasks']">
+      <mat-card-content>
+        <div class="flex items-center gap-sm">
+          <div class="icon-box w-9 h-9 rounded-md bg-primary-muted flex items-center justify-center shrink-0">
+            <mat-icon>account_tree</mat-icon>
+          </div>
+          <span class="metric-label">Supertasks</span>
+        </div>
+        <div class="flex-1 min-h-0"></div>
+        @if (canReadTasks) {
+          <div class="metric-value" [class.refreshflash]="refreshFlash">
+            @if (loading) {
+              <ng-container *ngTemplateOutlet="spinner"></ng-container>
+            } @else {
+              {{ completedSupertasks.toLocaleString() }}
+              <span class="text-subtle-foreground font-normal">/</span>
+              {{ totalSupertasks.toLocaleString() }}
+            }
+          </div>
+          <div class="metric-suffix">Completed / Total Supertasks</div>
+        } @else {
+          <ng-container *ngTemplateOutlet="noPermission; context: { testid: 'supertasks-no-perm' }"></ng-container>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined" class="metric-card cursor-pointer" [routerLink]="['/hashlists/show-cracks']">
+      <mat-card-content>
+        <div class="flex items-center gap-sm">
+          <div class="icon-box w-9 h-9 rounded-md bg-primary-muted flex items-center justify-center shrink-0">
+            <mat-icon>lock_open</mat-icon>
+          </div>
+          <span class="metric-label">Cracks</span>
+        </div>
+        <div class="flex-1 min-h-0"></div>
+        @if (canReadCracks) {
+          <div class="metric-value" [class.refreshflash]="refreshFlash">
+            @if (loading) {
+              <ng-container *ngTemplateOutlet="spinner"></ng-container>
+            } @else {
+              {{ totalCracks.toLocaleString() }}
+            }
+          </div>
+          <div class="metric-suffix">Last 7 days</div>
+        } @else {
+          <ng-container *ngTemplateOutlet="noPermission; context: { testid: 'cracks-no-perm' }"></ng-container>
+        }
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <mat-card appearance="outlined" class="activity-card">
+    <mat-card-content>
+      <header class="flex justify-between items-center gap-md mb-md flex-wrap">
+        <div class="flex items-baseline gap-xs flex-1 min-w-0">
+          <h2 class="text-sm font-medium text-muted-foreground uppercase tracking-wide">Activity</h2>
+          <span class="text-xs text-muted-foreground">last 12 months</span>
+        </div>
+        @if (canReadCracks && heatmapData.length) {
+          <div class="inline-flex items-center gap-1.5 shrink-0">
+            <span class="heatmap-legend__label">Less</span>
+            @for (color of legendColors; track $index) {
+              <span class="inline-block w-2.5 h-2.5 rounded-sm" [style.background]="color"></span>
+            }
+            <span class="heatmap-legend__label">More</span>
+          </div>
+        }
+        @if (canReadCracks) {
+          <div class="chart-controls flex items-center gap-xs text-subtle-foreground shrink-0">
+            @if (!autoRefreshService.refreshPage) {
+              <button
+                matIconButton
+                (click)="setAutoRefresh(true)"
+                data-testid="enable-auto-reload"
+                aria-label="Enable auto reload"
+              >
+                <mat-icon>autorenew</mat-icon>
+              </button>
+            }
+            @if (autoRefreshService.refreshPage) {
+              <button
+                matIconButton
+                (click)="setAutoRefresh(false)"
+                data-testid="pause-auto-reload"
+                aria-label="Pause auto reload"
+              >
+                <mat-icon>pause_circle_outline</mat-icon>
+              </button>
+            }
+          </div>
+        }
+      </header>
+      <div class="chart-wrapper">
+        @if (canReadCracks) {
+          @if (loading) {
+            <ng-container *ngTemplateOutlet="spinner"></ng-container>
+          } @else {
+            @if (heatmapData.length) {
+              <app-heatmap-chart
+                [class.refreshflash]="refreshFlash"
+                [data]="heatmapData"
+                [isDarkMode]="isDarkMode"
+                [showLegend]="false"
+              >
+              </app-heatmap-chart>
+            } @else {
+              <div class="heatmap-no-permission text-sm font-medium text-subtle-foreground italic">
+                No data to display
+              </div>
+            }
+          }
+        } @else {
+          <div
+            class="heatmap-no-permission text-sm font-medium text-subtle-foreground italic"
+            data-test-id="heatmap-no-perm"
+          >
+            No permission to view chart data
+          </div>
+        }
+      </div>
+      @if (canReadCracks) {
+        <footer class="activity-card__footer">
+          <last-updated
+            [lastUpdated]="lastUpdated"
+            [nextRefreshTimestamp]="autoRefreshService.nextRefreshTimestamp"
+            [refreshing]="refreshing"
+          >
+          </last-updated>
+        </footer>
+      }
+    </mat-card-content>
+  </mat-card>
+
+  <mat-card appearance="outlined" class="about-card">
+    <mat-card-content>
+      Hashtopolis is available on
+      <a href="https://github.com/hashtopolis" target="_blank" rel="noopener">Github</a>. To get information about how
+      to use it, please visit the
+      <a href="https://github.com/hashtopolis/server/wiki" target="_blank" rel="noopener">Wiki</a>
+      or
+      <a href="https://discord.com/invite/S2NTxbz" target="_blank" rel="noopener">Discord</a>.
+    </mat-card-content>
+  </mat-card>
+</app-page>

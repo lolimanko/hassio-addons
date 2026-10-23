@@ -1,0 +1,48 @@
+.snackbar-error,
+.snackbar-success,
+.snackbar-info {
+  .mat-mdc-snack-bar-label {
+    font-size: var(--text-md);
+    font-weight: 500;
+  }
+
+  .mdc-snackbar__surface {
+    margin-top: 0.25rem;
+    margin-left: 0;
+  }
+
+  --mat-snack-bar-button-color: var(--foreground);
+
+  .mat-mdc-snack-bar-actions button {
+    --mdc-text-button-label-text-color: var(--foreground);
+    font-size: var(--text-sm);
+    border: 1px solid var(--border-strong);
+  }
+}
+
+.snackbar-error {
+  --mat-snack-bar-container-color: color-mix(in oklab, var(--destructive) 16%, var(--well));
+  --mat-snack-bar-supporting-text-color: var(--destructive);
+
+  .mdc-snackbar__surface {
+    border-left: 5px solid var(--destructive);
+  }
+}
+
+.snackbar-success {
+  --mat-snack-bar-container-color: color-mix(in oklab, var(--success) 22%, var(--well));
+  --mat-snack-bar-supporting-text-color: var(--success);
+
+  .mdc-snackbar__surface {
+    border-left: 5px solid var(--success);
+  }
+}
+
+.snackbar-info {
+  --mat-snack-bar-container-color: color-mix(in oklab, var(--info) 16%, var(--well));
+  --mat-snack-bar-supporting-text-color: var(--info);
+
+  .mdc-snackbar__surface {
+    border-left: 5px solid var(--info);
+  }
+}

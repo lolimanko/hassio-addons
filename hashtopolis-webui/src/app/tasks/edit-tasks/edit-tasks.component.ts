@@ -1,0 +1,560 @@
+import { HashListFormat } from '@constants/hashlist.config';
+import { HTTP_SKIP_CACHE_HEADER_CONFIG } from '@constants/http.config';
+import {
+  zAgentAssignmentListResponse,
+  zAgentListResponse,
+  zHashTypeResponse,
+  zSpeedListResponse,
+  zTaskResponse
+} from '@generated/api/zod';
+import { finalize, lastValueFrom } from 'rxjs';
+
+import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
+import { Component, OnDestroy, OnInit, ViewChild, inject } from '@angular/core';
+import { FormControl, FormGroup, Validators } from '@angular/forms';
+import { MatButtonToggleChange } from '@angular/material/button-toggle';
+import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
+import { ActivatedRoute, Router } from '@angular/router';
+
+import { JAgentAssignment } from '@models/agent-assignment.model';
+import { ThinJAgent } from '@models/agent.model';
+import { TableSortDirection } from '@models/config-ui.model';
+import { JCrackerBinary } from '@models/cracker-binary.model';
+import { JHashlist } from '@models/hashlist.model';
+import { JHashtype } from '@models/hashtype.model';
+import { AgentId } from '@models/id.types';
+import { FilterType } from '@models/request-params.model';
+import { ResponseWrapper } from '@models/response.model';
+import { EditTaskRouteKind, zEditTaskRouteData, zIdRouteParams } from '@models/routes.schema';
+import { SpeedStat } from '@models/speed-stat.model';
+import { JTask, JTaskWith } from '@models/task.model';
+
+import { JsonAPISerializer } from '@services/api/serializer-service';
+import { setParameter } from '@services/buildparams';
+import { ConfirmDialogService } from '@services/confirm/confirm-dialog.service';
+import { SERV } from '@services/main.config';
+import { GlobalService } from '@services/main.service';
+import { RequestParamBuilder } from '@services/params/builder-implementation.service';
+import { TasksRoleService } from '@services/roles/tasks/tasks-role.service';
+import { AlertService } from '@services/shared/alert.service';
+import { AutoTitleService } from '@services/shared/autotitle.service';
+import { ConfigService } from '@services/shared/config.service';
+
+import { TasksAgentsTableComponent } from '@components/tables/tasks-agents-table/tasks-agents-table.component';
+import { TasksChunksTableComponent } from '@components/tables/tasks-chunks-table/tasks-chunks-table.component';
+
+import { AGENT_MAPPING } from '@src/app/core/_constants/select.config';
+import { StaticChunkingMode } from '@src/app/core/_constants/tasks.config';
+import { FileSizePipe } from '@src/app/core/_pipes/file-size.pipe';
+import { attackCommandWithAliasValidator } from '@src/app/core/_validators/attack-command.validator';
+import { SelectOption, transformSelectOptions } from '@src/app/shared/utils/forms';
+
+/** Task plus the aggregates edit-tasks reads (requested via the builder in loadTask). */
+type EditedTask = JTaskWith<
+  'searched' | 'timeSpent' | 'currentSpeed' | 'estimatedTime' | 'cprogress' | 'totalNumberOfChunks'
+>;
+
+@Component({
+  selector: 'app-edit-tasks',
+  templateUrl: './edit-tasks.component.html',
+  styleUrls: ['./edit-tasks.component.scss'],
+  providers: [FileSizePipe],
+  standalone: false
+})
+export class EditTasksComponent implements OnInit, OnDestroy {
+  editMode = false;
+  editedTaskIndex: number;
+  taskWrapperId: number;
+  originalValue: JTask;
+
+  pageTitle = 'Task';
+
+  updateForm: FormGroup;
+  createForm: FormGroup<{ agentId: FormControl<number | null> }>; // Assign Agent
+  /** On form update show a spinner loading */
+  isUpdatingLoading = false;
+
+  // loading gate to avoid painting the screen before data is ready
+  isLoading = true;
+
+  color = '';
+  tusepreprocessor: number;
+  preprocessorCommand: string;
+  originalPreprocessorCommand: string;
+  hashlistDescrip: string;
+  hashlistinform: JHashlist | undefined;
+  availAgents: ThinJAgent[] = [];
+  selectAgents: SelectOption<AgentId>[] = [];
+  isLoadingAgents = false;
+  crackerinfo: JCrackerBinary | undefined;
+  tkeyspace: number;
+
+  @ViewChild('assignedAgentsTable') agentsTable: TasksAgentsTableComponent;
+  @ViewChild(TasksChunksTableComponent) chunkTable!: TasksChunksTableComponent;
+
+  // Time calculation
+  cprogress: number; // Keyspace searched
+  ctimespent: number; // Time Spent
+  estimatedTime: number; // Estimated time till task is finished
+  searched: string;
+
+  chunkview: number;
+  isactive = 0;
+  currenspeed = 0;
+
+  isReadOnly = false;
+
+  taskProgressImageUrl: SafeUrl | null = null;
+  private rawTaskProgressObjectUrl: string | null = null;
+
+  private titleService = inject(AutoTitleService);
+  private route = inject(ActivatedRoute);
+  private alertService = inject(AlertService);
+  private gs = inject(GlobalService);
+  private router = inject(Router);
+  private serializer = inject(JsonAPISerializer);
+  private confirmDialog = inject(ConfirmDialogService);
+  protected roleService = inject(TasksRoleService);
+  private cs = inject(ConfigService);
+  private http = inject(HttpClient);
+  private sanitizer = inject(DomSanitizer);
+
+  constructor() {
+    this.titleService.set(['Edit Task']);
+  }
+
+  async ngOnInit(): Promise<void> {
+    this.isReadOnly = !this.roleService.hasRole('edit');
+
+    this.editedTaskIndex = zIdRouteParams.parse(this.route.snapshot.params).id;
+    this.editMode = Number.isFinite(this.editedTaskIndex);
+
+    this.buildForm();
+
+    try {
+      const task = await this.loadTask();
+
+      this.originalValue = task;
+      this.pageTitle = 'Task ' + (task.taskName ?? '');
+      this.searched = task.searched ?? '';
+      this.color = task.color ?? '';
+      this.crackerinfo = task.crackerBinary;
+      this.taskWrapperId = task.taskWrapperId;
+      this.tkeyspace = task.keyspace;
+      this.tusepreprocessor = task.preprocessorId;
+      this.preprocessorCommand = task.preprocessorCommand;
+      this.originalPreprocessorCommand = task.preprocessorCommand;
+      this.ctimespent = task.timeSpent ?? 0;
+      this.currenspeed = task.currentSpeed ?? 0;
+      this.estimatedTime = task.estimatedTime ?? 0;
+      this.cprogress = task.cprogress ?? 0;
+
+      if (this.roleService.hasRole('editTaskAgents') && this.roleService.hasRole('editTaskAssignAgents')) {
+        this.assingAgentInit((task.assignedAgents ?? []).map((entry) => entry.id));
+      }
+
+      if (this.roleService.hasRole('editTaskSpeed')) {
+        this.getTaskSpeeds((task.assignedAgents ?? []).length);
+      }
+
+      if (task.hashlist && this.roleService.hasRole('editTaskInfoHashlist')) {
+        this.hashlistinform = task.hashlist;
+        this.gs.get(SERV.HASHTYPES, task.hashlist.hashTypeId).subscribe((response: ResponseWrapper) => {
+          const hashtype: JHashtype = this.serializer.deserialize(response, zHashTypeResponse);
+          this.hashlistDescrip = hashtype.description;
+        });
+      }
+
+      this.updateForm.setValue({
+        taskId: task.id,
+        forcePipe: task.forcePipe ? 'Yes' : 'No',
+        staticChunks: this.getStaticChunkingLabel(task.staticChunks, task.chunkSize),
+        skipKeyspace: task.skipKeyspace > 0 ? task.skipKeyspace : 'N/A',
+        keyspace: task.keyspace,
+        keyspaceProgress: task.keyspaceProgress,
+        crackerBinaryId: task.crackerBinaryId,
+        chunkSize: task.chunkSize,
+        totalNumberOfChunks: task.totalNumberOfChunks,
+        preprocessorCommand: task.preprocessorCommand,
+        updateData: {
+          taskName: task.taskName,
+          attackCmd: task.attackCmd,
+          notes: task.notes,
+          color: task.color,
+          chunkTime: Number(task.chunkTime),
+          statusTimer: task.statusTimer,
+          priority: task.priority,
+          maxAgents: task.maxAgents,
+          isCpuTask: task.isCpuTask,
+          isSmall: task.isSmall
+        }
+      });
+
+      this.assignChunksInit();
+
+      if (this.editedTaskIndex && this.roleService.hasRole('editTaskChunks')) {
+        this.loadTaskProgressImage();
+      }
+
+      this.isLoading = false;
+    } catch (e: unknown) {
+      const status = e instanceof HttpErrorResponse ? e.status : undefined;
+      if (status === 403) {
+        this.router.navigateByUrl('/forbidden');
+        return;
+      }
+      // Only navigate to not-found when the backend explicitly returns 404.
+      // For other server errors (500 etc.) show an error message so the
+      // user knows something went wrong on the server instead of silently
+      // redirecting to the 404 page.
+      if (status === 404) {
+        this.router.navigateByUrl('/not-found');
+        return;
+      }
+
+      // Log and show a user-friendly error for unexpected server errors
+      // (500, 502, etc.). Keep the loading flag disabled so the UI can
+      // present an appropriate state.
+
+      console.error('Error loading task:', e);
+      const msg = status ? `Error loading task (server returned ${status}).` : 'Error loading task.';
+      this.alertService.showErrorMessage(msg);
+      this.isLoading = false;
+      return;
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (this.rawTaskProgressObjectUrl) {
+      URL.revokeObjectURL(this.rawTaskProgressObjectUrl);
+      this.rawTaskProgressObjectUrl = null;
+    }
+  }
+
+  private buildForm(): void {
+    this.updateForm = new FormGroup({
+      taskId: new FormControl({ value: '', disabled: true }),
+      forcePipe: new FormControl({ value: '', disabled: true }),
+      staticChunks: new FormControl({ value: '', disabled: true }),
+      skipKeyspace: new FormControl({ value: '', disabled: true }),
+      keyspace: new FormControl({ value: '', disabled: true }),
+      keyspaceProgress: new FormControl({ value: '', disabled: true }),
+      crackerBinaryId: new FormControl({ value: '', disabled: true }),
+      chunkSize: new FormControl({ value: '', disabled: true }),
+      totalNumberOfChunks: new FormControl({ value: '', disabled: true }),
+      preprocessorCommand: new FormControl({ value: '', disabled: this.isReadOnly }),
+      updateData: new FormGroup({
+        taskName: new FormControl(
+          { value: '', disabled: this.isReadOnly },
+          this.isReadOnly ? [] : [Validators.required]
+        ),
+        attackCmd: new FormControl(
+          { value: '', disabled: this.isReadOnly },
+          this.isReadOnly ? [] : [Validators.required, attackCommandWithAliasValidator()]
+        ),
+        notes: new FormControl({ value: '', disabled: this.isReadOnly }),
+        color: new FormControl({ value: '', disabled: this.isReadOnly }),
+        chunkTime: new FormControl({ value: '', disabled: this.isReadOnly }),
+        statusTimer: new FormControl({ value: '', disabled: this.isReadOnly }),
+        priority: new FormControl({ value: '', disabled: this.isReadOnly }),
+        maxAgents: new FormControl({ value: '', disabled: this.isReadOnly }),
+        isCpuTask: new FormControl({ value: '', disabled: this.isReadOnly }),
+        isSmall: new FormControl({ value: '', disabled: this.isReadOnly })
+      })
+    });
+
+    this.createForm = new FormGroup<{ agentId: FormControl<number | null> }>({
+      agentId: new FormControl<number | null>(null)
+    });
+  }
+
+  private async loadTask(): Promise<EditedTask> {
+    const noCacheHeaders = new HttpHeaders(HTTP_SKIP_CACHE_HEADER_CONFIG);
+    const params = new RequestParamBuilder()
+      .addInclude('hashlist')
+      .addInclude('crackerBinary')
+      .addInclude('crackerBinaryType')
+      .addInclude('assignedAgents')
+      .addAggregate({
+        field: 'task',
+        values: ['searched', 'timeSpent', 'currentSpeed', 'estimatedTime', 'cprogress', 'totalNumberOfChunks'] as const
+      })
+      .create();
+
+    const base = this.cs.getEndpoint() + SERV.TASKS.URL;
+    const url = `${base}/${this.editedTaskIndex}`;
+
+    try {
+      const response = await lastValueFrom<ResponseWrapper>(
+        this.http.get<ResponseWrapper>(url, { params: setParameter(params), headers: noCacheHeaders })
+      );
+      // Cast: task relationship includes aren't schema-typed yet (see JTaskIncludes TODO in task.model.ts),
+      // so the deserializer resolves them to worse types (null/never) than JTask's hand-typed relationships,
+      // which are authoritative. The shapes don't structurally overlap, hence `as unknown`.
+      return this.serializer.deserialize(response, zTaskResponse, params) as unknown as EditedTask;
+    } catch (err: unknown) {
+      // If backend fails with server error (500+), try a fallback request without includes.
+      // This helps when the server chokes resolving included relationships but the main
+      // resource exists — the UI can still open the edit form with the primary data.
+      if (err instanceof HttpErrorResponse && err.status && err.status >= 500) {
+        console.warn('loadTask(): primary request failed, retrying without includes', err);
+        const responseFallback = await lastValueFrom<ResponseWrapper>(
+          this.http.get<ResponseWrapper>(url, { headers: noCacheHeaders })
+        );
+        // Fallback omits aggregates (no params sent) — the `?? ` guards in ngOnInit cover their runtime absence.
+        return this.serializer.deserialize(responseFallback, zTaskResponse, params) as unknown as EditedTask;
+      }
+      throw err;
+    }
+  }
+
+  onSubmit(): void {
+    if (this.updateForm.valid && !this.isReadOnly) {
+      // Check if attackCmd has been modified
+      if (this.updateForm.value['updateData'].attackCmd !== this.originalValue.attackCmd) {
+        const message =
+          'Do you really want to change the attack command? If the task already was started, it will be completely purged before and reset to an initial state. (Note that you cannot change files)';
+        this.confirmDialog.confirmYesNo('Update task data', message).subscribe((confirmed) => {
+          if (confirmed) {
+            this.updateTask();
+          } else {
+            this.alertService.showInfoMessage('Task Information has not been updated');
+          }
+        });
+      } else if (this.updateForm.value['preprocessorCommand'] !== this.originalPreprocessorCommand) {
+        const message =
+          'Do you really want to change the preprocessor command? If the task already was started, it will be completely purged before and reset to an initial state.';
+        this.confirmDialog.confirmYesNo('Update preprocessor command', message).subscribe((confirmed) => {
+          if (confirmed) {
+            this.updateTask();
+          } else {
+            this.alertService.showInfoMessage('Preprocessor command has not been updated');
+          }
+        });
+      } else {
+        this.updateTask();
+      }
+    } else {
+      this.updateForm.markAllAsTouched();
+      this.updateForm.updateValueAndValidity();
+    }
+  }
+
+  private updateTask(): void {
+    this.isUpdatingLoading = true;
+    const updatePayload = this.updateForm.value['updateData'];
+    const preprocessorCommandChanged =
+      this.updateForm.value['preprocessorCommand'] !== this.originalPreprocessorCommand;
+
+    // If preprocessor command changed, make the update request first
+    if (preprocessorCommandChanged) {
+      this.gs
+        .update(SERV.TASKS, this.editedTaskIndex, { preprocessorCommand: this.updateForm.value['preprocessorCommand'] })
+        .subscribe({
+          next: () => {
+            // After preprocessor command is updated, update the task data
+            this.gs.update(SERV.TASKS, this.editedTaskIndex, updatePayload).subscribe({
+              next: () => {
+                this.isUpdatingLoading = false;
+                this.router.navigate(['tasks/show-tasks']).then(() => {
+                  this.alertService.showSuccessMessage('Task data has been updated successfully.');
+                });
+              },
+              error: (err) => {
+                console.error('Error updating task', err);
+                this.isUpdatingLoading = false;
+              }
+            });
+          },
+          error: (err) => {
+            console.error('Error updating preprocessor command', err);
+            this.isUpdatingLoading = false;
+          }
+        });
+    } else {
+      // No preprocessor command change, just update task data normally
+      this.gs.update(SERV.TASKS, this.editedTaskIndex, updatePayload).subscribe({
+        next: () => {
+          this.isUpdatingLoading = false;
+          this.router.navigate(['tasks/show-tasks']).then(() => {
+            this.alertService.showSuccessMessage('Task data has been updated successfully.');
+          });
+        },
+        error: (err) => {
+          console.error('Error updating task', err);
+          this.isUpdatingLoading = false;
+        }
+      });
+    }
+  }
+
+  /**
+   * Load task progress image from backend
+   * @private
+   */
+  private loadTaskProgressImage(): void {
+    const url = this.cs.getEndpoint() + SERV.HELPER.URL + '/getTaskProgressImage?task=' + this.editedTaskIndex;
+
+    try {
+      if (this.rawTaskProgressObjectUrl) {
+        URL.revokeObjectURL(this.rawTaskProgressObjectUrl);
+        this.rawTaskProgressObjectUrl = null;
+        this.taskProgressImageUrl = null;
+      }
+
+      this.http.get(url, { responseType: 'blob' }).subscribe({
+        next: (blob) => {
+          if (!blob || blob.size === 0) {
+            this.taskProgressImageUrl = null;
+            return;
+          }
+          const objectUrl = URL.createObjectURL(blob);
+          this.rawTaskProgressObjectUrl = objectUrl;
+          this.taskProgressImageUrl = this.sanitizer.bypassSecurityTrustUrl(objectUrl);
+        },
+        error: () => {
+          this.taskProgressImageUrl = null;
+        }
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  /**
+   * The below functions are related with assign, manage and delete agents
+   */
+  private assingAgentInit(assignedAgentIds: Array<number>): void {
+    this.isLoadingAgents = true;
+    const params = new RequestParamBuilder();
+    if (assignedAgentIds.length > 0) {
+      params.addFilter({ field: 'agentId', operator: FilterType.NOTIN, value: assignedAgentIds });
+    }
+
+    this.gs.getAll(SERV.AGENTS, params.create()).subscribe((responseAgents: ResponseWrapper) => {
+      this.availAgents = this.serializer.deserialize(responseAgents, zAgentListResponse);
+      this.selectAgents = transformSelectOptions(this.availAgents, AGENT_MAPPING);
+      this.isLoadingAgents = false;
+    });
+  }
+
+  reloadAgentAssignment(): void {
+    const paramsAgentAssign = new RequestParamBuilder();
+    paramsAgentAssign.addFilter({ field: 'taskId', operator: FilterType.EQUAL, value: this.editedTaskIndex });
+    this.gs.getAll(SERV.AGENT_ASSIGN, paramsAgentAssign.create()).subscribe((responseAssignments: ResponseWrapper) => {
+      const agentAssignments: JAgentAssignment[] = this.serializer.deserialize(
+        responseAssignments,
+        zAgentAssignmentListResponse
+      );
+      const agentAssignmentsAgentIds: Array<number> = agentAssignments.map(
+        (agentAssignment) => agentAssignment.agentId
+      );
+      this.assingAgentInit(agentAssignmentsAgentIds);
+    });
+  }
+
+  assignAgent(): void {
+    if (this.createForm.valid) {
+      const payload = {
+        taskId: this.editedTaskIndex,
+        agentId: this.createForm.value['agentId']
+      };
+      this.gs
+        .chelper(SERV.HELPER, 'assignAgent', payload)
+        .pipe(
+          finalize(() => {
+            this.reloadAgentAssignment();
+            this.agentsTable.reload();
+          })
+        )
+        .subscribe({
+          next: () => {
+            this.createForm.reset();
+            this.alertService.showSuccessMessage('Agent assigned!');
+          },
+          error: (err: HttpErrorResponse) => {
+            // If backend rejects the assignment, clear selection so the user knows it wasn't added
+            this.createForm.reset();
+            const msg = err?.error?.message ?? 'Agent cannot be assigned to this task.';
+            this.alertService.showErrorMessage(msg);
+          }
+        });
+    }
+  }
+
+  private assignChunksInit(): void {
+    this.route.data.subscribe((data) => {
+      const routeKind = zEditTaskRouteData.parse(data).kind;
+      switch (routeKind) {
+        case EditTaskRouteKind.EditTask:
+          this.chunkview = 0;
+          break;
+        case EditTaskRouteKind.EditTaskCrackedAll:
+          this.chunkview = 1;
+          break;
+      }
+    });
+  }
+
+  onChunkViewChange(event: MatButtonToggleChange): void {
+    this.chunkview = event.value;
+  }
+
+  purgeTask(): void {
+    this.confirmDialog.confirmYesNo('Purge Task', 'Do you really want to purge the task').subscribe((confirmed) => {
+      if (confirmed) {
+        const payload = { taskId: this.editedTaskIndex };
+        this.gs.chelper(SERV.HELPER, 'purgeTask', payload).subscribe(() => {
+          this.alertService.showSuccessMessage(`Purged task id ${this.editedTaskIndex}`);
+        });
+      } else {
+        this.alertService.showInfoMessage('Purge was cancelled');
+      }
+    });
+  }
+
+  /**
+   * Get task speeds for speed diagram.
+   *
+   * Time range is roughly limited to one hour for a maximum of 10 agents.
+   * If we have more than 10 agents, the period will be decreased (e.g. 30 minutes for 20 agents)
+   * Estimation is a new speed entry per agent every 5 seconds: (60 seconds * 60) / 5 = 720
+   *
+   * The resulting array must be reversed to have it sorted ascending by time
+   *
+   * @param assignedAgentsCount - number of assigned agents to the task
+   * @private
+   */
+  private getTaskSpeeds(assignedAgentsCount: number): void {
+    const limitPerAgent = 720;
+    const maxAgents = 10;
+    const requestLimit = Math.min(limitPerAgent * (assignedAgentsCount + 1), limitPerAgent * maxAgents);
+
+    const speedParams = new RequestParamBuilder()
+      .addFilter({
+        field: 'taskId',
+        value: this.editedTaskIndex,
+        operator: FilterType.EQUAL
+      })
+      .addSorting({ dataKey: 'speedId', direction: TableSortDirection.DESC, isSortable: true })
+      .setPageSize(requestLimit);
+
+    this.gs.getAll(SERV.SPEEDS, speedParams.create()).subscribe((response: ResponseWrapper) => {
+      const speeds: SpeedStat[] = this.serializer.deserialize(response, zSpeedListResponse);
+      this.originalValue.speeds = [...speeds].reverse();
+    });
+  }
+
+  private getStaticChunkingLabel(staticChunks: number, chunkSize: number): string {
+    switch (staticChunks) {
+      case StaticChunkingMode.FIXED_CHUNK_SIZE:
+        return `Fixed chunksize: ${chunkSize.toLocaleString()}`;
+      case StaticChunkingMode.FIXED_NUMBER_OF_CHUNKS:
+        return `Fixed number of chunks: ${chunkSize.toLocaleString()}`;
+      default:
+        return 'No';
+    }
+  }
+
+  protected readonly HashListFormat = HashListFormat;
+}

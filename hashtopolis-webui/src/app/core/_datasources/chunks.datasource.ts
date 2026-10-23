@@ -1,0 +1,86 @@
+import { ChunkState } from '@constants/chunks.config';
+import { HTTP_SKIP_ERROR_HEADER_CONFIG } from '@constants/http.config';
+import { zChunkListResponse } from '@generated/api/zod';
+import { catchError, finalize, forkJoin, of } from 'rxjs';
+
+import { HttpHeaders } from '@angular/common/http';
+
+import { JChunk } from '@models/chunk.model';
+import { Filter, FilterType } from '@models/request-params.model';
+import { ResponseWrapper } from '@models/response.model';
+
+import { SERV } from '@services/main.config';
+import { RequestParamBuilder } from '@services/params/builder-implementation.service';
+
+import { BaseDataSource } from '@datasources/base.datasource';
+
+export class ChunksDataSource extends BaseDataSource<JChunk> {
+  private _agentId = 0;
+  private _currentFilter: Filter | null = null;
+  isDetail = false;
+
+  setAgentId(agentId: number): void {
+    this._agentId = agentId;
+    this.isDetail = true;
+  }
+
+  loadAll(query?: Filter): void {
+    this.loading = true;
+    // Store the current filter if provided
+    if (query) {
+      this._currentFilter = query;
+    }
+
+    // Use stored filter if no new filter is provided
+    const activeFilter = query || this._currentFilter;
+    let params = new RequestParamBuilder().addInitial(this).addInclude('task').addInclude('agent');
+    if (this._agentId) {
+      params.addFilter({ field: 'agentId', operator: FilterType.EQUAL, value: this._agentId });
+    }
+    params = this.applyFilterWithPaginationReset(params, activeFilter, query);
+
+    const httpOptions = { headers: new HttpHeaders(HTTP_SKIP_ERROR_HEADER_CONFIG) };
+    const chunks$ = this.service.getAll(SERV.CHUNKS, params.create(), httpOptions);
+
+    forkJoin([chunks$])
+      .pipe(
+        catchError((error) => {
+          this.handleFilterError(error);
+          return of([] as ResponseWrapper[]);
+        }),
+        finalize(() => (this.loading = false))
+      )
+      .subscribe(([response]: ResponseWrapper[]) => {
+        const assignedChunks: JChunk[] = this.serializer.deserialize(response, zChunkListResponse);
+
+        assignedChunks.forEach((chunk: JChunk) => {
+          if (chunk.task != undefined) {
+            chunk.taskName = chunk.task.taskName;
+          }
+          if (chunk.agent != undefined) {
+            chunk.agentName = chunk.agent.agentName;
+          }
+          chunk.isRunning = chunk.state === ChunkState.RUNNING;
+        });
+
+        const length = response.meta.page.total_elements;
+        const nextLink = response.links.next;
+        const prevLink = response.links.prev;
+        const after = nextLink ? new URL(nextLink).searchParams.get('page[after]') : null;
+        const before = prevLink ? new URL(prevLink).searchParams.get('page[before]') : null;
+
+        this.setPaginationConfig(this.pageSize, length, after, before, this.index);
+        this.setData(assignedChunks);
+      });
+  }
+
+  reload(): void {
+    this.clearSelection();
+    this.loadAll();
+  }
+  clearFilter(): void {
+    this._currentFilter = null;
+    this.setPaginationConfig(this.pageSize, undefined, undefined, undefined, 0);
+    this.reload();
+  }
+}

@@ -1,0 +1,240 @@
+import { Observable, catchError, of } from 'rxjs';
+
+import { AfterViewInit, Component, OnInit } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+
+import { JHealthCheck } from '@models/health-check.model';
+
+import { HealthCheckContextMenuService } from '@services/context-menu/config/health-check-menu.service';
+import { SERV } from '@services/main.config';
+
+import { ActionMenuEvent } from '@components/menus/action-menu/action-menu.model';
+import { BulkActionMenuAction } from '@components/menus/bulk-action-menu/bulk-action-menu.constants';
+import { RowActionMenuAction } from '@components/menus/row-action-menu/row-action-menu.constants';
+import { BaseTableComponent } from '@components/tables/base-table/base-table.component';
+import {
+  HealthChecksTableCol,
+  HealthChecksTableColumnLabel,
+  HealthChecksTableStatusLabel
+} from '@components/tables/health-checks-table/health-checks-table.constants';
+import { HTTableColumn, HTTableRouterLink } from '@components/tables/ht-table/ht-table.models';
+import { TableDialogComponent } from '@components/tables/table-dialog/table-dialog.component';
+import { DialogData } from '@components/tables/table-dialog/table-dialog.model';
+
+import { HealthChecksDataSource } from '@datasources/health-checks.datasource';
+
+import { FilterType } from '@src/app/core/_models/request-params.model';
+import { formatUnixTimestamp } from '@src/app/shared/utils/datetime';
+
+@Component({
+  selector: 'health-checks-table',
+  templateUrl: './health-checks-table.component.html',
+  standalone: false
+})
+export class HealthChecksTableComponent extends BaseTableComponent implements OnInit, AfterViewInit {
+  tableColumns: HTTableColumn[] = [];
+  dataSource: HealthChecksDataSource;
+  selectedFilterColumn: HTTableColumn;
+
+  ngOnInit(): void {
+    this.setColumnLabels(HealthChecksTableColumnLabel);
+    this.tableColumns = this.getColumns();
+    this.dataSource = new HealthChecksDataSource(this.injector);
+    this.dataSource.setColumns(this.tableColumns);
+    this.contextMenuService = new HealthCheckContextMenuService(this.permissionService).addContextMenu();
+    this.dataSource.loadAll();
+    // Setup filter error handling
+    this.setupFilterErrorSubscription(this.dataSource);
+  }
+
+  ngAfterViewInit(): void {
+    // Wait until paginator is defined
+    this.dataSource.loadAll();
+  }
+
+  filter(input: string) {
+    const selectedColumn = this.selectedFilterColumn;
+    if (input && input.length > 0) {
+      this.dataSource.loadAll({
+        value: input,
+        field: selectedColumn.dataKey ?? '',
+        operator: FilterType.ICONTAINS,
+        parent: selectedColumn.parent
+      });
+      return;
+    } else {
+      this.dataSource.loadAll(); // Reload all data if input is empty
+    }
+  }
+  handleBackendSqlFilter(event: string) {
+    if (event && event.trim().length > 0) {
+      this.filter(event);
+    } else {
+      // Clear the filter when search box is cleared
+      this.dataSource.clearFilter();
+    }
+  }
+  getColumns(): HTTableColumn[] {
+    return [
+      {
+        id: HealthChecksTableCol.ID,
+        dataKey: 'id',
+        routerLink: (healthCheck: JHealthCheck) => this.renderHealthCheckLink(healthCheck),
+        isSortable: true,
+        isSearchable: true,
+        export: async (healthCheck: JHealthCheck) => healthCheck.id + ''
+      },
+      {
+        id: HealthChecksTableCol.CREATED,
+        dataKey: 'created',
+        isSortable: false,
+        render: (healthCheck: JHealthCheck) => formatUnixTimestamp(healthCheck.time, this.dateTimeFormat),
+        export: async (healthCheck: JHealthCheck) => formatUnixTimestamp(healthCheck.time, this.dateTimeFormat)
+      },
+      {
+        id: HealthChecksTableCol.TYPE,
+        dataKey: 'hashtypeDescription',
+        render: (healthCheck: JHealthCheck) =>
+          healthCheck.hashType ? `Brute Force (${this.sanitize(healthCheck.hashType.description)})` : '',
+        isSortable: false,
+        export: async (healthCheck: JHealthCheck) =>
+          healthCheck.hashType ? `Brute Force (${healthCheck.hashType.description})` : ''
+      },
+      {
+        id: HealthChecksTableCol.STATUS,
+        dataKey: 'status',
+        render: (healthCheck: JHealthCheck) => HealthChecksTableStatusLabel[healthCheck.status],
+        isSortable: true,
+        export: async (healthCheck: JHealthCheck) => HealthChecksTableStatusLabel[healthCheck.status]
+      }
+    ];
+  }
+
+  openDialog(data: DialogData<JHealthCheck>) {
+    const dialogRef = this.dialog.open(TableDialogComponent, {
+      data: data,
+      width: '450px'
+    });
+
+    dialogRef
+      .afterClosed()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((result) => {
+        if (result && result.action) {
+          switch (result.action) {
+            case RowActionMenuAction.DELETE:
+              this.rowActionDelete(result.data);
+              break;
+            case BulkActionMenuAction.DELETE:
+              this.bulkActionDelete(result.data);
+              break;
+          }
+        }
+      });
+  }
+
+  /**
+   * Render healthcheck link
+   * @param healthCheck - healthcheck object to render link for
+   * @return observable object containing a router link array
+   */
+  private renderHealthCheckLink(healthCheck: JHealthCheck): Observable<HTTableRouterLink[]> {
+    const links: HTTableRouterLink[] = [];
+    if (healthCheck) {
+      links.push({
+        routerLink: ['/config/health-checks', healthCheck.id],
+        label: healthCheck.id
+      });
+    }
+    return of(links);
+  }
+
+  // --- Action functions ---
+
+  exportActionClicked(event: ActionMenuEvent<JHealthCheck[]>): void {
+    const visibleColumnIds = this.table.displayedColumns.map(Number);
+    const visibleColumns = this.tableColumns.filter((col) => visibleColumnIds.includes(col.id));
+    this.exportService.handleExportAction<JHealthCheck>(
+      event,
+      visibleColumns,
+      HealthChecksTableColumnLabel,
+      'hashtopolis-health-checks'
+    );
+  }
+
+  rowActionClicked(event: ActionMenuEvent<JHealthCheck>): void {
+    switch (event.menuItem.action) {
+      case RowActionMenuAction.DELETE:
+        this.openDialog({
+          rows: [event.data],
+          title: `Deleting health check Brute Force (${event.data.hashType?.description ?? ''}) ...`,
+          icon: 'warning',
+          body: `Are you sure you want to delete it? Note that this action cannot be undone.`,
+          warn: true,
+          action: event.menuItem.action
+        });
+        break;
+      case RowActionMenuAction.VIEW:
+        this.rowActionView(event.data);
+        break;
+    }
+  }
+
+  bulkActionClicked(event: ActionMenuEvent<JHealthCheck[]>): void {
+    switch (event.menuItem.action) {
+      case BulkActionMenuAction.DELETE:
+        this.openDialog({
+          rows: event.data,
+          title: `Deleting ${event.data.length} health checks ...`,
+          icon: 'warning',
+          body: `Are you sure you want to delete the above health checks? Note that this action cannot be undone.`,
+          warn: true,
+          listAttribute: 'hashTypeDescription',
+          action: event.menuItem.action
+        });
+        break;
+    }
+  }
+
+  /**
+   * @todo Implement error handling.
+   */
+  private bulkActionDelete(healthChecks: JHealthCheck[]): void {
+    this.gs
+      .bulkDelete(SERV.HEALTH_CHECKS, healthChecks)
+      .pipe(
+        catchError((error) => {
+          console.error('Error during deletion: ', error);
+          return [];
+        }),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe(() => {
+        this.alertService.showSuccessMessage(`Successfully deleted healthchecks!`);
+        this.dataSource.reload();
+      });
+  }
+
+  /**
+   * @todo Implement error handling.
+   */
+  private rowActionDelete(healthChecks: JHealthCheck[]): void {
+    this.gs
+      .delete(SERV.HEALTH_CHECKS, healthChecks[0].id)
+      .pipe(
+        catchError((error) => {
+          console.error('Error during deletion:', error);
+          return [];
+        }),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe(() => {
+        this.alertService.showSuccessMessage('Successfully deleted health check!');
+        this.reload();
+      });
+  }
+
+  private rowActionView(healthCheck: JHealthCheck): void {
+    this.router.navigate(['/config/health-checks', healthCheck.id]);
+  }
+}
