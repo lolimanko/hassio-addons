@@ -1,0 +1,388 @@
+import { HttpStatus } from '@constants/http.config';
+import { IconDefinition } from '@fortawesome/fontawesome-svg-core';
+import { faApple, faLinux, faWindows } from '@fortawesome/free-brands-svg-icons';
+import { zAgentResponse, zGetBestTasksAgentResponse, zUserListResponse } from '@generated/api/zod';
+import { lastValueFrom } from 'rxjs';
+
+import { HttpErrorResponse } from '@angular/common/http';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormGroup } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
+
+import { JAgentAssignment } from '@models/agent-assignment.model';
+import { JAgentWith, ThinJAgent } from '@models/agent.model';
+import { AccessGroupId, TaskId, UserId } from '@models/id.types';
+import { ResponseWrapper } from '@models/response.model';
+import { zIdRouteParams } from '@models/routes.schema';
+
+import { JsonAPISerializer } from '@services/api/serializer-service';
+import { SERV } from '@services/main.config';
+import { GlobalService } from '@services/main.service';
+import { RequestParamBuilder } from '@services/params/builder-implementation.service';
+import { AgentRoleService } from '@services/roles/agents/agent-role.service';
+import { AlertService } from '@services/shared/alert.service';
+import { AutoTitleService } from '@services/shared/autotitle.service';
+import { UIConfigService } from '@services/shared/storage.service';
+
+import {
+  EditAgentForm,
+  UpdateAssignmentForm,
+  getEditAgentForm,
+  getUpdateAssignmentForm
+} from '@src/app/agents/edit-agent/edit-agent.form';
+import { ASC, IgnoreErrorsOptions } from '@src/app/core/_constants/agentsc.config';
+import { AgentOS } from '@src/app/core/_constants/agentsc.config';
+import {
+  ACCESS_GROUP_FIELD_MAPPING,
+  DEFAULT_FIELD_MAPPING,
+  TASKS_FIELD_MAPPING
+} from '@src/app/core/_constants/select.config';
+import { SelectOption, transformSelectOptions } from '@src/app/shared/utils/forms';
+
+/** Agent with the includes loaded for the edit view plus the requested crackingTime aggregate. */
+type ShownAgent = JAgentWith<'agentStats' | 'accessGroups' | 'assignments' | 'crackingTime'>;
+
+@Component({
+  selector: 'app-edit-agent',
+  templateUrl: './edit-agent.component.html',
+  standalone: false
+})
+export class EditAgentComponent implements OnInit {
+  /** Flag indicating whether data is still loading. */
+  isLoading = true;
+
+  /** Form group for main form and assign agent. */
+  updateForm: FormGroup<EditAgentForm>;
+  updateAssignForm: FormGroup<UpdateAssignmentForm>;
+
+  /** On form update show a spinner loading */
+  isUpdatingLoading = false;
+
+  /** Select Options. */
+  selectUsers: SelectOption<UserId>[] = [];
+  selectIgnorerrors = IgnoreErrorsOptions;
+  selectUserAgps: SelectOption<AccessGroupId>[] = [];
+
+  /** Assign Tasks */
+  assignTasks: SelectOption<TaskId>[] = [];
+  assignNew = false;
+  assignId: number | null = null;
+
+  // Edit Index
+  editedAgentIndex: number;
+  showagent: ShownAgent;
+
+  pageTitle = 'Agent';
+
+  currentAssignment: JAgentAssignment | null = null;
+  public ASC = ASC;
+  protected readonly faLinux = faLinux;
+  protected readonly faWindows = faWindows;
+  protected readonly faApple = faApple;
+
+  private destroyRef = inject(DestroyRef);
+  private titleService = inject(AutoTitleService);
+  private uiService = inject(UIConfigService);
+  private route = inject(ActivatedRoute);
+  private alert = inject(AlertService);
+  private gs = inject(GlobalService);
+  private router = inject(Router);
+  private serializer = inject(JsonAPISerializer);
+  protected agentRoleService = inject(AgentRoleService);
+
+  constructor() {
+    this.onInitialize();
+    this.buildEmptyForms();
+    this.titleService.set(['Edit Agent']);
+  }
+
+  /**
+   * Initializes the component by extracting and setting the agent ID.
+   * If the id is missing or invalid, redirect to 404.
+   */
+  private onInitialize(): void {
+    const routeParams = zIdRouteParams.safeParse(this.route.snapshot.params);
+    this.editedAgentIndex = routeParams.success ? routeParams.data.id : NaN;
+
+    if (!routeParams.success) {
+      this.router.navigate(['/not-found']);
+    }
+  }
+
+  /**
+   * Lifecycle hook called after component initialization.
+   */
+  async ngOnInit(): Promise<void> {
+    if (!this.editedAgentIndex || Number.isNaN(this.editedAgentIndex)) {
+      return;
+    }
+
+    try {
+      await this.loadAgent();
+      this.loadSelectTasks();
+      this.loadSelectUsers();
+
+      this.initForm();
+    } catch (error) {
+      this.handleLoadError(error);
+      return;
+    } finally {
+      this.isLoading = false;
+    }
+  }
+
+  /**
+   * Centralized handler for 404 / 403 / other load errors.
+   */
+  private handleLoadError(error: unknown): void {
+    const httpError = error as HttpErrorResponse;
+    const status = httpError?.status;
+
+    if (status === HttpStatus.NOT_FOUND) {
+      this.router.navigate(['/not-found']);
+    } else if (status === HttpStatus.FORBIDDEN) {
+      this.router.navigate(['/forbidden']);
+    } else {
+      this.alert.showErrorMessage('Error loading agent details');
+    }
+  }
+
+  /**
+   * Builds the empty forms for editing an agent and updating its assignment to a task
+   * @private
+   */
+  private buildEmptyForms(): void {
+    this.updateForm = getEditAgentForm(!this.agentRoleService.hasRole('update'));
+    this.updateAssignForm = getUpdateAssignmentForm(!this.agentRoleService.hasRole('updateAssignment'));
+  }
+
+  /**
+   * Load agent including its agentStats and accessGroups from server to draw stat graphs
+   * @private
+   */
+  private async loadAgent(): Promise<void> {
+    const includes = ['agentStats', 'accessGroups'];
+
+    if (this.agentRoleService.hasRole('readAssignment')) {
+      includes.push('assignments');
+    }
+    try {
+      const response = await lastValueFrom<ResponseWrapper>(
+        this.gs.get(SERV.AGENTS, this.editedAgentIndex, {
+          include: includes,
+          aggregate: [{ field: 'agent', values: ['crackingTime'] }]
+        })
+      );
+
+      const typingParams = new RequestParamBuilder()
+        .addInclude('agentStats')
+        .addInclude('accessGroups')
+        .addInclude('assignments')
+        .addAggregate({ field: 'agent', values: ['crackingTime'] as const })
+        .create();
+      const agent: ShownAgent = this.serializer.deserialize(response, zAgentResponse, typingParams);
+      this.showagent = agent;
+      this.selectUserAgps = transformSelectOptions(agent.accessGroups ?? [], ACCESS_GROUP_FIELD_MAPPING);
+      if (this.agentRoleService.hasRole('readAssignment')) {
+        if ((agent.assignments ?? []).length) {
+          const firstAssignment = (agent.assignments ?? [])[0];
+          this.assignNew = !!firstAssignment.taskId;
+          this.assignId = firstAssignment.id;
+          this.currentAssignment = firstAssignment;
+        } else {
+          this.currentAssignment = null;
+          this.assignId = null;
+          this.assignNew = false;
+        }
+      }
+    } catch (err) {
+      const httpErr = err as HttpErrorResponse;
+
+      // If the server fails while resolving included relations (500+),
+      // try once more without the `include` params so the primary resource can still load.
+      if (httpErr?.status && httpErr.status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+        const response = await lastValueFrom<ResponseWrapper>(this.gs.get(SERV.AGENTS, this.editedAgentIndex));
+
+        // Degraded fallback: no includes loaded due to server error
+        const agent: ThinJAgent = this.serializer.deserialize(response, zAgentResponse);
+        this.showagent = agent as ShownAgent;
+        this.selectUserAgps = [];
+        return;
+      }
+
+      // Non-500 errors are rethrown and will be handled by the caller
+      throw err;
+    }
+  }
+
+  /**
+   * Load assignable task for the select element (All tasks not yet completed and not running)
+   * @private
+   */
+  private loadSelectTasks(): void {
+    if (!this.agentRoleService.hasRole('readAssignment')) {
+      return;
+    }
+
+    this.gs
+      .ghelper(SERV.HELPER, 'getBestTasksAgent', { agent: this.editedAgentIndex })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((response: ResponseWrapper) => {
+        const tasks = this.serializer.deserialize(response, zGetBestTasksAgentResponse);
+        this.assignTasks = transformSelectOptions(tasks, TASKS_FIELD_MAPPING);
+      });
+  }
+
+  /**
+   * Load all users for the select element
+   * @private
+   */
+  private loadSelectUsers(): void {
+    this.gs
+      .getAll(SERV.USERS)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((response: ResponseWrapper) => {
+        this.selectUsers = transformSelectOptions(
+          this.serializer.deserialize(response, zUserListResponse),
+          DEFAULT_FIELD_MAPPING
+        );
+      });
+  }
+
+  /**
+   * Initializes the forms with data retrieved from the server.
+   * @private
+   */
+  private initForm(): void {
+    if (!this.showagent) {
+      return;
+    }
+
+    this.pageTitle = 'Agent ' + (this.showagent.agentName ?? '');
+
+    this.updateForm.setValue({
+      isActive: this.showagent.isActive,
+      userId: this.showagent.userId ?? null,
+      agentName: this.showagent.agentName,
+      cpuOnly: this.showagent.cpuOnly,
+      cmdPars: this.showagent.cmdPars,
+      ignoreErrors: this.showagent.ignoreErrors ?? null,
+      isTrusted: this.showagent.isTrusted
+    });
+
+    if (this.currentAssignment) {
+      this.updateAssignForm.setValue({
+        taskId: this.currentAssignment.taskId
+      });
+    } else {
+      this.updateAssignForm.reset({
+        taskId: null
+      });
+    }
+  }
+
+  /**
+   * Handles the form submission for updating an agent.
+   */
+  onSubmit(): void {
+    if (this.updateForm.invalid) {
+      this.updateForm.markAllAsTouched();
+      this.updateForm.updateValueAndValidity();
+      return;
+    }
+
+    if (this.updateAssignForm.valid && this.updateAssignForm.value.taskId !== this.currentAssignment?.taskId) {
+      this.onUpdateAssign(this.updateAssignForm.value.taskId ?? null);
+    }
+
+    this.isUpdatingLoading = true;
+
+    this.gs
+      .update(SERV.AGENTS, this.editedAgentIndex, this.updateForm.value)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.alert.showSuccessMessage('Agent saved');
+          this.isUpdatingLoading = false;
+          this.router.navigate(['agents/show-agents']);
+        },
+        error: () => {
+          this.isUpdatingLoading = false;
+          this.alert.showErrorMessage('Error updating agent');
+        }
+      });
+  }
+
+  /**
+   * Updates agent assignment based on the provided value.
+   * Assigns the agent to the provided taskID or removes a current assignment
+   * @param taskId The task ID.
+   */
+  onUpdateAssign(taskId: number | null): void {
+    let request$;
+
+    if (taskId) {
+      const payload = {
+        taskId,
+        agentId: this.editedAgentIndex
+      };
+      request$ = this.gs.chelper(SERV.HELPER, 'assignAgent', payload);
+    } else if (this.assignId) {
+      request$ = this.gs.delete(SERV.AGENT_ASSIGN, this.assignId);
+    }
+
+    if (request$) {
+      request$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
+    }
+  }
+
+  // Render devices using count by device type, one entry per line.
+  // Accepts either real newlines or HTML <br> as the incoming separator.
+  renderDevices(devices: string): string {
+    const deviceList = devices
+      .replace(/<br\s*\/?>/gi, '\n')
+      .split('\n')
+      .map((d) => d.trim())
+      .filter((d) => !!d);
+    const deviceCountMap: Record<string, number> = {};
+
+    deviceList.forEach((device) => {
+      deviceCountMap[device] = (deviceCountMap[device] || 0) + 1;
+    });
+
+    return Object.keys(deviceCountMap)
+      .map((device) => `${deviceCountMap[device]} x ${device}`)
+      .join('\n');
+  }
+
+  getOsLabel(os: AgentOS): string {
+    switch (os) {
+      case AgentOS.LINUX:
+        return 'Linux';
+      case AgentOS.WINDOWS:
+        return 'Windows';
+      case AgentOS.MACOS:
+        return 'MacOS';
+      default:
+        return 'Unknown';
+    }
+  }
+
+  getOsMessage(os: AgentOS): string {
+    return this.getOsLabel(os);
+  }
+
+  getOsFaIcon(os: AgentOS): IconDefinition | null {
+    switch (os) {
+      case AgentOS.LINUX:
+        return this.faLinux;
+      case AgentOS.WINDOWS:
+        return this.faWindows;
+      case AgentOS.MACOS:
+        return this.faApple;
+      default:
+        return null;
+    }
+  }
+}

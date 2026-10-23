@@ -1,0 +1,211 @@
+import { catchError } from 'rxjs';
+
+import { Component, OnInit } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+
+import { BaseModel } from '@models/base.model';
+
+import { VoucherContextMenuService } from '@services/context-menu/agents/voucher-menu.service';
+
+import { ActionMenuEvent } from '@src/app/core/_components/menus/action-menu/action-menu.model';
+import { BulkActionMenuAction } from '@src/app/core/_components/menus/bulk-action-menu/bulk-action-menu.constants';
+import { RowActionMenuAction } from '@src/app/core/_components/menus/row-action-menu/row-action-menu.constants';
+import { BaseTableComponent } from '@src/app/core/_components/tables/base-table/base-table.component';
+import { HTTableColumn } from '@src/app/core/_components/tables/ht-table/ht-table.models';
+import { TableDialogComponent } from '@src/app/core/_components/tables/table-dialog/table-dialog.component';
+import { DialogData } from '@src/app/core/_components/tables/table-dialog/table-dialog.model';
+import {
+  VouchersTableCol,
+  VouchersTableColumnLabel
+} from '@src/app/core/_components/tables/vouchers-table/vouchers-table.constants';
+import { VouchersDataSource } from '@src/app/core/_datasources/vouchers.datasource';
+import { FilterType } from '@src/app/core/_models/request-params.model';
+import { JVoucher } from '@src/app/core/_models/voucher.model';
+import { SERV } from '@src/app/core/_services/main.config';
+import { formatUnixTimestamp } from '@src/app/shared/utils/datetime';
+
+@Component({
+  selector: 'app-vouchers-table',
+  templateUrl: './vouchers-table.component.html',
+  standalone: false
+})
+export class VouchersTableComponent extends BaseTableComponent implements OnInit {
+  tableColumns: HTTableColumn[] = [];
+  dataSource: VouchersDataSource;
+  selectedFilterColumn: HTTableColumn;
+  ngOnInit(): void {
+    this.setColumnLabels(VouchersTableColumnLabel);
+    this.tableColumns = this.getColumns();
+    this.dataSource = new VouchersDataSource(this.injector);
+    this.dataSource.setColumns(this.tableColumns);
+    this.contextMenuService = new VoucherContextMenuService(this.permissionService).addContextMenu();
+    this.dataSource.loadAll();
+  }
+
+  /**
+   * Filter voucher
+   * @param input value to filter
+   * @returns true, if voucher contains filterValue, else false
+   */
+  filter(input: string) {
+    const selectedColumn = this.selectedFilterColumn;
+    if (input && input.length > 0) {
+      this.dataSource.loadAll({
+        value: input,
+        field: selectedColumn.dataKey ?? '',
+        operator: FilterType.ICONTAINS,
+        parent: selectedColumn.parent
+      });
+      return;
+    } else {
+      this.dataSource.loadAll(); // Reload all data if input is empty
+    }
+  }
+
+  getColumns(): HTTableColumn[] {
+    return [
+      {
+        id: VouchersTableCol.ID,
+        isNumeric: true,
+        dataKey: 'id',
+        isSortable: true,
+        isSearchable: true
+      },
+      {
+        id: VouchersTableCol.KEY,
+        dataKey: 'voucher',
+        isSortable: true,
+        isCopy: true,
+        isSearchable: true,
+        export: async (voucher: JVoucher) => voucher.voucher
+      },
+      {
+        id: VouchersTableCol.CREATED,
+        dataKey: 'time',
+        isSortable: true,
+        render: (voucher: JVoucher) => formatUnixTimestamp(voucher.time, this.dateTimeFormat),
+        export: async (voucher: JVoucher) => formatUnixTimestamp(voucher.time, this.dateTimeFormat)
+      }
+    ];
+  }
+
+  openDialog(data: DialogData<JVoucher>) {
+    const dialogRef = this.dialog.open(TableDialogComponent, {
+      data: data,
+      width: '450px'
+    });
+
+    dialogRef
+      .afterClosed()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((result) => {
+        if (result && result.action) {
+          switch (result.action) {
+            case RowActionMenuAction.DELETE:
+              this.rowActionDelete(result.data);
+              break;
+            case BulkActionMenuAction.DELETE:
+              this.bulkActionDelete(result.data);
+              break;
+          }
+        }
+      });
+  }
+
+  // --- Action functions ---
+
+  exportActionClicked(event: ActionMenuEvent<JVoucher[]>): void {
+    const visibleColumnIds = this.table.displayedColumns.map(Number);
+    const visibleColumns = this.tableColumns.filter((col) => visibleColumnIds.includes(col.id));
+    this.exportService.handleExportAction<JVoucher>(
+      event,
+      visibleColumns,
+      VouchersTableColumnLabel,
+      'hashtopolis-vouchers'
+    );
+  }
+
+  protected receiveCopyData(event: BaseModel): void {
+    if (this.clipboard.copy(String((event as JVoucher).voucher))) {
+      this.alertService.showSuccessMessage('Voucher key successfully copied to clipboard.');
+    } else {
+      this.alertService.showErrorMessage('Could not copy Voucher key clipboard.');
+    }
+  }
+
+  rowActionClicked(event: ActionMenuEvent<JVoucher>): void {
+    switch (event.menuItem.action) {
+      case RowActionMenuAction.DELETE:
+        this.openDialog({
+          rows: [event.data],
+          title: `Deleting voucher ${event.data.voucher} ...`,
+          icon: 'warning',
+          body: `Are you sure you want to delete it? Note that this action cannot be undone.`,
+          warn: true,
+          action: event.menuItem.action
+        });
+        break;
+      case RowActionMenuAction.EDIT:
+        this.rowActionEdit(event.data);
+        break;
+    }
+  }
+
+  bulkActionClicked(event: ActionMenuEvent<JVoucher[]>): void {
+    switch (event.menuItem.action) {
+      case BulkActionMenuAction.DELETE:
+        this.openDialog({
+          rows: event.data,
+          title: `Deleting ${event.data.length} vouchers ...`,
+          icon: 'warning',
+          body: `Are you sure you want to delete the above vouchers? Note that this action cannot be undone.`,
+          warn: true,
+          listAttribute: 'voucher',
+          action: event.menuItem.action
+        });
+        break;
+    }
+  }
+
+  /**
+   * @todo Implement error handling.
+   */
+  private bulkActionDelete(vouchers: JVoucher[]): void {
+    this.gs
+      .bulkDelete(SERV.VOUCHER, vouchers)
+      .pipe(
+        catchError((error) => {
+          console.error('Error during deletion: ', error);
+          return [];
+        }),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe(() => {
+        this.alertService.showSuccessMessage(`Successfully deleted vouchers!`);
+        this.dataSource.reload();
+      });
+  }
+
+  /**
+   * @todo Implement error handling.
+   */
+  private rowActionDelete(vouchers: JVoucher[]): void {
+    this.gs
+      .delete(SERV.VOUCHER, vouchers[0].id)
+      .pipe(
+        catchError((error) => {
+          console.error('Error during deletion:', error);
+          return [];
+        }),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe(() => {
+        this.alertService.showSuccessMessage('Successfully deleted voucher!');
+        this.reload();
+      });
+  }
+
+  private rowActionEdit(voucher: JVoucher): void {
+    this.router.navigate(['/config', 'engine', 'vouchers', voucher.id, 'edit']);
+  }
+}

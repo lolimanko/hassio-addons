@@ -1,0 +1,431 @@
+import { Subject, combineLatest } from 'rxjs';
+import { map, startWith, takeUntil } from 'rxjs/operators';
+
+import { COMMA, ENTER } from '@angular/cdk/keycodes';
+import { CdkVirtualScrollViewport } from '@angular/cdk/scrolling';
+import {
+  AfterViewInit,
+  ChangeDetectionStrategy,
+  Component,
+  Input,
+  OnChanges,
+  OnDestroy,
+  SimpleChanges,
+  ViewChild,
+  forwardRef,
+  inject
+} from '@angular/core';
+import { NG_VALUE_ACCESSOR } from '@angular/forms';
+import { MatAutocomplete, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
+import { MatChipInputEvent } from '@angular/material/chips';
+import { MatInput } from '@angular/material/input';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+
+import { AbstractInputComponent } from '@src/app/shared/input/abstract-input';
+import { SelectOption, extractIds } from '@src/app/shared/utils/forms';
+
+/**
+ * InputMultiSelectComponent for selecting or searching items from an array of objects.
+ * Supports dynamic filtering, highlighting, and emits selection changes.
+ */
+@Component({
+  selector: 'input-multiselect',
+  templateUrl: 'multiselect.component.html',
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => InputMultiSelectComponent),
+      multi: true
+    }
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  standalone: false
+})
+export class InputMultiSelectComponent
+  extends AbstractInputComponent<number | number[]>
+  implements AfterViewInit, OnChanges, OnDestroy
+{
+  @Input() label = 'Select or search:';
+  @Input() placeholder = 'Select or search';
+  @Input() isLoading = false;
+  @Input() set items(value: SelectOption<number>[]) {
+    // Keep an immutable copy to avoid mutating parent inputs
+    this._items = value ? [...value] : [];
+    this.availableItems = [...this._items];
+    this.itemsSubject.next(this.availableItems);
+  }
+  get items(): SelectOption<number>[] {
+    return this._items;
+  }
+  @Input() multiselectEnabled = true;
+  @Input() mergeIdAndName = false;
+  @Input() initialHashlistId: string | number;
+
+  @ViewChild('selectInput', { read: MatInput }) selectInput: MatInput;
+  @ViewChild(CdkVirtualScrollViewport) virtualViewport: CdkVirtualScrollViewport;
+  @ViewChild(MatAutocomplete) autocomplete: MatAutocomplete;
+
+  private searchInputSubject = new Subject<string>();
+  private itemsSubject = new Subject<SelectOption<number>[]>();
+  private destroy$ = new Subject<void>();
+  private _items: SelectOption<number>[] = [];
+  private availableItems: SelectOption<number>[] = [];
+
+  readonly itemSize = 48;
+  filteredItems: SelectOption<number>[] = [];
+  searchTerm = '';
+
+  // Visual chips
+  selectedItems: SelectOption<number>[] = [];
+
+  // Validation model (dummy, never displayed)
+  chipGridValidation: SelectOption<number>[] = [];
+
+  readonly separatorKeysCodes: number[] = [COMMA, ENTER]; // ENTER and COMMA key codes
+
+  private sanitizer = inject(DomSanitizer);
+
+  constructor() {
+    super();
+    combineLatest([this.searchInputSubject.pipe(startWith('')), this.itemsSubject.pipe(startWith(this.availableItems))])
+      .pipe(
+        map(([searchTerm]) => (searchTerm ? this._filter(searchTerm) : this.getUnselectedItems())),
+        takeUntil(this.destroy$)
+      )
+      .subscribe((items) => {
+        this.filteredItems = items;
+        this.cdr.markForCheck();
+      });
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['items'] && !changes['items'].firstChange) {
+      // Already handled by setter, just refresh search
+      this.searchInputSubject.next(this.searchTerm);
+    }
+  }
+
+  ngAfterViewInit(): void {
+    // Check if initialHashlistId is provided
+    if (this.initialHashlistId != null) {
+      // Find the preselected item based on initialHashlistId
+      const preselectedItem = this.availableItems.find((item) => item.id === this.initialHashlistId);
+
+      // If the preselected item is found, add it to selectedItems
+      if (preselectedItem) {
+        this.selectedItems.push(preselectedItem);
+
+        // Optionally, remove the preselected item from the available items
+        this.availableItems = this.availableItems.filter((i) => i.id !== preselectedItem.id);
+        this.itemsSubject.next(this.availableItems);
+      }
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  /**
+   * Called when the autocomplete panel opens. Gives the CDK virtual scroll
+   * viewport a chance to measure its size after the overlay becomes visible.
+   */
+  onPanelOpened(): void {
+    setTimeout(() => {
+      this.virtualViewport?.checkViewportSize();
+      this.clearAutocompleteSelectionFlags();
+      this.cdr.markForCheck();
+    });
+  }
+
+  /**
+   * Returns the height for the virtual scroll viewport, capped at 5 visible rows.
+   *
+   * @returns Height in pixels
+   */
+  get viewportHeight(): number {
+    return Math.min(this.filteredItems.length, 5) * this.itemSize;
+  }
+
+  public addChip(item: SelectOption<number>): void {
+    if (!this.selectedItems.find((i) => i.id === item.id)) {
+      // Update visual array
+      if (this.multiselectEnabled) {
+        this.selectedItems.push(item);
+      } else {
+        this.selectedItems = [item];
+      }
+
+      // Update validation array
+      this.chipGridValidation = [...this.selectedItems];
+
+      this.updateAvailableItems();
+      this.itemsSubject.next(this.availableItems);
+
+      // Update filtered items
+      this.searchInputSubject.next(this.searchTerm);
+
+      // Notify Angular forms
+      this.onChangeValue(this.selectedItems);
+      this.onTouched();
+    }
+  }
+
+  public remove(item: SelectOption<number>): void {
+    const nextSelectedItems = this.selectedItems.filter((selectedItem) => selectedItem.id !== item.id);
+    if (nextSelectedItems.length === this.selectedItems.length) return;
+
+    this.selectedItems = nextSelectedItems;
+    this.chipGridValidation = [...this.selectedItems];
+
+    this.updateAvailableItems();
+    this.searchInputSubject.next(this.searchTerm);
+    this.itemsSubject.next(this.availableItems);
+
+    this.onChangeValue(this.selectedItems);
+    this.onTouched();
+    this.cdr.markForCheck();
+  }
+
+  /**
+   * Available Items is always all items without the selected ones
+   */
+  private updateAvailableItems(): void {
+    const selectedIds = new Set(this.selectedItems.map((s) => s.id));
+    this.availableItems = this._items.filter((item) => !selectedIds.has(item.id));
+  }
+
+  /**
+   * Reset every MatOption's internal `selected` flag due to virtual scroll reusing options that
+   * might already be selected from previous ones
+   */
+  private clearAutocompleteSelectionFlags(): void {
+    this.autocomplete?.options?.forEach((opt) => opt.deselect());
+  }
+
+  // When typing a separator key (ENTER, COMMA)
+  onInputChipAdd(event: MatChipInputEvent) {
+    const value = event.value?.trim();
+    if (!value) return;
+
+    const firstFilteredItem = this.filteredItems[0];
+    if (firstFilteredItem) {
+      this.clearInvalidSelectionError();
+      this.onAutocompleteSelect(firstFilteredItem);
+      event.chipInput.clear();
+      return;
+    }
+
+    this.setInvalidSelectionError();
+  }
+
+  // When selecting from autocomplete
+  onAutocompleteSelect(selected: SelectOption<number>) {
+    this.clearInvalidSelectionError();
+    this.addChip(selected);
+    this.searchTerm = '';
+    this.searchInputSubject.next(this.searchTerm);
+    if (this.selectInput) {
+      try {
+        this.selectInput.value = '';
+      } catch {
+        // ignore
+      }
+    }
+    this.clearAutocompleteSelectionFlags();
+    this.cdr.markForCheck();
+  }
+
+  /**
+   * Handles the change in the input value and triggers the corresponding change events.
+   *
+   * @param value - The new value of the input.
+   * @returns {void}
+   */
+  /**
+   * Handles the change in the input value and triggers the corresponding change events.
+   *
+   * @param value - The new value of the input.
+   * @returns {void}
+   */
+  onChangeValue(value: SelectOption<number> | SelectOption<number>[]): void {
+    if (!this.multiselectEnabled) {
+      if (Array.isArray(value)) {
+        this.value = extractIds(value, 'id')[0];
+      } else if (value) {
+        this.value = extractIds([value], 'id')[0]; // wrap in array
+      } else {
+        this.value = [] as number[]; // handle empty case
+      }
+    } else {
+      if (Array.isArray(value)) {
+        this.value = extractIds(value, 'id');
+      } else if (value) {
+        this.value = extractIds([value], 'id');
+      } else {
+        this.value = [];
+      }
+    }
+
+    this.onChange(this.value);
+  }
+
+  /**
+   * Handles the change in the search input and updates the search input subject.
+   *
+   * @returns {void}
+   */
+  onSearchInputChange(event?: Event): void {
+    if (event) {
+      const target = event.target as HTMLInputElement;
+      this.searchTerm = target.value;
+    }
+    this.clearInvalidSelectionError();
+    this.searchInputSubject.next(this.searchTerm);
+  }
+
+  private setInvalidSelectionError(): void {
+    const control = this.ngControl?.control;
+    if (!control) return;
+
+    control.setErrors({ ...(control.errors ?? {}), invalidSelection: true });
+    control.markAsTouched();
+    this.cdr.markForCheck();
+  }
+
+  private clearInvalidSelectionError(): void {
+    const control = this.ngControl?.control;
+    const errors = control?.errors;
+    if (!control || !errors?.['invalidSelection']) return;
+
+    const { invalidSelection, ...remainingErrors } = errors;
+    void invalidSelection;
+    control.setErrors(Object.keys(remainingErrors).length > 0 ? remainingErrors : null);
+    this.cdr.markForCheck();
+  }
+
+  /**
+   * Filters the items based on the provided search value.
+   *
+   * @param {string} value - The search value to filter the items.
+   * @returns {SelectOption<number>[]} - The filtered array of items.
+   */
+  private _filter(value: string | SelectOption<number>): SelectOption<number>[] {
+    // If a SelectOption is passed by accident, convert to string
+    const searchString = typeof value === 'string' ? value : (value.name ?? '');
+    const filterValue = searchString.toLowerCase();
+
+    const results: SelectOption<number>[] = [];
+    for (const item of this.availableItems) {
+      const nameToSearch = this.mergeIdAndName ? `${item.id} ${item.name}`.toLowerCase() : item.name.toLowerCase();
+      if (nameToSearch.includes(filterValue)) {
+        results.push(item);
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Handles the selection of an item from the autocomplete dropdown.
+   *
+   * @param {MatAutocompleteSelectedEvent} event - The event containing information about the selected item.
+   * @returns {void}
+   */
+  public selected(event: MatAutocompleteSelectedEvent): void {
+    if (!this.multiselectEnabled) {
+      this.selectedItems = [];
+    }
+
+    this.searchTerm = ''; // Reset the search term
+    this.selectedItems.push(event.option.value);
+
+    this.updateAvailableItems();
+
+    // Update the filteredItems observable
+    this.searchInputSubject.next(this.searchTerm);
+
+    if (this.selectInput) {
+      try {
+        this.selectInput.value = '';
+      } catch {
+        // ignore
+      }
+    }
+    this.cdr.markForCheck();
+
+    // Notify about the change
+    this.onChangeValue(this.selectedItems);
+    this.onTouched();
+  }
+
+  /**
+   * Gets the unselected items from the available items list.
+   *
+   * @returns {SelectOption<number>[]} - The array of unselected items.
+   */
+  private getUnselectedItems(): SelectOption<number>[] {
+    return this.availableItems.filter((item) => !this.selectedItems.find((s) => s.id === item.id));
+  }
+
+  override writeValue(newValue: number | number[] | null): void {
+    // Reset visual selection to reflect external form writes (e.g., reset())
+    if (!newValue || (Array.isArray(newValue) && newValue.length === 0)) {
+      this.selectedItems = [];
+      this.chipGridValidation = [];
+      // Restore available items from the latest input set
+      this.availableItems = [...this._items];
+      this.itemsSubject.next(this.availableItems);
+      this.searchTerm = '';
+      this.searchInputSubject.next(this.searchTerm);
+      this.value = this.multiselectEnabled ? [] : ([] as number[]);
+    } else {
+      // Convert number/number[] to SelectOption/SelectOption<number>[]
+      const ids = Array.isArray(newValue) ? newValue : [newValue];
+
+      this.selectedItems = ids
+        .map((id) => this._items.find((item) => Number(item.id) === Number(id)))
+        .filter((item): item is SelectOption<number> => item !== undefined);
+      this.chipGridValidation = [...this.selectedItems];
+
+      // Remove selected items from available
+      const selectedIds = new Set(ids.map((id) => Number(id)));
+      this.availableItems = this._items.filter((item) => !selectedIds.has(Number(item.id)));
+      this.itemsSubject.next(this.availableItems);
+
+      this.value = this.multiselectEnabled ? ids : ids[0];
+    }
+  }
+
+  /**
+   * Utility to escape HTML entities
+   * @param text
+   * @returns sanitized Text
+   */
+  private escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.innerText = text;
+    return div.innerHTML;
+  }
+
+  /**
+   * Updates the provided string by highlighting the matching term.
+   *
+   * @param {string} value - The original string to be highlighted.
+   * @param {string} term - The term to be highlighted in the string.
+   * @returns {SafeHtml} - The sanitized HTML with the highlighted term.
+   */
+  public updateHighlightedValue(value: string, term: string): SafeHtml {
+    if (typeof term === 'string' && typeof value === 'string') {
+      const escapedValue = this.escapeHtml(value);
+      const escapedTerm = this.escapeHtml(term);
+
+      const regex = new RegExp(`(${escapedTerm})`, 'ig');
+      const highlighted = escapedValue.replace(regex, '<span class="highlight-text">$1</span>');
+
+      return this.sanitizer.bypassSecurityTrustHtml(highlighted);
+    }
+
+    return this.sanitizer.bypassSecurityTrustHtml(this.escapeHtml(value));
+  }
+}

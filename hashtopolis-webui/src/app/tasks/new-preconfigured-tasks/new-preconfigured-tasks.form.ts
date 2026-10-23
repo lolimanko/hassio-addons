@@ -1,0 +1,53 @@
+import { FormControl, FormGroup, Validators } from '@angular/forms';
+
+import { UIConfigService } from '@services/shared/storage.service';
+
+import { attackCommandWithAliasValidator } from '@src/app/core/_validators/attack-command.validator';
+import { environment } from '@src/environments/environment';
+
+/**
+ * Interface definition for form to create new pretasks
+ */
+export interface NewPretaskForm {
+  taskName: FormControl<string>;
+  attackCmd: FormControl<string>;
+  maxAgents: FormControl<number>;
+  chunkTime: FormControl<number>;
+  statusTimer: FormControl<number>;
+  priority: FormControl<number>;
+  color: FormControl<string>;
+  isCpuTask: FormControl<boolean>;
+  crackerBinaryTypeId: FormControl<number>;
+  isSmall: FormControl<boolean>;
+  useNewBench: FormControl<boolean>;
+  isMaskImport: FormControl<boolean>;
+  files: FormControl<number[]>;
+}
+
+/**
+ * Get an empty instance of NewPretaskForm
+ */
+export function getNewPretaskForm(uiService: UIConfigService): FormGroup<NewPretaskForm> {
+  const useSpeedBenchmark = uiService.getUISettings()?.defaultBenchmark !== 0;
+  return new FormGroup<NewPretaskForm>({
+    taskName: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.required]
+    }),
+    attackCmd: new FormControl(uiService.getUISettings()?.hashlistAlias ?? '', {
+      nonNullable: true,
+      validators: [Validators.required, attackCommandWithAliasValidator()]
+    }),
+    maxAgents: new FormControl(environment.config.tasks.maxAgents, { nonNullable: true }),
+    chunkTime: new FormControl(uiService.getUISettings()?.chunktime ?? 0, { nonNullable: true }),
+    statusTimer: new FormControl(uiService.getUISettings()?.statustimer ?? 0, { nonNullable: true }),
+    priority: new FormControl(environment.config.tasks.priority, { nonNullable: true }),
+    color: new FormControl<string>('', { nonNullable: true }),
+    isCpuTask: new FormControl(false, { nonNullable: true }),
+    crackerBinaryTypeId: new FormControl(1, { nonNullable: true }),
+    isSmall: new FormControl(false, { nonNullable: true }),
+    useNewBench: new FormControl(useSpeedBenchmark, { nonNullable: true }),
+    isMaskImport: new FormControl(false, { nonNullable: true }),
+    files: new FormControl([], { nonNullable: true })
+  });
+}

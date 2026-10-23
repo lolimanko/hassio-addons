@@ -1,0 +1,110 @@
+<app-page [title]="pageTitle">
+  <grid-main [narrow]="true">
+    <form (ngSubmit)="onSubmit()" [formGroup]="form">
+      <div class="form-field">
+        <label for="dateFormat">Date Format</label>
+        <mat-form-field>
+          <mat-select formControlName="dateFmt" id="dateFormat">
+            @for (d of dateFormats; track d) {
+              <mat-option [value]="d.value">{{ d.description }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="form-field">
+        <label for="timeFormat">
+          Time Format
+          <mat-icon
+            matTooltip="Whether times are shown on a 24-hour or a 12-hour clock. Whether seconds are
+          shown depends on the place they are displayed in."
+            class="text-base cursor-pointer align-middle ml-1"
+          >
+            info_outline
+          </mat-icon>
+        </label>
+        <mat-form-field>
+          <mat-select formControlName="timeFmt" id="timeFormat">
+            @for (t of timeFormats; track t) {
+              <mat-option [value]="t.value">{{ t.description }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="form-field">
+        <span>Preview</span>
+        <p class="preview">
+          Date only: <strong>{{ datePreview }}</strong>
+          <br />
+          Date and time: <strong>{{ dateTimePreview }}</strong>
+        </p>
+      </div>
+
+      <div class="form-field">
+        <label for="layout">Layout</label>
+        <mat-form-field>
+          <mat-select formControlName="layout" id="layout">
+            @for (d of layouts; track d) {
+              <mat-option [value]="d.value">{{ d.description }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="form-field">
+        <label for="theme">Theme</label>
+        <mat-form-field>
+          <mat-select formControlName="theme" id="theme">
+            @for (t of themes; track t) {
+              <mat-option [value]="t.value">{{ t.description }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="form-field">
+        <label for="refreshPage">
+          Auto Refresh
+          <mat-icon
+            matTooltip="Automatically refreshes the dashboard and task and agent status table at the specified refresh interval."
+            class="text-base cursor-pointer align-middle ml-1"
+          >
+            info_outline
+          </mat-icon>
+        </label>
+
+        <mat-form-field>
+          <mat-select formControlName="refreshPage" id="refreshPage">
+            <mat-option [value]="true">Enabled</mat-option>
+            <mat-option [value]="false">Disabled</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="form-field">
+        <label for="refreshInterval">
+          Refresh Interval (seconds)
+          <mat-icon
+            matTooltip="The interval in seconds at which the dashboard and task/agent status tables are automatically
+          refreshed. Allowed range:
+          {{ UiSettingsFormGroup.REFRESH_INTERVAL_MIN }} – {{ UiSettingsFormGroup.REFRESH_INTERVAL_MAX }} seconds."
+            class="text-base cursor-pointer align-middle ml-1"
+          >
+            info_outline
+          </mat-icon>
+        </label>
+
+        <input-number
+          [max]="UiSettingsFormGroup.REFRESH_INTERVAL_MAX"
+          [min]="UiSettingsFormGroup.REFRESH_INTERVAL_MIN"
+          formControlName="refreshInterval"
+        />
+      </div>
+
+      <grid-buttons>
+        <button-submit data-testid="button-submit" name="Save Settings" [loading]="isUpdatingLoading"></button-submit>
+      </grid-buttons>
+    </form>
+  </grid-main>
+</app-page>

@@ -1,0 +1,13 @@
+<h2 mat-dialog-title>
+  @if (data.icon) {
+    <mat-icon>{{ data.icon }}</mat-icon>
+  }
+  {{ data.title || 'Confirm' }}
+</h2>
+<mat-dialog-content>
+  <p>{{ data.message }}</p>
+</mat-dialog-content>
+<mat-dialog-actions align="end" class="dialog-actions--danger">
+  <button-submit type="cancel-dialog" [name]="data.cancelText || 'Cancel'" (click)="onCancel()"></button-submit>
+  <button-submit type="submit" [name]="data.confirmText || 'OK'" (click)="onConfirm()"></button-submit>
+</mat-dialog-actions>

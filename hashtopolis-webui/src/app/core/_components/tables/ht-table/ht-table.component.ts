@@ -1,0 +1,838 @@
+import {
+  AfterViewInit,
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  Component,
+  DestroyRef,
+  ElementRef,
+  EventEmitter,
+  Input,
+  OnDestroy,
+  OnInit,
+  Output,
+  ViewChild,
+  inject
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormControl, FormGroup } from '@angular/forms';
+import { MatCheckboxChange } from '@angular/material/checkbox';
+import { MatDialog } from '@angular/material/dialog';
+import { MatPaginator, PageEvent } from '@angular/material/paginator';
+import { MatSort, SortDirection } from '@angular/material/sort';
+
+import { BaseModel } from '@models/base.model';
+import { Sorting, TableSettingsKey, UIConfig } from '@models/config-ui.model';
+import { JHash } from '@models/hash.model';
+
+import { ContextMenuService } from '@services/context-menu/base/context-menu.service';
+import { LocalStorageService } from '@services/storage/local-storage.service';
+
+import { ActionMenuEvent } from '@components/menus/action-menu/action-menu.model';
+import { BulkActionMenuComponent } from '@components/menus/bulk-action-menu/bulk-action-menu.component';
+import { ColumnSelectionDialogComponent } from '@components/tables/column-selection-dialog/column-selection-dialog.component';
+import {
+  COL_ROW_ACTION,
+  COL_SELECT,
+  CheckboxChangeEvent,
+  CheckboxColumnType,
+  CheckboxFiles,
+  ColumnDefId,
+  DataType,
+  HTTableColumn,
+  HTTableEditable,
+  SortingColumn
+} from '@components/tables/ht-table/ht-table.models';
+
+import { BaseDataSource } from '@datasources/base.datasource';
+
+import { UISettingsUtilityClass } from '@src/app/shared/utils/config';
+
+/**
+ * The `HTTableComponent` is a custom table component that allows you to display tabular data with
+ * features like sorting, filtering, and row selection. It provides flexibility in selecting columns
+ * to display and handling various table actions.
+ *
+ * Usage:
+ * ```
+ * <ht-table
+ *   [name]="tableName"
+ *   [dataSource]="myDataSource"
+ *   [isPageable]="true"
+ *   [isSortable]="true"
+ *   [isSelectable]="true"
+ *   [isFilterable]="true"
+ *   [tableColumns]="myTableColumns"
+ *   [paginationSizes]="[5, 10, 15]"
+ *   [defaultPageSize]="10"
+ *   [filterFn]="customFilterFunction"
+ *   (rowActionClicked)="myRowActionHandler($event)"
+ *   (bulkActionClicked)="myBulkActionHandler($event)">
+ * </ht-table>
+ *
+ * ```
+ *
+ * - `[name]`: The internal name of the table used when storing user customizations.
+ * - `[dataSource]`: An instance of a data source that extends `BaseDataSource`.
+ * - `[isPageable]`: Set to `true` to enable pagination.
+ * - `[isSortable]`: Set to `true` to enable column sorting.
+ * - `[isSelectable]`: Set to `true` to enable row selection with checkboxes.
+ * - `[isFilterable]`: Set to `true` to enable filtering.
+ * - `[tableColumns]`: An array of `HTTableColumn` configurations for defining columns.
+ * - `[paginationSizes]`: An array of available page sizes.
+ * - `[defaultPageSize]`: The default page size for pagination.
+ * - `[filterFn]`: A custom filter function for advanced filtering.
+ * - `(rowActionClicked)`: Emits an `ActionMenuEvent` when a row action is triggered.
+ * - `(bulkActionClicked)`: Emits an `ActionMenuEvent` when a bulk action is triggered.
+ * - `(exportActionClicked)`: Emits an `ActionMenuEvent` when an export action is triggered.
+ *
+ * @see `BaseDataSource` for creating a data source.
+ * @see `HTTableColumn` for defining column configurations.
+ *
+ */
+@Component({
+  selector: 'ht-table',
+  templateUrl: './ht-table.component.html',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'block' },
+  standalone: false
+})
+export class HTTableComponent<T extends BaseModel> implements OnInit, AfterViewInit, OnDestroy {
+  dialog = inject(MatDialog);
+  private cd = inject(ChangeDetectorRef);
+  private storage = inject<LocalStorageService<UIConfig>>(LocalStorageService);
+  private host = inject<ElementRef<HTMLElement>>(ElementRef);
+
+  /** Stringified column enum IDs for mat-table binding, built by {@link setDisplayedColumns}. */
+  displayedColumns: ColumnDefId[] = [];
+  selectedFilterColumn: HTTableColumn;
+  filterableColumns: HTTableColumn[] = [];
+  colSelect = COL_SELECT;
+  colRowAction = COL_ROW_ACTION;
+  checkboxColumnType = CheckboxColumnType;
+
+  /** Whether a row-action column will be rendered -> if present will be sticky if inner part is scrollable*/
+  private colRowActionPresent = false;
+
+  /** Stringified ids of the leading data columns to freeze (sticky-start). */
+  private leadingStickyIds = new Set<ColumnDefId>();
+
+  /** Flag to indicate if data is being loaded */
+  loading = true;
+
+  /** Reference to MatPaginator for pagination support. */
+  @ViewChild(MatPaginator, { static: false }) matPaginator: MatPaginator;
+
+  /** Reference to MatSort for sorting support. */
+  @ViewChild(MatSort, { static: true }) matSort: MatSort;
+
+  /** Name of the table, used when storing user customizations */
+  @Input() name: TableSettingsKey;
+
+  /** All available column labels */
+  @Input() columnLabels: Record<number, string>;
+
+  /** Data type displayed in the table, used to load relevant context menus */
+  @Input() dataType: DataType;
+
+  /** Whether filtering is handled client-side (datasource) or sent to the backend. */
+  @Input() filterMode: 'client' | 'backend' = 'backend';
+
+  /** The data source for the table. */
+  @Input() dataSource: BaseDataSource<T>;
+
+  /** Flag to enable or disable pagination. */
+  @Input() isPageable = false;
+
+  /** Flag to enable or disable sorting. */
+  @Input() isSortable = false;
+
+  /** Flag to enable or disable selectable rows. */
+  @Input() isSelectable = false;
+
+  /**Flag to signal if it's a detail page, since detail pages do not keep state. */
+  @Input() isDetailPage = false;
+
+  /** Flag to enable or disable cmd task attack checkbox. */
+  @Input() isCmdTask = false;
+
+  /** Selected checkbox Cmd files */
+  @Input() isCmdFiles: CheckboxFiles | number[];
+
+  /** Flag to enable or disable cmd preprocessor attack checkbox. */
+  @Input() isCmdPreproAttack = false;
+
+  @Input() isCmdPreproFiles: number[] = [];
+
+  /** Flag to add dual label text. */
+  @Input() isCmdLabel: string;
+
+  /** Flag to enable or disable filtering. */
+  @Input() isFilterable = false;
+
+  /** Flag to show the export button. */
+  @Input() showExport = true;
+
+  /** Flag show archived data. */
+  @Input() isArchived = false;
+
+  /** The list of table columns and their configurations. */
+  @Input() tableColumns: HTTableColumn[] = [];
+
+  /** Pagination sizes to choose from. */
+  @Input() paginationSizes: number[] = [5, 25, 50, 100, 250, 500, 1000, 5000];
+
+  /** Default page size for pagination. */
+  @Input() defaultPageSize = this.paginationSizes[1];
+
+  /** Default start page. */
+  @Input() defaultStartPage: number | string | undefined = undefined;
+
+  /** Default start page. */
+  @Input() defaultBeforePage: number | string | undefined = undefined;
+
+  /** Default pagination index */
+  @Input() defaultIndex = 0;
+
+  /** Flag to enable  temperature Information dialog */
+  @Input() hasTemperatureInformation = false;
+
+  @Input() contextMenuService: ContextMenuService;
+
+  /** Flag to enable auto refresh control, default: false */
+  @Input() supportsAutoRefresh = false;
+
+  /** Flag to color a table row */
+  @Input() rowClass: ((row: T) => string) | undefined;
+
+  /**
+   * Number of leading sticky columns, after that the content will be scrollable (apart from the last column which might be sticky again if row menu action)
+   */
+  @Input() stickyLeadingColumns = 2;
+
+  @Output() rowActionClicked = new EventEmitter<ActionMenuEvent<T>>();
+
+  @Output() bulkActionClicked = new EventEmitter<ActionMenuEvent<T[]>>();
+
+  @Output() exportActionClicked = new EventEmitter<ActionMenuEvent<T[]>>();
+
+  @Output() editableSaved = new EventEmitter<HTTableEditable<T>>();
+
+  @Output() editableCheckbox = new EventEmitter<HTTableEditable<T>>();
+
+  /** Event emitter for checkbox attack */
+  @Output() checkboxChanged: EventEmitter<CheckboxChangeEvent> = new EventEmitter();
+
+  /** Event emitter for checkbox attack */
+  @Output() temperatureInformationClicked: EventEmitter<void> = new EventEmitter();
+  @Output() selectedFilterColumnChanged: EventEmitter<HTTableColumn> = new EventEmitter();
+  @Output() emitCopyRowData: EventEmitter<BaseModel> = new EventEmitter();
+  @Output() emitFullHashModal: EventEmitter<JHash> = new EventEmitter();
+  @Output() linkClicked = new EventEmitter();
+
+  /** Fetches user customizations */
+  @Output() backendSqlFilter: EventEmitter<string> = new EventEmitter();
+
+  private uiSettings: UISettingsUtilityClass;
+  private destroyRef = inject(DestroyRef);
+
+  @ViewChild('bulkMenu') bulkMenu: BulkActionMenuComponent;
+
+  /** Horizontal-scroll container holding the table (native scrollbar hidden). */
+  @ViewChild('tableScroll') tableScroll?: ElementRef<HTMLElement>;
+
+  /** Synthetic scrollbar that drives {@link tableScroll}, spanning only the scrollable columns. */
+  @ViewChild('tableXScroll') tableXScroll?: ElementRef<HTMLElement>;
+
+  /** Inner rail of the synthetic scrollbar; its width sets the scroll range. */
+  @ViewChild('tableXScrollRail') tableXScrollRail?: ElementRef<HTMLElement>;
+
+  /** True when the table is wider than its container (drives the synthetic scrollbar's visibility). */
+  hasHorizontalOverflow = false;
+
+  /** Disable the jump-to-start / jump-to-end chevrons once that edge is reached. */
+  atScrollStart = true;
+  atScrollEnd = false;
+
+  /** Re-measures the synthetic scrollbar when the table or its container resize. */
+  private tableResizeObserver?: ResizeObserver;
+  filterQueryFormGroup = new FormGroup({
+    textFilter: new FormControl('')
+  });
+  filterError: string | null = null;
+
+  ngOnInit(): void {
+    this.uiSettings = new UISettingsUtilityClass(this.storage);
+    const displayedColumns = this.uiSettings.getTableSettings(this.name);
+    const tableSettings = this.uiSettings.getTableConfig(this.name);
+
+    if (!this.isDetailPage && tableSettings) {
+      this.defaultPageSize = tableSettings.page;
+      this.defaultStartPage = tableSettings.start;
+      this.defaultBeforePage = tableSettings.before;
+      this.defaultIndex = tableSettings.index ?? 0;
+    }
+
+    if (Array.isArray(displayedColumns)) {
+      this.setDisplayedColumns(displayedColumns);
+    } else {
+      // Handle the case when the retrieved value is neither an array nor a TableConfig
+      console.error(`Unexpected table configuration for key: ${this.name}`);
+    }
+    this.initFilterableColumns();
+    this.onFilterColumnChange();
+  }
+
+  /** ngStyle for the left colour bar; backend colours are bare hex, so re-add the `#` for CSS. */
+  colorBarStyle(row: T): Record<string, string> {
+    const r = row as unknown as { color?: string; tasks?: { color?: string }[] };
+    const raw = r.tasks?.length ? r.tasks[0].color : r.color;
+    if (!raw) return {};
+    return { 'box-shadow': `inset 8px 0 0 #${String(raw).replace(/^#/, '')}` };
+  }
+
+  /**
+   * Builds the list of columns available in the filter column selector from tableColumns
+   * that have both a dataKey and isSearchable set. Defaults the active filter column to
+   * the second entry (index 1) when two or more searchable columns exist, otherwise the first.
+   */
+  initFilterableColumns(): void {
+    this.filterableColumns = this.tableColumns.filter((column) => column.dataKey && column.isSearchable);
+    if (this.filterableColumns.length >= 2) {
+      this.selectedFilterColumn = this.filterableColumns[1];
+    } else if (this.filterableColumns.length > 0) {
+      this.selectedFilterColumn = this.filterableColumns[0];
+    }
+  }
+  /**
+   * Called when the user changes the active filter column in the dropdown.
+   * Notifies parent components via selectedFilterColumnChanged and, in client mode,
+   * immediately re-applies the current filter value against the new column.
+   */
+  onFilterColumnChange(): void {
+    this.selectedFilterColumnChanged.emit(this.selectedFilterColumn);
+    if (this.filterMode === 'client') {
+      const currentValue = this.filterQueryFormGroup.controls.textFilter.value;
+      if (currentValue) {
+        this.dataSource.applyClientFilter(currentValue, this.selectedFilterColumn);
+      }
+    }
+  }
+
+  ngAfterViewInit(): void {
+    // Configure paginator and sorting
+    if (this.isPageable) {
+      this.dataSource.paginator = this.matPaginator;
+      // Get saved Pagesize from local storage, otherwise use default value
+      this.dataSource.pageSize = this.defaultPageSize;
+      // Get saved start page
+      this.dataSource.pageAfter = this.defaultStartPage;
+      // Get saved before page
+      this.dataSource.pageBefore = this.defaultBeforePage;
+      this.dataSource.index = this.defaultIndex;
+      // Note: totalItems is NOT restored from localStorage as it should always come from the API response
+    }
+
+    // Sorted header arrow and sorting initialization
+    const viewInitSettings = this.uiSettings.getTableConfig(this.name);
+    this.dataSource.sortingColumn = viewInitSettings?.order as SortingColumn;
+    if (!this.isDetailPage) {
+      // Search item
+      this.dataSource.filter = (viewInitSettings?.search as string) ?? '';
+    }
+    if (this.dataSource.sortingColumn) {
+      // Use the stored column `id` (stringified) for the matSort header id if present.
+      // This aligns the visual sort indicator (mat-sort-header) with the stored table settings
+      // while the backend request still uses `dataKey` for the actual sort param.
+      const sortId =
+        this.dataSource.sortingColumn.id !== undefined && this.dataSource.sortingColumn.id !== null
+          ? this.dataSource.sortingColumn.id + ''
+          : this.dataSource.sortingColumn.dataKey;
+
+      this.matSort.sort({
+        id: sortId,
+        start: this.dataSource.sortingColumn.direction as SortDirection,
+        disableClear: false
+      });
+    }
+    this.dataSource.sort = this.matSort;
+    this.matSort.sortChange.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      this.uiSettings.updateTableSettings(this.name, {
+        start: undefined,
+        before: undefined,
+        page: this.dataSource.pageSize, // Store the new page size
+        index: this.dataSource.index //store the new table index
+      });
+
+      // Update pagination configuration in the data source
+      this.dataSource.setPaginationConfig(this.dataSource.pageSize, this.dataSource.totalItems, null, null, 0);
+    });
+    this.setupHorizontalScroll();
+  }
+
+  /** Cleanup on component destruction */
+  ngOnDestroy(): void {
+    this.tableResizeObserver?.disconnect();
+  }
+
+  /**
+   * Connect synthetic scrollbar with the actual native one.
+   * Needed as table layout is hard to have only scrollbar for the scrollable inner part
+   */
+  private setupHorizontalScroll(): void {
+    const scroll = this.tableScroll?.nativeElement;
+    if (!scroll || !this.stickyLeadingEnabled || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    this.tableResizeObserver = new ResizeObserver(() => this.updateHorizontalScroll());
+    this.tableResizeObserver.observe(scroll);
+    const table = scroll.querySelector('table');
+    if (table) {
+      this.tableResizeObserver.observe(table);
+    }
+    // Observe the bar so the rail is re-sized once it becomes visible on overflow.
+    const bar = this.tableXScroll?.nativeElement;
+    if (bar) {
+      this.tableResizeObserver.observe(bar);
+    }
+    this.updateHorizontalScroll();
+  }
+
+  /**
+   * Recomputes whether the table overflows and, if so, positions the synthetic scrollbar to
+   * span only the columns between the frozen left and right groups, sizing its rail so its
+   * scroll range matches the table's (scrollLeft then maps 1:1 between the two).
+   */
+  private updateHorizontalScroll(): void {
+    const scroll = this.tableScroll?.nativeElement;
+    const bar = this.tableXScroll?.nativeElement;
+    const rail = this.tableXScrollRail?.nativeElement;
+    if (!scroll) {
+      return;
+    }
+    const overflow = scroll.scrollWidth - scroll.clientWidth > 1;
+    if (overflow !== this.hasHorizontalOverflow) {
+      this.hasHorizontalOverflow = overflow;
+      this.cd.markForCheck();
+    }
+    this.updateScrollEdges();
+    if (!overflow || !bar || !rail) {
+      return;
+    }
+    const containerRect = scroll.getBoundingClientRect();
+    const leftEdge = scroll.querySelector<HTMLElement>('.mat-mdc-table-sticky-border-elem-left');
+    const rightEdge = scroll.querySelector<HTMLElement>('.mat-mdc-table-sticky-border-elem-right');
+    const leftWidth = leftEdge ? leftEdge.getBoundingClientRect().right - containerRect.left : 0;
+    const rightWidth = rightEdge ? containerRect.right - rightEdge.getBoundingClientRect().left : 0;
+    // Inset both chevron rows and the synthetic bar so they span only the scrollable columns.
+    this.host.nativeElement.style.setProperty('--ht-frozen-left', `${leftWidth}px`);
+    this.host.nativeElement.style.setProperty('--ht-frozen-right', `${rightWidth}px`);
+    // Size the rail so the bar's scroll range equals the table's; scrollLeft then maps 1:1
+    // no matter how much width the flanking chevrons take from the bar.
+    rail.style.width = `${bar.clientWidth + (scroll.scrollWidth - scroll.clientWidth)}px`;
+    bar.scrollLeft = scroll.scrollLeft;
+  }
+
+  /** Reflects the table's scroll position onto the chevrons' disabled state. */
+  private updateScrollEdges(): void {
+    const scroll = this.tableScroll?.nativeElement;
+    if (!scroll) {
+      return;
+    }
+    const max = scroll.scrollWidth - scroll.clientWidth;
+    const atStart = scroll.scrollLeft <= 1;
+    const atEnd = scroll.scrollLeft >= max - 1;
+    if (atStart !== this.atScrollStart || atEnd !== this.atScrollEnd) {
+      this.atScrollStart = atStart;
+      this.atScrollEnd = atEnd;
+      this.cd.markForCheck();
+    }
+  }
+
+  /** Smoothly scroll the table fully left (start). */
+  scrollToStart(): void {
+    this.tableScroll?.nativeElement.scrollTo({ left: 0, behavior: 'smooth' });
+  }
+
+  /** Smoothly scroll the table fully right (end). */
+  scrollToEnd(): void {
+    const scroll = this.tableScroll?.nativeElement;
+    scroll?.scrollTo({ left: scroll.scrollWidth, behavior: 'smooth' });
+  }
+
+  /** Sync: table scrolled (trackpad/keyboard/drag) moves the synthetic bar. */
+  onTableScroll(): void {
+    const scroll = this.tableScroll?.nativeElement;
+    const bar = this.tableXScroll?.nativeElement;
+    if (scroll && bar && Math.abs(bar.scrollLeft - scroll.scrollLeft) > 0.5) {
+      bar.scrollLeft = scroll.scrollLeft;
+    }
+    this.updateScrollEdges();
+  }
+
+  /** Sync: dragging the synthetic bar scrolls the table. */
+  onXScroll(): void {
+    const scroll = this.tableScroll?.nativeElement;
+    const bar = this.tableXScroll?.nativeElement;
+    if (scroll && bar && Math.abs(scroll.scrollLeft - bar.scrollLeft) > 0.5) {
+      scroll.scrollLeft = bar.scrollLeft;
+    }
+  }
+
+  onLinkClicked() {
+    this.linkClicked.emit();
+  }
+
+  copyRowDataEmit(event: JHash) {
+    this.emitCopyRowData.emit(event);
+  }
+
+  showFullHashModalEmit(event: JHash): void {
+    this.emitFullHashModal.emit(event);
+  }
+
+  /**
+   * Opens a dialog for selecting table columns to display.
+   */
+  openColumnSelectionDialog(): void {
+    const dialogRef = this.dialog.open(ColumnSelectionDialogComponent, {
+      width: '400px',
+      data: {
+        availableColumns: this.filterKeys(
+          this.columnLabels,
+          this.tableColumns.map((col) => col.id + '')
+        ),
+        selectedColumns: this.displayedColumns
+      }
+    });
+
+    dialogRef.afterClosed().subscribe((selectedColumns: string[]) => {
+      if (selectedColumns) {
+        const numericColumns = selectedColumns.map(Number);
+        this.setDisplayedColumns(numericColumns);
+        this.uiSettings.updateTableSettings(this.name, {
+          columns: numericColumns
+        });
+        this.cd.detectChanges();
+      }
+    });
+  }
+
+  /**
+   * Handles the click event when a column header is clicked for sorting.
+   * Updates the sorting order in the UI settings based on the clicked column.
+   *
+   * @param {any} column - The column that was clicked for sorting.
+   * @returns {void}
+   */
+  onColumnHeaderClick(column: HTTableColumn): void {
+    const sorting: Sorting = {
+      id: column.id,
+      dataKey: column.dataKey ?? '',
+      isSortable: column.isSortable ?? false,
+      direction: this.dataSource.sort['_direction'],
+      ...(column.parent ? { parent: column.parent } : {})
+    };
+    this.dataSource.sortingColumn = sorting;
+    if (!this.isDetailPage) {
+      this.uiSettings.updateTableSettings(this.name, {
+        order: sorting
+      });
+    }
+    if (this.filterMode === 'client') {
+      const currentValue = this.filterQueryFormGroup.controls.textFilter.value ?? '';
+      this.dataSource.applyClientFilter(currentValue, this.selectedFilterColumn);
+    } else {
+      this.dataSource.reload();
+    }
+  }
+
+  private filterKeys(original: Record<string, string>, include: string[]): Record<string, string> {
+    const filteredObject: Record<string, string> = {};
+
+    for (const attribute of include) {
+      if (Object.prototype.hasOwnProperty.call(original, attribute)) {
+        filteredObject[attribute] = original[attribute];
+      }
+    }
+
+    return filteredObject;
+  }
+
+  rowAction(event: ActionMenuEvent<BaseModel>): void {
+    this.rowActionClicked.emit(event as ActionMenuEvent<T>);
+  }
+
+  bulkAction(event: ActionMenuEvent<BaseModel>): void {
+    this.bulkActionClicked.emit({
+      ...event,
+      data: this.dataSource.selection.selected
+    } as ActionMenuEvent<T[]>);
+  }
+
+  exportAction(event: ActionMenuEvent<BaseModel>): void {
+    this.exportActionClicked.emit({
+      ...event,
+      data: this.dataSource.selection.selected
+    } as ActionMenuEvent<T[]>);
+  }
+
+  /** True when leading-column freezing is active (drives the select column's [sticky]). */
+  get stickyLeadingEnabled(): boolean {
+    return this.stickyLeadingColumns > 0;
+  }
+
+  /** True when the right-side row-action column should be frozen ([stickyEnd]). */
+  get stickyTrailingEnabled(): boolean {
+    return this.stickyLeadingColumns > 0 && this.colRowActionPresent;
+  }
+
+  /** Whether the given data column is part of the frozen leading group. */
+  isLeadingSticky(tableColumn: HTTableColumn): boolean {
+    return this.leadingStickyIds.has(tableColumn.id + '');
+  }
+
+  /**
+   * Sets the displayed columns based on user selection, and recomputes which
+   * leading data columns are frozen (the first {@link stickyLeadingColumns} in
+   * display order, counting data columns only).
+   *
+   * @param columnNames - The list of column names to display.
+   */
+  setDisplayedColumns(columnNames: number[]): void {
+    this.displayedColumns = [];
+    this.leadingStickyIds.clear();
+    if (this.isSelectable) {
+      // Add checkbox if enabled
+      this.displayedColumns.push(COL_SELECT + '');
+    }
+    let dataAdded = 0;
+    for (const num of columnNames) {
+      if (this.tableColumns.some((col) => col.id === num)) {
+        const id = num + '';
+        this.displayedColumns.push(id);
+        if (dataAdded < this.stickyLeadingColumns) {
+          this.leadingStickyIds.add(id);
+        }
+        dataAdded++;
+      }
+    }
+
+    this.colRowActionPresent = this.contextMenuService !== undefined && this.contextMenuService.getHasContextMenu();
+    if (this.colRowActionPresent) {
+      // Add action menu if enabled
+      this.displayedColumns.push(COL_ROW_ACTION + '');
+    }
+  }
+
+  emitFilterValue(): void {
+    this.filterError = null;
+    const value = this.filterQueryFormGroup.controls.textFilter.value ?? '';
+    this.dataSource.clearSelection();
+    this.dataSource.pageAfter = null;
+    this.dataSource.pageBefore = null;
+    if (this.filterMode === 'client') {
+      this.dataSource.applyClientFilter(value, this.selectedFilterColumn);
+    } else {
+      this.backendSqlFilter.emit(value);
+    }
+  }
+
+  setFilterError(error: string): void {
+    // Parse error message - if it's about invalid integer, show user-friendly message
+    let displayError = error;
+    if (error && error.includes('not valid integer')) {
+      displayError = 'Only numeric values allowed';
+    } else if (error && error.includes('not valid')) {
+      displayError = 'Invalid filter value';
+    }
+
+    this.filterError = displayError;
+
+    // Mark the form control as invalid to trigger error display
+    const control = this.filterQueryFormGroup.get('textFilter');
+    if (control) {
+      control.setErrors({ filterError: displayError });
+      control.markAsTouched(); // Ensure the error is visible
+    }
+    this.cd.markForCheck();
+  }
+
+  clearFilterError(): void {
+    this.filterError = null;
+    // Clear the form control errors
+    const control = this.filterQueryFormGroup.get('textFilter');
+    if (control) {
+      control.setErrors(null);
+    }
+    this.cd.markForCheck();
+  }
+
+  /**
+   * Checks if a row is selected.
+   *
+   * @param row - The row to check.
+   */
+  isSelected(row: T): boolean {
+    if (Array.isArray(this.isCmdFiles) && this.isCmdFiles.length > 0) {
+      return this.isCmdFiles.includes(row.id);
+    } else {
+      return this.dataSource.isSelected(row);
+    }
+  }
+
+  isPreproSelected(row: T): boolean {
+    return this.isCmdPreproFiles.includes(row.id);
+  }
+
+  /**
+   * Checks if all rows are selected.
+   */
+  isAllSelected(): boolean {
+    return this.dataSource.isAllSelected();
+  }
+
+  /**
+   * Toggles selection for all rows.
+   */
+  toggleAll(): void {
+    this.dataSource.toggleAll();
+  }
+
+  /**
+   * Checks if there are selected rows.
+   */
+  hasSelected(): boolean {
+    return this.dataSource.hasSelected();
+  }
+
+  /**
+   * Checks if the selection state is indeterminate.
+   */
+  indeterminate(): boolean {
+    return this.dataSource.indeterminate();
+  }
+
+  /**
+   * Toggles selection for a specific row.
+   *
+   * @param row - The row to toggle.
+   */
+  toggleSelect(row: T): void {
+    if (this.isSelectable) {
+      this.dataSource.toggleRow(row);
+    }
+  }
+
+  /**
+   * Handles the change event for the attack checkbox.
+   *
+   * @param event - The MatCheckboxChange event.
+   * @param row - The data of the row.
+   * @param type - The type of the column (CMD, main attack, or preprocessor).
+   */
+  toggleAttack(event: MatCheckboxChange, row: BaseModel, type: CheckboxColumnType): void {
+    // Handle the change event for the Cmd Attack checkbox
+    const checked = event.checked;
+
+    // Emit the event with specific properties
+    this.checkboxChanged.emit({
+      row, // All row data
+      columnType: type, // Column type CMD main attack or preprocessor
+      checked: checked // Boolean
+    });
+  }
+  // emit when Temperature Information is clicked
+  temperatureInformationEmit() {
+    this.temperatureInformationClicked.emit();
+  }
+  /**
+   * Reloads the data in the table and the bulk menu.
+   */
+  reload(): void {
+    this.dataSource.reset(false);
+    const reloadSettings = this.uiSettings.getTableConfig(this.name);
+    if (reloadSettings) {
+      this.dataSource.pageSize = reloadSettings.page;
+      this.dataSource.pageAfter = reloadSettings.start;
+      this.dataSource.pageBefore = reloadSettings.before;
+      this.dataSource.index = reloadSettings.index ?? 0;
+    }
+    // Note: totalItems is NOT restored from localStorage as it should always come from the API response
+    this.dataSource.forceReload();
+    if (this.bulkMenu) {
+      this.bulkMenu.reload();
+    }
+    this.filterQueryFormGroup.controls.textFilter.setValue('', { emitEvent: false });
+  }
+  clearSearchBox(): void {
+    this.filterQueryFormGroup.controls.textFilter.setValue('');
+    this.clearFilterError();
+    if (this.filterMode === 'client') {
+      this.dataSource.applyClientFilter('', null);
+    } else {
+      this.backendSqlFilter.emit('');
+    }
+  }
+  /**
+   * Handles the page change event, including changes in page size and page index.
+   *
+   * @param event - The `PageEvent` object containing information about the new page configuration.
+   */
+  onPageChange(event: PageEvent): void {
+    /*     this.clearFilter();
+     */ let pageAfter = this.dataSource.pageAfter;
+    let pageBefore = this.dataSource.pageBefore;
+    let index = event.pageIndex;
+    if (index > this.dataSource.index) {
+      pageBefore = null;
+    } else if (index < this.dataSource.index) {
+      pageAfter = null;
+    }
+    if (event.pageSize !== this.dataSource.pageSize) {
+      // TODO This code happens when user changes the page size, now we will just reset and
+      // go to the first page, ideally you want to stay on the page you previously were
+      // and recalculate the page index. The problem is that, this is very hard to do,
+      // because we use cursor-based pagination.
+      index = 0;
+      pageAfter = null;
+      pageBefore = null;
+    } else if (index === 0) {
+      // jump to the first page
+      pageAfter = null;
+      pageBefore = null;
+    } else if (event.pageIndex !== 0) {
+      // const originalData = this.dataSource.getOriginalData();
+      // const ids = originalData.map(items => items.id);
+      // if (event.pageIndex > event.previousPageIndex) {
+      //   pageAfter = Math.max(...ids);
+      // } else {
+      //   pageBefore = Math.min(...ids);
+      // }
+    }
+
+    // only store table settings in local storage when it is not a detail page
+    if (!this.isDetailPage) {
+      this.uiSettings.updateTableSettings(this.name, {
+        start: pageAfter ?? undefined,
+        before: pageBefore ?? undefined,
+        page: event.pageSize, // Store the new page size
+        index: index //store the new table index
+      });
+    }
+
+    // Update pagination configuration in the data source
+    this.dataSource.setPaginationConfig(event.pageSize, this.dataSource.totalItems, pageAfter, pageBefore, index);
+    /*     this.dataSource.setPaginationConfig(event.pageSize, this.dataSource.totalItems, pageAfter, pageBefore, index);
+     */
+    // Reload data with updated pagination settings
+    this.dataSource.reload();
+  }
+
+  editableInputSaved(editable: HTTableEditable<BaseModel>): void {
+    this.editableSaved.emit(editable as HTTableEditable<T>);
+  }
+
+  editableCheckboxSaved(editable: HTTableEditable<BaseModel>): void {
+    this.editableCheckbox.emit(editable as HTTableEditable<T>);
+  }
+}

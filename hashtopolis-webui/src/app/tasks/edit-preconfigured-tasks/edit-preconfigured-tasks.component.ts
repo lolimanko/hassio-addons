@@ -1,0 +1,213 @@
+import { HttpStatus } from '@constants/http.config';
+import { zPreTaskResponse } from '@generated/api/zod';
+import { lastValueFrom } from 'rxjs';
+
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormControl, FormGroup, Validators } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
+
+import { JPretask } from '@models/pretask.model';
+import { FilterType } from '@models/request-params.model';
+import { ResponseWrapper } from '@models/response.model';
+import { zIdRouteParams } from '@models/routes.schema';
+
+import { JsonAPISerializer } from '@services/api/serializer-service';
+import { SERV } from '@services/main.config';
+import { GlobalService } from '@services/main.service';
+import { RequestParamBuilder } from '@services/params/builder-implementation.service';
+import { PreconfiguredTasksRoleService } from '@services/roles/tasks/preconfiguredTasks-role.service';
+import { AlertService } from '@services/shared/alert.service';
+import { AutoTitleService } from '@services/shared/autotitle.service';
+import { ConfigService } from '@services/shared/config.service';
+
+import { YesNoOptions } from '@src/app/core/_constants/general.config';
+import { BenchmarkTypeOptions } from '@src/app/core/_constants/tasks.config';
+import { attackCommandWithAliasValidator } from '@src/app/core/_validators/attack-command.validator';
+
+/**
+ * Represents the EditPreconfiguredTasksComponent responsible for editing a Pretask.
+ */
+@Component({
+  selector: 'app-edit-preconfigured-tasks',
+  templateUrl: './edit-preconfigured-tasks.component.html',
+  standalone: false
+})
+export class EditPreconfiguredTasksComponent implements OnInit {
+  /** Flag indicating whether data is still loading. */
+  isLoading = true;
+
+  /** Form group for the Pretask. */
+  updateForm: FormGroup;
+
+  /** On form update show a spinner loading */
+  isUpdatingLoading = false;
+
+  /** Select Options. */
+  selectYesno = YesNoOptions;
+  selectBenchmarktype = BenchmarkTypeOptions;
+
+  // Edit Options
+  editedPretaskIndex: number;
+
+  pretaskName = '';
+
+  /** Read-only mode based on roles */
+  isReadOnly = false;
+
+  private destroyRef = inject(DestroyRef);
+  private titleService = inject(AutoTitleService);
+  private route = inject(ActivatedRoute);
+  private alert = inject(AlertService);
+  private gs = inject(GlobalService);
+  private router = inject(Router);
+  private serializer = inject(JsonAPISerializer);
+  private cs = inject(ConfigService);
+  private http = inject(HttpClient);
+  protected roleService = inject(PreconfiguredTasksRoleService);
+
+  constructor() {
+    this.titleService.set(['Edit Preconfigured Tasks']);
+    this.buildForm();
+  }
+
+  /**
+   * Lifecycle hook called after component initialization.
+   */
+  async ngOnInit(): Promise<void> {
+    this.isReadOnly = !this.roleService.hasRole('edit');
+
+    this.buildForm();
+
+    this.editedPretaskIndex = zIdRouteParams.parse(this.route.snapshot.params).id;
+
+    try {
+      await this.loadPretask();
+      this.loadData();
+      this.isLoading = false;
+    } catch (e: unknown) {
+      const status = e instanceof HttpErrorResponse ? e.status : undefined;
+      if (status === HttpStatus.FORBIDDEN) {
+        this.router.navigateByUrl('/forbidden');
+        return;
+      }
+
+      if (status === HttpStatus.NOT_FOUND) {
+        this.router.navigateByUrl('/not-found');
+        return;
+      }
+
+      // For other errors (500 etc.) show a friendly message instead of redirecting
+      // so the user knows the server failed. Keep the loading flag disabled.
+
+      console.error('Error loading pretask:', e);
+      const msg = status ? `Error loading pretask (server returned ${status}).` : 'Error loading pretask.';
+      this.alert.showErrorMessage(msg);
+      this.isLoading = false;
+      return;
+    }
+  }
+
+  /**
+   * Builds the empty form.
+   */
+  buildForm(): void {
+    this.updateForm = new FormGroup({
+      pretaskId: new FormControl({ value: '', disabled: true }),
+      updateData: new FormGroup({
+        taskName: new FormControl(
+          { value: '', disabled: this.isReadOnly },
+          this.isReadOnly ? [] : [Validators.required]
+        ),
+        attackCmd: new FormControl(
+          { value: '', disabled: this.isReadOnly },
+          this.isReadOnly ? [] : [Validators.required, attackCommandWithAliasValidator()]
+        ),
+        chunkTime: new FormControl({ value: '', disabled: this.isReadOnly }),
+        color: new FormControl({ value: '', disabled: this.isReadOnly }),
+        priority: new FormControl({ value: '', disabled: this.isReadOnly }),
+        maxAgents: new FormControl({ value: '', disabled: this.isReadOnly }),
+        isCpuTask: new FormControl({ value: '', disabled: this.isReadOnly }),
+        isSmall: new FormControl({ value: '', disabled: this.isReadOnly }),
+        statusTimer: new FormControl({ value: '', disabled: this.isReadOnly }),
+        useNewBench: new FormControl({ value: '', disabled: true })
+      })
+    });
+  }
+
+  private async loadPretask(): Promise<void> {
+    const url = `${this.cs.getEndpoint()}${SERV.PRETASKS.URL}/${this.editedPretaskIndex}`;
+
+    const response = await lastValueFrom<ResponseWrapper>(this.http.get<ResponseWrapper>(url));
+
+    const pretask: JPretask = this.serializer.deserialize(response, zPreTaskResponse);
+
+    this.pretaskName = pretask.taskName ?? '';
+
+    this.updateForm = new FormGroup({
+      pretaskId: new FormControl({
+        value: pretask.id,
+        disabled: true
+      }),
+      updateData: new FormGroup({
+        taskName: new FormControl(pretask.taskName, this.isReadOnly ? [] : [Validators.required]),
+        attackCmd: new FormControl(
+          pretask.attackCmd,
+          this.isReadOnly ? [] : [Validators.required, attackCommandWithAliasValidator()]
+        ),
+        chunkTime: new FormControl(pretask.chunkTime),
+        color: new FormControl(pretask.color),
+        priority: new FormControl(pretask.priority),
+        maxAgents: new FormControl(pretask.maxAgents),
+        isCpuTask: new FormControl(pretask.isCpuTask, this.isReadOnly ? [] : [Validators.required]),
+        isSmall: new FormControl(pretask.isSmall, this.isReadOnly ? [] : [Validators.required]),
+        statusTimer: new FormControl({ value: pretask.statusTimer, disabled: this.isReadOnly }),
+        useNewBench: new FormControl({ value: pretask.useNewBench, disabled: true })
+      })
+    });
+  }
+
+  /**
+   * Loads data, specifically Pretasks/files, for the component.
+   */
+  loadData(): void {
+    const params = new RequestParamBuilder()
+      .addFilter({
+        field: 'pretaskId',
+        operator: FilterType.EQUAL,
+        value: this.editedPretaskIndex
+      })
+      .addInclude('pretaskFiles')
+      .create();
+
+    this.gs.getAll(SERV.PRETASKS, params).pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
+  }
+
+  /**
+   * Handles form submission, edit Pretask
+   * If the form is valid, it makes an API request and navigates to the Pretask page.
+   */
+  onSubmit(): void {
+    if (this.updateForm.valid && !this.isReadOnly) {
+      this.isUpdatingLoading = true;
+      this.gs
+        .update(SERV.PRETASKS, this.editedPretaskIndex, this.updateForm.value['updateData'])
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: () => {
+            this.alert.showSuccessMessage('Preconfigured Task saved');
+            this.isUpdatingLoading = false;
+            this.router.navigate(['tasks/preconfigured-tasks']);
+          },
+          error: (err) => {
+            console.error('Error updating preconfigured Task', err);
+            this.isUpdatingLoading = false;
+          }
+        });
+    } else {
+      this.updateForm.markAllAsTouched();
+      this.updateForm.updateValueAndValidity();
+    }
+  }
+}

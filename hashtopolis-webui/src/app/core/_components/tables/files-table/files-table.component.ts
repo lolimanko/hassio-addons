@@ -1,0 +1,395 @@
+import { faKey } from '@fortawesome/free-solid-svg-icons';
+import { Observable, catchError, of } from 'rxjs';
+
+import { AfterViewInit, Component, Input, OnDestroy, OnInit } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+
+import { FileType, JFile } from '@models/file.model';
+
+import { FilesContextMenuService } from '@services/context-menu/files-menu.service';
+import { SERV } from '@services/main.config';
+
+import { ActionMenuEvent } from '@components/menus/action-menu/action-menu.model';
+import { BulkActionMenuAction } from '@components/menus/bulk-action-menu/bulk-action-menu.constants';
+import { RowActionMenuAction } from '@components/menus/row-action-menu/row-action-menu.constants';
+import { BaseTableComponent } from '@components/tables/base-table/base-table.component';
+import {
+  FilesRowAction,
+  FilesTableCol,
+  FilesTableColumnLabel
+} from '@components/tables/files-table/files-table.constants';
+import { HTTableColumn, HTTableRouterLink } from '@components/tables/ht-table/ht-table.models';
+import { TableDialogComponent } from '@components/tables/table-dialog/table-dialog.component';
+import { DialogData } from '@components/tables/table-dialog/table-dialog.model';
+
+import { FilesDataSource } from '@datasources/files.datasource';
+
+import { FilterType } from '@src/app/core/_models/request-params.model';
+import { FilePreviewDialogComponent } from '@src/app/shared/dialog/file-preview-dialog/file-preview-dialog.component';
+import { FilePreviewDialogData } from '@src/app/shared/dialog/file-preview-dialog/file-preview-dialog.model';
+import { formatFileSize } from '@src/app/shared/utils/util';
+
+/**
+ * Contains table component for files
+ * @module
+ */
+
+@Component({
+  selector: 'app-files-table',
+  templateUrl: './files-table.component.html',
+  standalone: false
+})
+export class FilesTableComponent extends BaseTableComponent implements OnInit, AfterViewInit, OnDestroy {
+  private _editIndex: number;
+
+  @Input() fileType: FileType = FileType.WORDLIST;
+  @Input()
+  set editIndex(value: number) {
+    if (value !== this._editIndex) {
+      this._editIndex = value;
+    }
+  }
+  get editIndex(): number {
+    if (this._editIndex === undefined) {
+      return 0;
+    } else {
+      return this._editIndex;
+    }
+  }
+
+  @Input() editType?: number; //0 Task 1 Pretask
+  @Input() showExport = true;
+  @Input() isSortable = true;
+  @Input() isPageable = true;
+  @Input() filterMode: 'client' | 'backend' = 'backend';
+  @Input() isDetailPage = false;
+
+  tableColumns: HTTableColumn[] = [];
+  dataSource: FilesDataSource;
+  editPath = '';
+  selectedFilterColumn: HTTableColumn;
+  showAccessGroups: boolean = true;
+
+  ngOnInit(): void {
+    const pathMap = {
+      [FileType.WORDLIST]: 'wordlist-edit',
+      [FileType.RULES]: 'rules-edit',
+      [FileType.OTHER]: 'other-edit'
+    };
+    this.editPath = pathMap[this.fileType];
+
+    this.showAccessGroups = this.editType === undefined;
+
+    this.setColumnLabels(FilesTableColumnLabel);
+    this.tableColumns = this.getColumns();
+    if (!this.isDetailPage) {
+      this.contextMenuService = new FilesContextMenuService(this.permissionService).addContextMenu();
+    }
+    this.dataSource = new FilesDataSource(this.injector);
+    this.dataSource.setColumns(this.tableColumns);
+    this.dataSource.setFileType(this.fileType);
+    if (this.editIndex) {
+      this.dataSource.setEditValues(this.editIndex!, this.editType ?? 0);
+    }
+    // Setup filter error handling
+    this.setupFilterErrorSubscription(this.dataSource);
+  }
+
+  ngAfterViewInit(): void {
+    // Wait until paginator is defined
+    this.dataSource.loadAll();
+    // Auto-refresh is only offered on the files pages, detail lists must not touch the shared timer
+    if (!this.isDetailPage && this.dataSource.autoRefreshService.refreshPage) {
+      this.dataSource.startAutoRefresh();
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (!this.isDetailPage) {
+      this.dataSource.stopAutoRefresh();
+    }
+  }
+
+  /**
+   * Reloads the data source with a backend field filter applied to the currently selected column.
+   * Clears the filter and reloads all data when input is empty.
+   *
+   * @param input - The search string to send to the backend.
+   */
+  filter(input: string) {
+    const selectedColumn = this.selectedFilterColumn;
+    if (input && input.length > 0) {
+      this.dataSource.loadAll({
+        value: input,
+        field: selectedColumn.dataKey ?? '',
+        operator: FilterType.ICONTAINS,
+        parent: selectedColumn.parent
+      });
+      return;
+    } else {
+      this.dataSource.loadAll(); // Reload all data if input is empty
+    }
+  }
+  /**
+   * Handles the backendSqlFilter event emitted by ht-table.
+   * No-ops when filterMode is not 'backend'. Delegates to filter() or clearFilter()
+   * depending on whether the event contains a non-empty search string.
+   *
+   * @param event - The filter string emitted by the table's filter input.
+   */
+  handleBackendSqlFilter(event: string) {
+    if (this.filterMode !== 'backend') return;
+    if (event && event.trim().length > 0) {
+      this.filter(event);
+    } else {
+      // Clear the filter when search box is cleared
+      this.dataSource.clearFilter();
+    }
+  }
+  /**
+   * Get all table columns
+   * @returns List of table columns
+   */
+  getColumns(): HTTableColumn[] {
+    const tableColumns: HTTableColumn[] = [
+      {
+        id: FilesTableCol.ID,
+        isNumeric: true,
+        dataKey: 'id',
+        isSortable: this.isSortable,
+        isSearchable: true,
+        export: async (file: JFile) => file.id + ''
+      },
+      {
+        id: FilesTableCol.NAME,
+        dataKey: 'filename',
+        routerLink: (file: JFile) => this.renderFileLink(file),
+        isSortable: this.isSortable,
+        isSearchable: true,
+        export: async (file: JFile) => file.filename
+      },
+      {
+        id: FilesTableCol.SIZE,
+        isNumeric: true,
+        dataKey: 'size',
+        render: (file: JFile) => formatFileSize(file.size, 'short'),
+        isSortable: this.isSortable,
+        export: async (file: JFile) => formatFileSize(file.size, 'short')
+      },
+      {
+        id: FilesTableCol.LINE_COUNT,
+        isNumeric: true,
+        dataKey: 'lineCount',
+        isSortable: this.isSortable,
+        render: (file: JFile) => (file.lineCount ? file.lineCount.toLocaleString() : 0),
+        export: async (file: JFile) => (file.lineCount ? file.lineCount.toLocaleString() : 0) + ''
+      }
+    ];
+
+    if (this.showAccessGroups) {
+      tableColumns.push({
+        id: FilesTableCol.ACCESS_GROUP,
+        dataKey: 'accessGroupName',
+        isSortable: false,
+        routerLink: (file: JFile) => this.renderAccessGroupLink(file.accessGroup!),
+        export: async (file: JFile) => file.accessGroup?.groupName ?? ''
+      });
+    }
+
+    return tableColumns;
+  }
+
+  /**
+   * Opens dialog
+   * @param data Dialog data
+   */
+  openDialog(data: DialogData<JFile>) {
+    const dialogRef = this.dialog.open(TableDialogComponent, {
+      data: data,
+      width: '450px'
+    });
+
+    dialogRef
+      .afterClosed()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((result) => {
+        if (result && result.action) {
+          switch (result.action) {
+            case RowActionMenuAction.DELETE:
+              this.rowActionDelete(result.data);
+              break;
+            case BulkActionMenuAction.DELETE:
+              this.bulkActionDelete(result.data);
+              break;
+          }
+        }
+      });
+  }
+
+  // --- Action functions ---
+  exportActionClicked(event: ActionMenuEvent<JFile[]>): void {
+    const visibleColumnIds = this.table.displayedColumns.map(Number);
+    const visibleColumns = this.tableColumns.filter((col) => visibleColumnIds.includes(col.id));
+    this.exportService.handleExportAction<JFile>(event, visibleColumns, FilesTableColumnLabel, 'hashtopolis-files');
+  }
+
+  rowActionClicked(event: ActionMenuEvent<JFile>): void {
+    switch (event.menuItem.action) {
+      case RowActionMenuAction.EDIT:
+        this.rowActionEdit(event.data);
+        break;
+      case RowActionMenuAction.DELETE:
+        this.openDialog({
+          rows: [event.data],
+          title: `Deleting file ${event.data.filename} ...`,
+          icon: 'warning',
+          body: `Are you sure you want to delete it? Note that this action cannot be undone.`,
+          warn: true,
+          action: event.menuItem.action
+        });
+        break;
+      case RowActionMenuAction.DOWNLOAD:
+        this.rowActionDownload(event.data);
+        break;
+      case FilesRowAction.PREVIEW:
+        this.rowActionPreview(event.data);
+        break;
+      case FilesRowAction.TOGGLE_SECRET:
+        this.rowActionToggleSecret(event.data);
+        break;
+      case FilesRowAction.RECOUNT_LINES:
+        this.rowActionRecount(event.data);
+        break;
+    }
+  }
+
+  bulkActionClicked(event: ActionMenuEvent<JFile[]>): void {
+    switch (event.menuItem.action) {
+      case BulkActionMenuAction.DELETE:
+        this.openDialog({
+          rows: event.data,
+          title: `Deleting ${event.data.length} files ...`,
+          icon: 'warning',
+          body: `Are you sure you want to delete the above files? Note that this action cannot be undone.`,
+          warn: true,
+          listAttribute: 'filename',
+          action: event.menuItem.action
+        });
+        break;
+    }
+  }
+
+  private bulkActionDelete(files: JFile[]): void {
+    this.gs
+      .bulkDelete(SERV.FILES, files)
+      .pipe(
+        catchError((error) => {
+          console.error('Error during deletion: ', error);
+          return [];
+        }),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe(() => {
+        this.alertService.showSuccessMessage(`Successfully deleted files!`);
+        this.dataSource.reload();
+      });
+  }
+
+  /**
+   * @todo Implement error handling.
+   */
+  private rowActionDelete(files: JFile[]): void {
+    this.gs
+      .delete(SERV.FILES, files[0].id)
+      .pipe(
+        catchError((error) => {
+          console.error('Error during deletion:', error);
+          return [];
+        }),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe(() => {
+        this.alertService.showSuccessMessage('Successfully deleted file!');
+        this.reload();
+      });
+  }
+
+  /**
+   * Render file link
+   * @param file - file object to render link for
+   * @return observable object containing a router link array
+   */
+  private renderFileLink(file: JFile): Observable<HTTableRouterLink[]> {
+    const links: HTTableRouterLink[] = [];
+    if (file) {
+      links.push({
+        routerLink: ['/files', file.id, this.editPath],
+        label: file['filename'],
+        icon: {
+          faIcon: file.isSecret ? faKey : undefined,
+          tooltip: file.isSecret ? 'Secret file' : ''
+        }
+      });
+    }
+    return of(links);
+  }
+
+  private rowActionEdit(file: JFile): void {
+    this.renderFileLink(file).subscribe((links: HTTableRouterLink[]) => {
+      this.router.navigate(links[0].routerLink ?? []).then(() => {});
+    });
+  }
+
+  private rowActionDownload(file: JFile): void {
+    this.gs.getFile(SERV.GET_FILES, file.id, file.filename);
+  }
+
+  /**
+   * Opens a preview that reads the file in byte ranges, so a multi-gigabyte wordlist can be inspected
+   * without downloading it.
+   *
+   * @param file - File to preview.
+   */
+  private rowActionPreview(file: JFile): void {
+    this.dialog.open<FilePreviewDialogComponent, FilePreviewDialogData>(FilePreviewDialogComponent, {
+      data: { file },
+      width: '900px',
+      maxWidth: '95vw'
+    });
+  }
+
+  private rowActionToggleSecret(file: JFile): void {
+    const isSecret = !file.isSecret;
+    this.gs
+      .update(SERV.FILES, file.id, { isSecret })
+      .pipe(
+        catchError((error) => {
+          console.error('Error updating secret flag:', error);
+          return [];
+        }),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe(() => {
+        this.alertService.showSuccessMessage(`File ${file.filename} is now ${isSecret ? 'secret' : 'not secret'}!`);
+        this.reload();
+      });
+  }
+
+  private rowActionRecount(file: JFile): void {
+    this.gs
+      .chelper(SERV.HELPER, 'recountFileLines', { fileId: file.id })
+      .pipe(
+        catchError((error) => {
+          console.error('Error recounting file lines:', error);
+          return [];
+        }),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe(() => {
+        // The recount runs as background job, reloading now would only show the old count
+        this.alertService.showSuccessMessage(
+          `Line recount for ${file.filename} queued. The line count updates once the background job has finished.`
+        );
+      });
+  }
+}
