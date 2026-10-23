@@ -1,6 +1,6 @@
 name: "hashtopolis-frontend"
 description: "frontend"
-version: "6.4"
+version: "1.0.1"
 slug: "hashtopolis-frontend"
 #init: false
 #host_network: true
