@@ -24,7 +24,7 @@ ingress: true
 #ingress_port: 80
 #image: "redroid/redroid" 
 options:
-  hashtopolis_backend_url:
+  hashtopolis_backend_url: https://example.duckdns.org:8081/api/v2
   SSL: false
 schema:
   hashtopolis_backend_url: str
