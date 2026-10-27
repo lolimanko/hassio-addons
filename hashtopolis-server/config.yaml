@@ -25,16 +25,16 @@ map:
     path: /usr/local/share/hashtopolis
 #image: "redroid/redroid" 
 options:
-  hashtopolis_db_type: 
+  hashtopolis_db_type: postgres
   hashtopolis_db_user: 
   hashtopolis_db_pass: 
-  hashtopolis_db_host: 
-  hashtopolis_db_port:
-  hashtopolis_db_database:
-  hashtopolis_admin_user:
-  hashtopolis_admin_password:
-  hashtopolis_backend_url:
-  hashtopolis_frontend_urls: 
+  hashtopolis_db_host: db21ed7f-postgres-latest
+  hashtopolis_db_port: 5432
+  hashtopolis_db_database: hashtopolis
+  hashtopolis_admin_user: 
+  hashtopolis_admin_password: 
+  hashtopolis_backend_url: https://example.duckdns.org:8081/api/v2
+  hashtopolis_frontend_urls: https://example.duckdns.org:4201,http://example.duckdns.org:4200,https://example.duckdns.org:8123
   SSL: false
 schema:
 
