@@ -1,4 +1,4 @@
-name: "stash"
+name: "Stash"
 description: "Stash is a self-hosted webapp written in Go which organizes and serves your diverse content collection, catering to both your SFW and NSFW needs."
 version: "0.31.1"
 slug: "stash"
