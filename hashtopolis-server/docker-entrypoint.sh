@@ -1,6 +1,6 @@
 #!/usr/bin/env bashio
 
-chomod 777 -R /addon_configs/fdd0cf77_hashtopolis-backend
+chmod 777 -R /addon_configs/fdd0cf77_hashtopolis-backend
 
 #source /usr/lib/bashio/bashio.sh
 ssl=$(bashio::config 'SSL')
