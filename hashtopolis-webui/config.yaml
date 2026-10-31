@@ -29,4 +29,4 @@ options:
 schema:
   hashtopolis_backend_url: str
   SSL: bool
-image: "ghcr.io/lolimanko/{arch}-hashtopolos-webui"
+#image: "ghcr.io/lolimanko/{arch}-hashtopolos-webui"
