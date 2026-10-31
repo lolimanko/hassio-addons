@@ -1,4 +1,23 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bashio
+
+#source /usr/lib/bashio/bashio.sh
+ssl=$(bashio::config 'SSL')
+if [ "$ssl" = "true" ]; then
+    
+    a2enmod ssl && a2ensite default-ssl
+
+fi
+su -s /bin/bash www-data
+export HASHTOPOLIS_DB_TYPE=$(bashio::config 'hashtopolis_db_type')
+export HASHTOPOLIS_DB_USER=$(bashio::config 'hashtopolis_db_user')
+export HASHTOPOLIS_DB_PASS=$(bashio::config 'hashtopolis_db_pass')
+export HASHTOPOLIS_DB_HOST=$(bashio::config 'hashtopolis_db_host')
+export HASHTOPOLIS_DB_PORT=$(bashio::config 'hashtopolis_db_port')
+export HASHTOPOLIS_DB_DATABASE=$(bashio::config 'hashtopolis_db_database')
+export HASHTOPOLIS_ADMIN_USER=$(bashio::config 'hashtopolis_admin_user')
+export HASHTOPOLIS_ADMIN_PASSWORD=$(bashio::config 'hashtopolis_admin_password')
+export HASHTOPOLIS_BACKEND_URL=$(bashio::config 'hashtopolis_backend_url')
+export HASHTOPOLIS_FRONTEND_URLS=$(bashio::config 'hashtopolis_frontend_urls')
 paths=(inc/utils/locks)
 
 for path in ${paths[@]}; do
@@ -18,15 +37,15 @@ if [[ "$HASHTOPOLIS_DB_TYPE" == "mysql" ]]; then
     echo "Using MySQL..."
     DB_CMD="mysql -u${HASHTOPOLIS_DB_USER} -p${HASHTOPOLIS_DB_PASS} -h ${HASHTOPOLIS_DB_HOST} --skip-ssl"
     DB_TYPE="mysql"
-    if [[ -n "${HASHTOPOLIS_DB_PORT}" ]]; then
-        DB_CMD="${DB_CMD} -P${HASHTOPOLIS_DB_PORT}"
+    if [[ -n "${HASHTOPOLIS_DB_PORT:3306}" ]]; then
+        DB_CMD="${DB_CMD} -P${HASHTOPOLIS_DB_PORT:3306}"
     fi
 elif [[ "$HASHTOPOLIS_DB_TYPE" == "postgres" ]]; then
     echo "Using postgres..."
     DB_CMD="psql -U${HASHTOPOLIS_DB_USER} -h ${HASHTOPOLIS_DB_HOST} ${HASHTOPOLIS_DB_DATABASE}"
     DB_TYPE="postgres"
-    if [[ -n "${HASHTOPOLIS_DB_PORT}" ]]; then
-        DB_CMD="${DB_CMD} -p${HASHTOPOLIS_DB_PORT}"
+    if [[ -n "${HASHTOPOLIS_DB_PORT:5432}" ]]; then
+        DB_CMD="${DB_CMD} -p${HASHTOPOLIS_DB_PORT:5432}}"
     fi
 else
     echo "INVALID DATABASE TYPE PROVIDED: $HASHTOPOLIS_DB_TYPE"
@@ -55,7 +74,6 @@ directories=(
   "${HASHTOPOLIS_LOG_PATH}"
   "${HASHTOPOLIS_IMPORT_PATH}"
   "${HASHTOPOLIS_BINARIES_PATH}"
-  "${HASHTOPOLIS_CRACKERS_PATH}"
   "${HASHTOPOLIS_TUS_PATH}"
   "${HASHTOPOLIS_TEMP_UPLOADS_PATH}"
   "${HASHTOPOLIS_TEMP_META_PATH}"
@@ -116,27 +134,7 @@ echo ""
 echo "                        Hashtopolis is now ready to use!"
 echo "                                      *\0/*"
 echo ""
-
 echo ""
 
-
-# Schedule the background job runner. It is called once a minute, overlapping runs
-# are prevented by the runner itself using a lock file. A cron daemon cannot be used
-# here as the container runs with an unprivileged user (vscode/www-data), so a simple
-# scheduler loop is started in the background instead. The loop inherits the container
-# environment, which a cron daemon would not. Set HASHTOPOLIS_CRON_ENABLE=0 to disable
-# it, for example to run the runner with an external cron or for deterministic tests.
-if [[ -z "${HASHTOPOLIS_CRON_ENABLE+x}" ]]; then
-    HASHTOPOLIS_CRON_ENABLE="1"
-fi
-if [[ "$HASHTOPOLIS_CRON_ENABLE" == "1" ]]; then
-    echo "Starting background job runner scheduler (every 60s)..."
-    (
-        while true; do
-            php -d xdebug.mode=off -f ${HASHTOPOLIS_DOCUMENT_ROOT}/inc/cron.php
-            sleep 60
-        done
-    ) &
-fi
 
 docker-php-entrypoint apache2-foreground
