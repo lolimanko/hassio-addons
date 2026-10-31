@@ -1,6 +1,6 @@
 #!/usr/bin/env bashio
 
-chmod 777 -R /config
+chmod 777 -R /usr/local/share/hashtopolis
 
 #source /usr/lib/bashio/bashio.sh
 ssl=$(bashio::config 'SSL')
