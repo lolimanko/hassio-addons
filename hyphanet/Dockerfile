@@ -103,6 +103,7 @@ RUN groupadd --gid ${HYPHANET_GID} ${HYPHANET_USER} && \
 
 COPY --from=builder --chown=${HYPHANET_UID}:${HYPHANET_GID} ${HYPHANET_HOME} ${HYPHANET_HOME}
 
+VOLUME [ "${HYPHANET_DATA}" ]
 RUN mkdir -p ${HYPHANET_DATA}
 RUN chown ${HYPHANET_UID}:${HYPHANET_GID} ${HYPHANET_DATA}
   
@@ -115,7 +116,7 @@ USER ${HYPHANET_USER}
 WORKDIR ${HYPHANET_HOME}
 
 EXPOSE 8123
-VOLUME [ "${HYPHANET_DATA}" ]
+#VOLUME [ "${HYPHANET_DATA}" ]
 
 ENTRYPOINT [ "/usr/local/bin/entrypoint.sh" ]
 CMD [ "start" ]
