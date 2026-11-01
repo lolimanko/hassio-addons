@@ -1,5 +1,5 @@
 name: "hyphanet"
-version: 1.0.13
+version: 1.0.14
 slug: "hyphanet"
 description: "hyphanet"
 arch:
@@ -20,5 +20,5 @@ map:
     read_only: false
 #image: "ghcr.io/lolimanko/{arch}-anigamerplus" 
 ingress: true 
-ingress_port: 8123
+ingress_port: 8888
 panel_icon: mdi:television
