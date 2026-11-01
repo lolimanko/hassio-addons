@@ -2,6 +2,7 @@ from playwright.sync_api import sync_playwright
 import sys
 import os
 import time
+import datetime
 import requests
 #import shutil
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -22,9 +23,11 @@ def Gas():
             page.locator( "xpath=//input[@name='CusDegree']").fill(j['main']['pre'])
             page.locator("xpath=//input[@name='send']").click()
             print("開始拍照")
-            if os.path.isfile("/share/gas.png"):
-                os.remove("/share/gas.png")
-            page.screenshot(path="/share/gas.png")
+            page.screenshot(path="/share/gas_"+datetime.datetime.now().strftime("%Y-%m-%d")+".png")
+            #if os.path.isfile("/share/gas.png"):
+            #    os.remove("/share/gas.png")
+            #page.screenshot(path="/share/gas.png")
+    
     
     print("執行結束")
 def main():
