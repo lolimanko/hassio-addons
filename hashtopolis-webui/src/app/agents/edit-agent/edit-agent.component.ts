@@ -1,7 +1,6 @@
-import { HttpStatus } from '@constants/http.config';
 import { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import { faApple, faLinux, faWindows } from '@fortawesome/free-brands-svg-icons';
-import { zAgentResponse, zGetBestTasksAgentResponse, zUserListResponse } from '@generated/api/zod';
+import { zAgentResponse, zTaskListResponse, zUserListResponse } from '@generated/api/zod';
 import { lastValueFrom } from 'rxjs';
 
 import { HttpErrorResponse } from '@angular/common/http';
@@ -23,6 +22,7 @@ import { RequestParamBuilder } from '@services/params/builder-implementation.ser
 import { AgentRoleService } from '@services/roles/agents/agent-role.service';
 import { AlertService } from '@services/shared/alert.service';
 import { AutoTitleService } from '@services/shared/autotitle.service';
+import { UIConfigService } from '@services/shared/storage.service';
 
 import {
   EditAgentForm,
@@ -30,7 +30,7 @@ import {
   getEditAgentForm,
   getUpdateAssignmentForm
 } from '@src/app/agents/edit-agent/edit-agent.form';
-import { ASC, IgnoreErrorsOptions } from '@src/app/core/_constants/agentsc.config';
+import { ASC, IGNORE_ERROR_CHOICES } from '@src/app/core/_constants/agentsc.config';
 import { AgentOS } from '@src/app/core/_constants/agentsc.config';
 import {
   ACCESS_GROUP_FIELD_MAPPING,
@@ -60,7 +60,7 @@ export class EditAgentComponent implements OnInit {
 
   /** Select Options. */
   selectUsers: SelectOption<UserId>[] = [];
-  selectIgnorerrors = IgnoreErrorsOptions;
+  selectIgnorerrors = IGNORE_ERROR_CHOICES;
   selectUserAgps: SelectOption<AccessGroupId>[] = [];
 
   /** Assign Tasks */
@@ -82,6 +82,7 @@ export class EditAgentComponent implements OnInit {
 
   private destroyRef = inject(DestroyRef);
   private titleService = inject(AutoTitleService);
+  private uiService = inject(UIConfigService);
   private route = inject(ActivatedRoute);
   private alert = inject(AlertService);
   private gs = inject(GlobalService);
@@ -137,9 +138,9 @@ export class EditAgentComponent implements OnInit {
     const httpError = error as HttpErrorResponse;
     const status = httpError?.status;
 
-    if (status === HttpStatus.NOT_FOUND) {
+    if (status === 404) {
       this.router.navigate(['/not-found']);
-    } else if (status === HttpStatus.FORBIDDEN) {
+    } else if (status === 403) {
       this.router.navigate(['/forbidden']);
     } else {
       this.alert.showErrorMessage('Error loading agent details');
@@ -199,7 +200,7 @@ export class EditAgentComponent implements OnInit {
 
       // If the server fails while resolving included relations (500+),
       // try once more without the `include` params so the primary resource can still load.
-      if (httpErr?.status && httpErr.status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      if (httpErr?.status && httpErr.status >= 500) {
         const response = await lastValueFrom<ResponseWrapper>(this.gs.get(SERV.AGENTS, this.editedAgentIndex));
 
         // Degraded fallback: no includes loaded due to server error
@@ -227,7 +228,7 @@ export class EditAgentComponent implements OnInit {
       .ghelper(SERV.HELPER, 'getBestTasksAgent', { agent: this.editedAgentIndex })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((response: ResponseWrapper) => {
-        const tasks = this.serializer.deserialize(response, zGetBestTasksAgentResponse);
+        const tasks = this.serializer.deserialize(response, zTaskListResponse);
         this.assignTasks = transformSelectOptions(tasks, TASKS_FIELD_MAPPING);
       });
   }

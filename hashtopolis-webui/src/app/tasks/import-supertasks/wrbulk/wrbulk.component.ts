@@ -6,7 +6,7 @@ import { FormControl, FormGroup, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 
 import { JCrackerBinaryType, zCrackerBinaryTypeList } from '@models/cracker-binary.model';
-import { FileType, TaskSelectFile } from '@models/file.model';
+import { TaskSelectFile } from '@models/file.model';
 import { HorizontalNav } from '@models/horizontalnav.model';
 import { CrackerBinaryTypeId } from '@models/id.types';
 import { ResponseWrapper } from '@models/response.model';
@@ -18,10 +18,8 @@ import { AlertService } from '@services/shared/alert.service';
 import { AutoTitleService } from '@services/shared/autotitle.service';
 import { UIConfigService } from '@services/shared/storage.service';
 
-import { CheckboxColumnType } from '@components/tables/ht-table/ht-table.models';
-
 import { CRACKER_TYPE_FIELD_MAPPING } from '@src/app/core/_constants/select.config';
-import { BenchmarkTypeOptions } from '@src/app/core/_constants/tasks.config';
+import { benchmarkType } from '@src/app/core/_constants/tasks.config';
 import { SelectOption, transformSelectOptions } from '@src/app/shared/utils/forms';
 
 interface WrbulkFormValue {
@@ -54,7 +52,6 @@ export interface WrbulkForm {
   standalone: false
 })
 export class WrbulkComponent implements OnInit {
-  protected readonly FileType = FileType;
   /**
    * Horizontal menu and redirection links.
    */
@@ -70,7 +67,7 @@ export class WrbulkComponent implements OnInit {
   createForm: FormGroup<WrbulkForm>;
 
   /** Select Options. */
-  selectBenchmarktype = BenchmarkTypeOptions;
+  selectBenchmarktype = benchmarkType;
   selectCrackertype: SelectOption<CrackerBinaryTypeId>[] | undefined = undefined;
 
   /** Select Options Mapping */
@@ -262,7 +259,7 @@ export class WrbulkComponent implements OnInit {
    * @param event - The event data containing attack command and files.
    */
   onUpdateForm(event: TaskSelectFile): void {
-    if (event.type === CheckboxColumnType.CMD) {
+    if (event.type === 'CMD') {
       this.createForm.patchValue({
         attackCmd: event.attackCmd,
         baseFiles: event.files

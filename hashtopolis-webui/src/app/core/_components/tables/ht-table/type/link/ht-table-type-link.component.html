@@ -53,7 +53,7 @@
           (mouseleave)="hidePreview()"
         >
           <div [matTooltip]="link.tooltip ?? ''">
-            <span [class.muted]="link.muted">
+            <span>
               @if (link.label) {
                 {{ link.label }}
               } @else {

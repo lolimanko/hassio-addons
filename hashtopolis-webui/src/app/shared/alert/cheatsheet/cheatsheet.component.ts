@@ -1,4 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
+import { ApplicationRef } from '@angular/core';
+import { MatDialogRef } from '@angular/material/dialog';
 import { MatTableDataSource } from '@angular/material/table';
 
 @Component({
@@ -7,6 +9,9 @@ import { MatTableDataSource } from '@angular/material/table';
   standalone: false
 })
 export class CheatsheetComponent {
+  dialogRef = inject<MatDialogRef<CheatsheetComponent>>(MatDialogRef);
+  private appRef = inject(ApplicationRef);
+
   // Display Table Information
   attackmode = [
     { _id: '0', name: 'Straight(Using rules)' },
@@ -52,4 +57,8 @@ export class CheatsheetComponent {
   dataSource2 = new MatTableDataSource([...this.attackex]);
 
   dataSource3 = new MatTableDataSource([...this.charsets]);
+
+  onClose(): void {
+    this.dialogRef.close();
+  }
 }

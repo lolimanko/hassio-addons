@@ -1,19 +1,16 @@
-import type { ErrorResponse } from './common';
-
-export type AgentStatDeleteMultiple = {
-  data: Array<{
-    id: number;
-    type: 'agentStat';
-  }>;
-};
+import type { ErrorResponse, NotFoundResponse } from './common';
 
 export type AgentStatResponse = {
   jsonapi: {
     version: string;
     ext?: Array<string>;
   };
-  links: {
+  links?: {
     self: string;
+    first?: string;
+    last?: string;
+    next?: string | null;
+    previous?: string | null;
   };
   data: {
     id: number;
@@ -24,10 +21,11 @@ export type AgentStatResponse = {
       time: number;
       value: Array<number>;
     };
-    links: {
-      self: string;
-    };
   };
+  relationships?: {
+    [key: string]: unknown;
+  };
+  included?: Array<unknown>;
 };
 
 export type AgentStatListResponse = {
@@ -35,17 +33,12 @@ export type AgentStatListResponse = {
     version: string;
     ext?: Array<string>;
   };
-  links: {
+  links?: {
     self: string;
-    first: string;
-    last: string | null;
-    next: string | null;
-    prev: string | null;
-  };
-  meta: {
-    page: {
-      total_elements: number;
-    };
+    first?: string;
+    last?: string;
+    next?: string | null;
+    previous?: string | null;
   };
   data: Array<{
     id: number;
@@ -56,37 +49,15 @@ export type AgentStatListResponse = {
       time: number;
       value: Array<number>;
     };
-    links: {
-      self: string;
-    };
   }>;
-};
-
-export type AgentStatCountResponse = {
-  jsonapi: {
-    version: string;
-    ext?: Array<string>;
-  };
-  meta: {
-    /**
-     * Number of objects accessible to the current user matching the given filters
-     */
-    count: number;
-    /**
-     * Number of objects accessible to the current user without any filter applied, only present when `include_total=true` was requested
-     */
-    total_count?: number;
-  };
-  /**
-   * Always empty: the count is reported under meta.
-   */
-  data: Array<{
+  relationships?: {
     [key: string]: unknown;
-  }>;
+  };
+  included?: Array<unknown>;
 };
 
 export type DeleteAgentstatsData = {
-  body: AgentStatDeleteMultiple;
+  body?: never;
   path?: never;
   query?: never;
   url: '/api/v2/ui/agentstats';
@@ -101,65 +72,43 @@ export type DeleteAgentstatsErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
-   * Not Found
-   */
-  404: ErrorResponse;
 };
 
 export type DeleteAgentstatsError = DeleteAgentstatsErrors[keyof DeleteAgentstatsErrors];
 
 export type DeleteAgentstatsResponses = {
   /**
-   * successfully deleted
+   * successful operation
    */
-  204: void;
+  200: unknown;
 };
-
-export type DeleteAgentstatsResponse = DeleteAgentstatsResponses[keyof DeleteAgentstatsResponses];
 
 export type GetAgentstatsData = {
   body?: never;
   path?: never;
   query?: {
     /**
-     * Pointer to paginate to retrieve the data after the object provided. Specify the `base64` encoded JSON string in a **uniquely identifiable** manner (e.g. object IDs), i.e. by using one (primary) or two (primary and secondary) fields that allow for **stable** sorting.
-     *
-     *
-     * Format: `{"primary":{"someField": 123},"secondary":{"someOtherOptionalField": "Foo"}}`
-     *
-     *
-     * Example: `{"primary":{"agentStatId": 123}}` -> `eyJwcmltYXJ5Ijp7ImFnZW50U3RhdElkIjogMTIzfX0=`
+     * Pointer to paginate to retrieve the data after the value provided
      */
-    'page[after]'?: string;
+    'page[after]'?: number;
     /**
-     * Pointer to paginate to retrieve the data before the object provided. Specify the `base64` encoded JSON string in a **uniquely identifiable** manner (e.g. object IDs), i.e. by using one (primary) or two (primary and secondary) fields that allow for **stable** sorting.
-     *
-     *
-     * Format: `{"primary":{"someField": 123},"secondary":{"someOtherOptionalField": "Foo"}}`
-     *
-     *
-     * Example: `{"primary":{"agentStatId": 123}}` -> `eyJwcmltYXJ5Ijp7ImFnZW50U3RhdElkIjogMTIzfX0=`
+     * Pointer to paginate to retrieve the data before the value provided
      */
-    'page[before]'?: string;
+    'page[before]'?: number;
     /**
      * Amout of data to retrieve inside a single page
      */
     'page[size]'?: number;
     /**
-     * Filters results using a query. Every key is an attribute name optionally suffixed with a comparison operator, e.g. `filter[agentStatId__gt]=200`.
+     * Filters results using a query
      */
     filter?: {
-      [key: string]: string;
+      [key: string]: unknown;
     };
     /**
-     * Relationships to include in the response, comma seperated. Possible options:
+     * Items to include, comma seperated. Possible options: Array
      */
-    include?: Array<string>;
+    include?: string;
   };
   url: '/api/v2/ui/agentstats';
 };
@@ -173,10 +122,6 @@ export type GetAgentstatsErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
 };
 
 export type GetAgentstatsError = GetAgentstatsErrors[keyof GetAgentstatsErrors];
@@ -195,15 +140,27 @@ export type GetAgentstatsCountData = {
   path?: never;
   query?: {
     /**
-     * Filters results using a query. Every key is an attribute name optionally suffixed with a comparison operator, e.g. `filter[agentStatId__gt]=200`.
+     * Pointer to paginate to retrieve the data after the value provided
+     */
+    'page[after]'?: number;
+    /**
+     * Pointer to paginate to retrieve the data before the value provided
+     */
+    'page[before]'?: number;
+    /**
+     * Amout of data to retrieve inside a single page
+     */
+    'page[size]'?: number;
+    /**
+     * Filters results using a query
      */
     filter?: {
-      [key: string]: string;
+      [key: string]: unknown;
     };
     /**
-     * Also report the number of accessible objects without any filter applied, as `meta.total_count`
+     * Items to include, comma seperated. Possible options: Array
      */
-    include_total?: boolean;
+    include?: string;
   };
   url: '/api/v2/ui/agentstats/count';
 };
@@ -217,10 +174,6 @@ export type GetAgentstatsCountErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
 };
 
 export type GetAgentstatsCountError = GetAgentstatsCountErrors[keyof GetAgentstatsCountErrors];
@@ -229,13 +182,15 @@ export type GetAgentstatsCountResponses = {
   /**
    * successful operation
    */
-  200: AgentStatCountResponse;
+  200: AgentStatListResponse;
 };
 
 export type GetAgentstatsCountResponse = GetAgentstatsCountResponses[keyof GetAgentstatsCountResponses];
 
 export type DeleteAgentstatsByIdData = {
-  body?: never;
+  body: {
+    [key: string]: unknown;
+  };
   path: {
     id: number;
   };
@@ -253,13 +208,9 @@ export type DeleteAgentstatsByIdErrors = {
    */
   401: ErrorResponse;
   /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
    * Not Found
    */
-  404: ErrorResponse;
+  404: NotFoundResponse;
 };
 
 export type DeleteAgentstatsByIdError = DeleteAgentstatsByIdErrors[keyof DeleteAgentstatsByIdErrors];
@@ -280,9 +231,9 @@ export type GetAgentstatsByIdData = {
   };
   query?: {
     /**
-     * Relationships to include in the response, comma seperated. Possible options:
+     * Items to include. Comma seperated
      */
-    include?: Array<string>;
+    include?: string;
   };
   url: '/api/v2/ui/agentstats/{id}';
 };
@@ -297,13 +248,9 @@ export type GetAgentstatsByIdErrors = {
    */
   401: ErrorResponse;
   /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
    * Not Found
    */
-  404: ErrorResponse;
+  404: NotFoundResponse;
 };
 
 export type GetAgentstatsByIdError = GetAgentstatsByIdErrors[keyof GetAgentstatsByIdErrors];

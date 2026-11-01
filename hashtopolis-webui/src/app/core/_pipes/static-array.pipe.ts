@@ -1,16 +1,5 @@
 import { Injectable, Pipe, PipeTransform } from '@angular/core';
 
-/** Which static lookup table {@link StaticArrayPipe} reads from. */
-export const StaticArrayKind = {
-  OS: 'os',
-  STATES: 'states',
-  STATES_COLOR: 'statescolor',
-  FORMATS: 'formats',
-  FORMAT_TABLES: 'formattables',
-  PLATFORMS: 'platforms'
-} as const;
-export type StaticArrayKind = (typeof StaticArrayKind)[keyof typeof StaticArrayKind];
-
 /**
  * Static Array, with some static configurations
  * @param id - The input number, id
@@ -32,7 +21,7 @@ export type StaticArrayKind = (typeof StaticArrayKind)[keyof typeof StaticArrayK
   providedIn: 'root'
 })
 export class StaticArrayPipe implements PipeTransform {
-  transform(id: number | undefined, search: StaticArrayKind): string {
+  transform(id: number | undefined, search: string): string {
     if (id === undefined) return '';
     const platforms = ['unknown', 'NVidia', 'AMD', 'CPU'];
     const oses = [
@@ -57,20 +46,20 @@ export class StaticArrayPipe implements PipeTransform {
     ];
     const statescolor = ['orange', 'black', 'green', 'black', 'black', 'blue', 'red', 'red', 'red', 'red', 'red'];
     switch (search) {
-      case StaticArrayKind.OS:
+      case 'os':
         if (id === -1) {
           return platforms[0];
         }
         return oses[id];
-      case StaticArrayKind.STATES:
+      case 'states':
         return states[id];
-      case StaticArrayKind.STATES_COLOR:
+      case 'statescolor':
         return statescolor[id];
-      case StaticArrayKind.FORMATS:
+      case 'formats':
         return formats[id];
-      case StaticArrayKind.FORMAT_TABLES:
+      case 'formattables':
         return formattables[id];
-      case StaticArrayKind.PLATFORMS:
+      case 'platforms':
         if (id === -1) {
           return platforms[0];
         }

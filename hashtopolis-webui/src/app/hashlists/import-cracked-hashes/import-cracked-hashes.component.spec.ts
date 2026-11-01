@@ -1,4 +1,3 @@
-import { HttpHeaderName } from '@constants/http.config';
 import { concat, of, throwError } from 'rxjs';
 
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
@@ -22,7 +21,6 @@ import { ButtonsModule } from '@src/app/shared/buttons/buttons.module';
 import { ComponentsModule } from '@src/app/shared/components.module';
 import { InputModule } from '@src/app/shared/input/input.module';
 import { mockResponse } from '@src/app/testing/mock-response';
-import { HashSource } from '@constants/hashlist.config';
 
 const mockServerImportFiles: ResponseWrapper = mockResponse({
   data: [],
@@ -382,7 +380,7 @@ describe('ImportCrackedHashesComponent', () => {
       const call = gsSpy.chelper.calls.mostRecent();
       expect(call.args[1]).toBe('importCrackedHashes');
       const httpOptions = call.args[4];
-      expect(httpOptions?.headers?.get(HttpHeaderName.SKIP_ERROR_DIALOG)).toBe('true');
+      expect(httpOptions?.headers?.get('X-Skip-Error-Dialog')).toBe('true');
 
       expect(alertSpy.showErrorMessage).toHaveBeenCalledWith(
         'Failed to import cracked hashes: Cracked hash file has too many lines!'
@@ -449,7 +447,7 @@ describe('ImportCrackedHashesComponent', () => {
   describe('onSubmit - unknown source type', () => {
     it('should show error when sourceType is unknown', () => {
       component.form.patchValue({
-        sourceType: 'unknown' as HashSource,
+        sourceType: 'unknown',
         fieldSeparator: ':'
       });
       component.onSubmit();

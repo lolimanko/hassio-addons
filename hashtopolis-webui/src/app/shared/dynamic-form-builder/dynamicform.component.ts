@@ -16,6 +16,7 @@ import { FormBuilder, FormControl, FormGroup, ValidatorFn, Validators } from '@a
 import { ResponseWrapper } from '@models/response.model';
 
 import { JsonAPISerializer } from '@services/api/serializer-service';
+import { GlobalService } from '@services/main.service';
 import { FieldType, MetadataFormField } from '@services/metadata.service';
 
 import { SelectOption, transformSelectOptions } from '@src/app/shared/utils/forms';
@@ -97,6 +98,7 @@ export class DynamicFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
   @Output() selectTypeChange: EventEmitter<number> = new EventEmitter<number>();
 
+  private gs = inject(GlobalService);
   private cdr = inject(ChangeDetectorRef);
   private fb = inject(FormBuilder);
 

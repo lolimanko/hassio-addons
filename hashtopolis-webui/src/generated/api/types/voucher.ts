@@ -1,4 +1,4 @@
-import type { ErrorResponse } from './common';
+import type { ErrorResponse, NotFoundResponse } from './common';
 
 export type VoucherCreate = {
   data: {
@@ -18,30 +18,17 @@ export type VoucherPatch = {
   };
 };
 
-export type VoucherPatchMultiple = {
-  data: Array<{
-    id: number;
-    type: 'voucher';
-    attributes: {
-      voucher?: string;
-    };
-  }>;
-};
-
-export type VoucherDeleteMultiple = {
-  data: Array<{
-    id: number;
-    type: 'voucher';
-  }>;
-};
-
 export type VoucherResponse = {
   jsonapi: {
     version: string;
     ext?: Array<string>;
   };
-  links: {
+  links?: {
     self: string;
+    first?: string;
+    last?: string;
+    next?: string | null;
+    previous?: string | null;
   };
   data: {
     id: number;
@@ -50,10 +37,11 @@ export type VoucherResponse = {
       voucher: string;
       time: number;
     };
-    links: {
-      self: string;
-    };
   };
+  relationships?: {
+    [key: string]: unknown;
+  };
+  included?: Array<unknown>;
 };
 
 export type VoucherPostPatchResponse = {
@@ -61,18 +49,12 @@ export type VoucherPostPatchResponse = {
     version: string;
     ext?: Array<string>;
   };
-  links: {
-    self: string;
-  };
   data: {
     id: number;
     type: 'voucher';
     attributes: {
       voucher: string;
       time: number;
-    };
-    links: {
-      self: string;
     };
   };
 };
@@ -82,17 +64,12 @@ export type VoucherListResponse = {
     version: string;
     ext?: Array<string>;
   };
-  links: {
+  links?: {
     self: string;
-    first: string;
-    last: string | null;
-    next: string | null;
-    prev: string | null;
-  };
-  meta: {
-    page: {
-      total_elements: number;
-    };
+    first?: string;
+    last?: string;
+    next?: string | null;
+    previous?: string | null;
   };
   data: Array<{
     id: number;
@@ -101,37 +78,15 @@ export type VoucherListResponse = {
       voucher: string;
       time: number;
     };
-    links: {
-      self: string;
-    };
   }>;
-};
-
-export type VoucherCountResponse = {
-  jsonapi: {
-    version: string;
-    ext?: Array<string>;
-  };
-  meta: {
-    /**
-     * Number of objects accessible to the current user matching the given filters
-     */
-    count: number;
-    /**
-     * Number of objects accessible to the current user without any filter applied, only present when `include_total=true` was requested
-     */
-    total_count?: number;
-  };
-  /**
-   * Always empty: the count is reported under meta.
-   */
-  data: Array<{
+  relationships?: {
     [key: string]: unknown;
-  }>;
+  };
+  included?: Array<unknown>;
 };
 
 export type DeleteVouchersData = {
-  body: VoucherDeleteMultiple;
+  body?: never;
   path?: never;
   query?: never;
   url: '/api/v2/ui/vouchers';
@@ -146,65 +101,43 @@ export type DeleteVouchersErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
-   * Not Found
-   */
-  404: ErrorResponse;
 };
 
 export type DeleteVouchersError = DeleteVouchersErrors[keyof DeleteVouchersErrors];
 
 export type DeleteVouchersResponses = {
   /**
-   * successfully deleted
+   * successful operation
    */
-  204: void;
+  200: unknown;
 };
-
-export type DeleteVouchersResponse = DeleteVouchersResponses[keyof DeleteVouchersResponses];
 
 export type GetVouchersData = {
   body?: never;
   path?: never;
   query?: {
     /**
-     * Pointer to paginate to retrieve the data after the object provided. Specify the `base64` encoded JSON string in a **uniquely identifiable** manner (e.g. object IDs), i.e. by using one (primary) or two (primary and secondary) fields that allow for **stable** sorting.
-     *
-     *
-     * Format: `{"primary":{"someField": 123},"secondary":{"someOtherOptionalField": "Foo"}}`
-     *
-     *
-     * Example: `{"primary":{"regVoucherId": 123}}` -> `eyJwcmltYXJ5Ijp7InJlZ1ZvdWNoZXJJZCI6IDEyM319`
+     * Pointer to paginate to retrieve the data after the value provided
      */
-    'page[after]'?: string;
+    'page[after]'?: number;
     /**
-     * Pointer to paginate to retrieve the data before the object provided. Specify the `base64` encoded JSON string in a **uniquely identifiable** manner (e.g. object IDs), i.e. by using one (primary) or two (primary and secondary) fields that allow for **stable** sorting.
-     *
-     *
-     * Format: `{"primary":{"someField": 123},"secondary":{"someOtherOptionalField": "Foo"}}`
-     *
-     *
-     * Example: `{"primary":{"regVoucherId": 123}}` -> `eyJwcmltYXJ5Ijp7InJlZ1ZvdWNoZXJJZCI6IDEyM319`
+     * Pointer to paginate to retrieve the data before the value provided
      */
-    'page[before]'?: string;
+    'page[before]'?: number;
     /**
      * Amout of data to retrieve inside a single page
      */
     'page[size]'?: number;
     /**
-     * Filters results using a query. Every key is an attribute name optionally suffixed with a comparison operator, e.g. `filter[regVoucherId__gt]=200`.
+     * Filters results using a query
      */
     filter?: {
-      [key: string]: string;
+      [key: string]: unknown;
     };
     /**
-     * Relationships to include in the response, comma seperated. Possible options:
+     * Items to include, comma seperated. Possible options: Array
      */
-    include?: Array<string>;
+    include?: string;
   };
   url: '/api/v2/ui/vouchers';
 };
@@ -218,10 +151,6 @@ export type GetVouchersErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
 };
 
 export type GetVouchersError = GetVouchersErrors[keyof GetVouchersErrors];
@@ -236,7 +165,7 @@ export type GetVouchersResponses = {
 export type GetVouchersResponse = GetVouchersResponses[keyof GetVouchersResponses];
 
 export type PatchVouchersData = {
-  body: VoucherPatchMultiple;
+  body?: never;
   path?: never;
   query?: never;
   url: '/api/v2/ui/vouchers';
@@ -251,30 +180,16 @@ export type PatchVouchersErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
-   * Not Found
-   */
-  404: ErrorResponse;
-  /**
-   * Resource already exists
-   */
-  409: ErrorResponse;
 };
 
 export type PatchVouchersError = PatchVouchersErrors[keyof PatchVouchersErrors];
 
 export type PatchVouchersResponses = {
   /**
-   * successfully updated
+   * successful operation
    */
-  204: void;
+  200: unknown;
 };
-
-export type PatchVouchersResponse = PatchVouchersResponses[keyof PatchVouchersResponses];
 
 export type PostVouchersData = {
   body: VoucherCreate;
@@ -292,14 +207,6 @@ export type PostVouchersErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
-   * Resource already exists
-   */
-  409: ErrorResponse;
 };
 
 export type PostVouchersError = PostVouchersErrors[keyof PostVouchersErrors];
@@ -318,15 +225,27 @@ export type GetVouchersCountData = {
   path?: never;
   query?: {
     /**
-     * Filters results using a query. Every key is an attribute name optionally suffixed with a comparison operator, e.g. `filter[regVoucherId__gt]=200`.
+     * Pointer to paginate to retrieve the data after the value provided
+     */
+    'page[after]'?: number;
+    /**
+     * Pointer to paginate to retrieve the data before the value provided
+     */
+    'page[before]'?: number;
+    /**
+     * Amout of data to retrieve inside a single page
+     */
+    'page[size]'?: number;
+    /**
+     * Filters results using a query
      */
     filter?: {
-      [key: string]: string;
+      [key: string]: unknown;
     };
     /**
-     * Also report the number of accessible objects without any filter applied, as `meta.total_count`
+     * Items to include, comma seperated. Possible options: Array
      */
-    include_total?: boolean;
+    include?: string;
   };
   url: '/api/v2/ui/vouchers/count';
 };
@@ -340,10 +259,6 @@ export type GetVouchersCountErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
 };
 
 export type GetVouchersCountError = GetVouchersCountErrors[keyof GetVouchersCountErrors];
@@ -352,13 +267,15 @@ export type GetVouchersCountResponses = {
   /**
    * successful operation
    */
-  200: VoucherCountResponse;
+  200: VoucherListResponse;
 };
 
 export type GetVouchersCountResponse = GetVouchersCountResponses[keyof GetVouchersCountResponses];
 
 export type DeleteVouchersByIdData = {
-  body?: never;
+  body: {
+    [key: string]: unknown;
+  };
   path: {
     id: number;
   };
@@ -376,13 +293,9 @@ export type DeleteVouchersByIdErrors = {
    */
   401: ErrorResponse;
   /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
    * Not Found
    */
-  404: ErrorResponse;
+  404: NotFoundResponse;
 };
 
 export type DeleteVouchersByIdError = DeleteVouchersByIdErrors[keyof DeleteVouchersByIdErrors];
@@ -403,9 +316,9 @@ export type GetVouchersByIdData = {
   };
   query?: {
     /**
-     * Relationships to include in the response, comma seperated. Possible options:
+     * Items to include. Comma seperated
      */
-    include?: Array<string>;
+    include?: string;
   };
   url: '/api/v2/ui/vouchers/{id}';
 };
@@ -420,13 +333,9 @@ export type GetVouchersByIdErrors = {
    */
   401: ErrorResponse;
   /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
    * Not Found
    */
-  404: ErrorResponse;
+  404: NotFoundResponse;
 };
 
 export type GetVouchersByIdError = GetVouchersByIdErrors[keyof GetVouchersByIdErrors];
@@ -459,17 +368,9 @@ export type PatchVouchersByIdErrors = {
    */
   401: ErrorResponse;
   /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
    * Not Found
    */
-  404: ErrorResponse;
-  /**
-   * Resource already exists
-   */
-  409: ErrorResponse;
+  404: NotFoundResponse;
 };
 
 export type PatchVouchersByIdError = PatchVouchersByIdErrors[keyof PatchVouchersByIdErrors];

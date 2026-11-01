@@ -54,10 +54,11 @@ export class SERV {
   // ACCESS
   public static AUTH = { URL: '/auth', RESOURCE: 'Auth' };
   public static ACCESS_GROUPS = { URL: '/ui/accessgroups', RESOURCE: 'AccessGroups' };
-  public static ACCESS_PERMISSIONS_GROUPS = { URL: '/ui/globalpermissiongroups', RESOURCE: 'globalPermissionGroup' };
+  public static ACCESS_PERMISSIONS_GROUPS = { URL: '/ui/globalpermissiongroups', RESOURCE: 'GlobalPermissionGroups' };
   // AGENTS
   public static AGENTS = { URL: '/ui/agents', RESOURCE: 'Agents' };
   public static AGENT_ERRORS = { URL: '/ui/agenterrors', RESOURCE: 'AgentErrors' };
+  public static AGENTS_STATS = { URL: '/ui/agentstats', RESOURCE: 'AgentStats' };
   public static AGENT_ASSIGN = { URL: '/ui/agentassignments', RESOURCE: 'AgentAssignments' };
   public static AGENTS_COUNT = { URL: '/ui/agents/count', RESOURCE: 'AgentsCount' };
   public static VOUCHER = { URL: '/ui/vouchers', RESOURCE: 'Vouchers' };
@@ -70,7 +71,6 @@ export class SERV {
   public static HEALTH_CHECKS = { URL: '/ui/healthchecks', RESOURCE: 'HealthCheck' };
   public static HEALTH_CHECKS_AGENTS = { URL: '/ui/healthcheckagents', RESOURCE: 'HealthCheckAgents' };
   public static LOGS = { URL: '/ui/logentries', RESOURCE: 'LogEntries' };
-  public static BACKGROUND_JOBS = { URL: '/ui/backgroundJobs', RESOURCE: 'backgroundJob' };
   public static PREPROCESSORS = { URL: '/ui/preprocessors', RESOURCE: 'Preprocessors' };
   // FILES
   public static FILES = { URL: '/ui/files', RESOURCE: 'Files' };
@@ -78,6 +78,7 @@ export class SERV {
   // HASHLISTS
   public static HASHES = { URL: '/ui/hashes', RESOURCE: 'Hashes' };
   public static HASHLISTS = { URL: '/ui/hashlists', RESOURCE: 'Hashlists' };
+  public static SUPER_HASHLISTS = { URL: '/ui/superhashlists', RESOURCE: 'Superhashlists' };
   public static HASHES_COUNT = { URL: '/ui/hashes/count', RESOURCE: 'HashesCount' };
   // TASKS
   public static CHUNKS = { URL: '/ui/chunks', RESOURCE: 'Chunks' };
@@ -93,44 +94,44 @@ export class SERV {
   public static USERS = { URL: '/ui/users', RESOURCE: 'Users' };
   // API TOKENS
   public static API_TOKENS = { URL: '/ui/apiTokens', RESOURCE: 'apiToken' };
+  // PROJECTS
+  public static PROJECTS = { URL: '/ui/tasks', RESOURCE: 'Projects' };
 }
 
 /**
  * Different RelationshipTypes used in API requests
+ * @enum
  */
-export const RelationshipType = {
-  ACCESSGROUP: 'accessGroup',
-  ACCESSGROUPS: 'accessGroups',
-  AGENT: 'agent',
-  AGENTMEMBER: 'agentMembers',
-  AGENTSTAT: 'agentStats',
-  ASSIGNMENT: 'assignments',
-  ASSIGNEDAGENTS: 'assignedAgents',
-  CHUNK: 'chunk',
-  CHUNKS: 'chunks',
-  CONFIGSECTION: 'configSection',
-  CRACKERBINARY: 'crackerBinary',
-  CRACKERBINARIES: 'crackerBinaries',
-  CRACKERBINARYTYPE: 'crackerBinaryType',
-  CRACKERVERSION: 'crackerVersions',
-  FILES: 'files',
-  GLOBALPERMISSIONGROUP: 'globalPermissionGroup',
-  HASHES: 'hashes',
-  HASHLIST: 'hashlist',
-  HASHLISTS: 'hashlists',
-  HASHTYPE: 'hashtype',
-  HASHTYPES: 'hashtypes',
-  HEALTHCHECK: 'healthCheck',
-  HEALTHCHECKAGENTS: 'healthCheckAgents',
-  PRETASKS: 'pretasks',
-  PRETASKFILES: 'pretaskFiles',
-  SPEEDS: 'speeds',
-  TASK: 'task',
-  TASKS: 'tasks',
-  USER: 'user',
-  USERMEMBERS: 'userMembers'
-} as const;
-export type RelationshipType = (typeof RelationshipType)[keyof typeof RelationshipType];
+export enum RelationshipType {
+  ACCESSGROUP = 'accessGroup',
+  ACCESSGROUPS = 'accessGroups',
+  AGENT = 'agent',
+  AGENTMEMBER = 'agentMembers',
+  AGENTSTAT = 'agentStats',
+  ASSIGNMENT = 'assignments',
+  ASSIGNEDAGENTS = 'assignedAgents',
+  CHUNK = 'chunk',
+  CHUNKS = 'chunks',
+  CONFIGSECTION = 'configSection',
+  CRACKERBINARY = 'crackerBinary',
+  CRACKERBINARYTYPE = 'crackerBinaryType',
+  CRACKERVERSION = 'crackerVersions',
+  FILES = 'files',
+  GLOBALPERMISSIONGROUP = 'globalPermissionGroup',
+  HASHES = 'hashes',
+  HASHLIST = 'hashlist',
+  HASHLISTS = 'hashlists',
+  HASHTYPE = 'hashtype',
+  HEALTHCHECK = 'healthCheck',
+  HEALTHCHECKAGENTS = 'healthCheckAgents',
+  PRETASKS = 'pretasks',
+  PRETASKFILES = 'pretaskFiles',
+  SPEEDS = 'speeds',
+  TASK = 'task',
+  TASKS = 'tasks',
+  USER = 'user',
+  USERMEMBERS = 'userMembers'
+}
 
 /**
  * Validation patterns for form validation

@@ -1,5 +1,3 @@
-import { HttpStatus } from '@constants/http.config';
-
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -169,11 +167,11 @@ export class FormComponent implements OnInit {
         },
         error: (err: unknown) => {
           const status = err instanceof HttpErrorResponse ? err.status : undefined;
-          if (status === HttpStatus.FORBIDDEN) {
+          if (status === 403) {
             this.router.navigateByUrl('/forbidden');
             return;
           }
-          if (status === HttpStatus.NOT_FOUND) {
+          if (status === 404) {
             this.router.navigateByUrl('/not-found');
             return;
           }

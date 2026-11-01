@@ -3,7 +3,6 @@ import { fakeAsync, tick } from '@angular/core/testing';
 
 import { BaseModel } from '@models/base.model';
 
-import { JsonAPISerializer } from '@services/api/serializer-service';
 import { GlobalService } from '@services/main.service';
 import { PermissionService } from '@services/permission/permission.service';
 import { HttpCacheService } from '@services/shared/http-cache.service';
@@ -48,7 +47,6 @@ describe('BaseDataSource Pagination', () => {
     mockInjector.get.withArgs(HttpCacheService).and.returnValue(mockHttpCacheService);
     mockInjector.get.withArgs(LocalStorageService).and.returnValue(mockLocalStorageService);
     mockInjector.get.withArgs(PermissionService).and.returnValue(mockPermissionService);
-    mockInjector.get.withArgs(JsonAPISerializer).and.returnValue({});
 
     // Initialize the DataSource
     dataSource = new TestBaseDataSource(mockInjector);

@@ -1,5 +1,3 @@
-import { HashListFormat } from '@constants/hashlist.config';
-
 import { BaseModel } from '@models/base.model';
 import { JHashtype } from '@models/hashtype.model';
 import { AccessGroupId, HashTypeId, HashlistId } from '@models/id.types';
@@ -13,7 +11,7 @@ export interface JHashlist extends BaseModel {
   hashlistId?: HashlistId;
   accessGroupId: AccessGroupId;
   brainFeatures: number;
-  format?: HashListFormat;
+  format?: number;
   name: string;
   hashTypeId: HashTypeId;
   hashType?: JHashtype | null;

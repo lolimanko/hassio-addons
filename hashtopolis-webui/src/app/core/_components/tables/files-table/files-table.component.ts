@@ -1,7 +1,7 @@
 import { faKey } from '@fortawesome/free-solid-svg-icons';
 import { Observable, catchError, of } from 'rxjs';
 
-import { AfterViewInit, Component, Input, OnDestroy, OnInit } from '@angular/core';
+import { AfterViewInit, Component, Input, OnInit } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { FileType, JFile } from '@models/file.model';
@@ -25,8 +25,6 @@ import { DialogData } from '@components/tables/table-dialog/table-dialog.model';
 import { FilesDataSource } from '@datasources/files.datasource';
 
 import { FilterType } from '@src/app/core/_models/request-params.model';
-import { FilePreviewDialogComponent } from '@src/app/shared/dialog/file-preview-dialog/file-preview-dialog.component';
-import { FilePreviewDialogData } from '@src/app/shared/dialog/file-preview-dialog/file-preview-dialog.model';
 import { formatFileSize } from '@src/app/shared/utils/util';
 
 /**
@@ -39,10 +37,10 @@ import { formatFileSize } from '@src/app/shared/utils/util';
   templateUrl: './files-table.component.html',
   standalone: false
 })
-export class FilesTableComponent extends BaseTableComponent implements OnInit, AfterViewInit, OnDestroy {
+export class FilesTableComponent extends BaseTableComponent implements OnInit, AfterViewInit {
   private _editIndex: number;
 
-  @Input() fileType: FileType = FileType.WORDLIST;
+  @Input() fileType: FileType = 0;
   @Input()
   set editIndex(value: number) {
     if (value !== this._editIndex) {
@@ -98,16 +96,6 @@ export class FilesTableComponent extends BaseTableComponent implements OnInit, A
   ngAfterViewInit(): void {
     // Wait until paginator is defined
     this.dataSource.loadAll();
-    // Auto-refresh is only offered on the files pages, detail lists must not touch the shared timer
-    if (!this.isDetailPage && this.dataSource.autoRefreshService.refreshPage) {
-      this.dataSource.startAutoRefresh();
-    }
-  }
-
-  ngOnDestroy(): void {
-    if (!this.isDetailPage) {
-      this.dataSource.stopAutoRefresh();
-    }
   }
 
   /**
@@ -251,9 +239,6 @@ export class FilesTableComponent extends BaseTableComponent implements OnInit, A
       case RowActionMenuAction.DOWNLOAD:
         this.rowActionDownload(event.data);
         break;
-      case FilesRowAction.PREVIEW:
-        this.rowActionPreview(event.data);
-        break;
       case FilesRowAction.TOGGLE_SECRET:
         this.rowActionToggleSecret(event.data);
         break;
@@ -344,20 +329,6 @@ export class FilesTableComponent extends BaseTableComponent implements OnInit, A
     this.gs.getFile(SERV.GET_FILES, file.id, file.filename);
   }
 
-  /**
-   * Opens a preview that reads the file in byte ranges, so a multi-gigabyte wordlist can be inspected
-   * without downloading it.
-   *
-   * @param file - File to preview.
-   */
-  private rowActionPreview(file: JFile): void {
-    this.dialog.open<FilePreviewDialogComponent, FilePreviewDialogData>(FilePreviewDialogComponent, {
-      data: { file },
-      width: '900px',
-      maxWidth: '95vw'
-    });
-  }
-
   private rowActionToggleSecret(file: JFile): void {
     const isSecret = !file.isSecret;
     this.gs
@@ -386,10 +357,8 @@ export class FilesTableComponent extends BaseTableComponent implements OnInit, A
         takeUntilDestroyed(this.destroyRef)
       )
       .subscribe(() => {
-        // The recount runs as background job, reloading now would only show the old count
-        this.alertService.showSuccessMessage(
-          `Line recount for ${file.filename} queued. The line count updates once the background job has finished.`
-        );
+        this.alertService.showSuccessMessage(`Recounted lines for ${file.filename}!`);
+        this.reload();
       });
   }
 }

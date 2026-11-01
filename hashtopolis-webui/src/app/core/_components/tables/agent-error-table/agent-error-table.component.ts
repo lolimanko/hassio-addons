@@ -83,7 +83,12 @@ export class AgentErrorTableComponent extends BaseTableComponent implements OnIn
       },
       {
         id: AgentErrorTableCol.CHUNK,
-        routerLink: (agentError: JAgentErrors) => this.renderChunkDetailLink(agentError.chunkId),
+        render: (agentError: JAgentErrors) => {
+          if (agentError.chunkId) {
+            return agentError.chunkId.toString();
+          }
+          return 'N/A';
+        },
         export: async (agentError: JAgentErrors) => (agentError.chunkId ? agentError.chunkId.toString() : 'N/A')
       },
       {

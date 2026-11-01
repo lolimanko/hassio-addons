@@ -1,4 +1,3 @@
-import { HttpHeaderName, HttpMethod } from '@constants/http.config';
 import { Observable, concat, of, tap } from 'rxjs';
 
 import { HttpEvent, HttpHandler, HttpInterceptor, HttpRequest, HttpResponse } from '@angular/common/http';
@@ -38,7 +37,7 @@ export class HttpCacheInterceptor implements HttpInterceptor {
       return next.handle(req);
     }
 
-    if (req.method !== HttpMethod.GET || req.headers.has(HttpHeaderName.SKIP_CACHE)) {
+    if (req.method !== 'GET' || req.headers.has('X-Cache-Skip')) {
       return next.handle(req);
     }
 
@@ -134,7 +133,6 @@ export class HttpCacheInterceptor implements HttpInterceptor {
   }
 
   private isMutation(req: HttpRequest<unknown>): boolean {
-    const mutatingMethods: string[] = [HttpMethod.POST, HttpMethod.PUT, HttpMethod.PATCH, HttpMethod.DELETE];
-    return mutatingMethods.includes(req.method.toUpperCase());
+    return ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method.toUpperCase());
   }
 }

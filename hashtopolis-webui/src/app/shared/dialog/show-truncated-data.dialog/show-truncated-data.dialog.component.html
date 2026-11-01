@@ -4,10 +4,11 @@
   cdkDragHandle
   class="moveable-cursor break-all whitespace-pre-wrap"
 >
-  <h2 mat-dialog-title>{{ data.title }}</h2>
+  <h2 mat-dialog-title>Full Hash for: {{ data.hashlistName }}</h2>
 
-  <p>{{ data.value }}</p>
+  <h3>Full Hash</h3>
+  <p>{{ data.unTruncatedText }}</p>
 </mat-dialog-content>
 <mat-dialog-actions align="end">
-  <button matButton="outlined" class="btn-submit" mat-dialog-close>Close</button>
+  <button-submit type="cancel-dialog" name="Close" (click)="closeDialog()"></button-submit>
 </mat-dialog-actions>

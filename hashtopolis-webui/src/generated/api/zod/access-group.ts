@@ -1,49 +1,5 @@
 import * as z from 'zod';
 
-import { zAgentListResponse } from './agent';
-import { zUserListResponse } from './user';
-
-export const zAccessGroupResourceObject = z.object({
-  id: z.int(),
-  type: z.literal('accessGroup'),
-  attributes: z.object({
-    groupName: z.string()
-  }),
-  links: z.object({
-    self: z.string().default('/api/v2/ui/accessgroups/1')
-  }),
-  relationships: z.object({
-    agentMembers: z.object({
-      links: z.object({
-        self: z.string().default('/api/v2/ui/accessgroups/relationships/agentMembers'),
-        related: z.string().default('/api/v2/ui/accessgroups/agentMembers')
-      }),
-      data: z
-        .array(
-          z.object({
-            type: z.literal('agent'),
-            id: z.int()
-          })
-        )
-        .optional()
-    }),
-    userMembers: z.object({
-      links: z.object({
-        self: z.string().default('/api/v2/ui/accessgroups/relationships/userMembers'),
-        related: z.string().default('/api/v2/ui/accessgroups/userMembers')
-      }),
-      data: z
-        .array(
-          z.object({
-            type: z.literal('user'),
-            id: z.int()
-          })
-        )
-        .optional()
-    })
-  })
-});
-
 export const zAccessGroupCreate = z.object({
   data: z.object({
     type: z.literal('accessGroup'),
@@ -62,45 +18,29 @@ export const zAccessGroupPatch = z.object({
   })
 });
 
-export const zAccessGroupPatchMultiple = z.object({
-  data: z.array(
-    z.object({
-      id: z.int(),
-      type: z.literal('accessGroup'),
-      attributes: z.object({
-        groupName: z.string().optional()
-      })
-    })
-  )
-});
-
-export const zAccessGroupDeleteMultiple = z.object({
-  data: z.array(
-    z.object({
-      id: z.int(),
-      type: z.literal('accessGroup')
-    })
-  )
-});
-
 export const zAccessGroupResponse = z.object({
   jsonapi: z.object({
     version: z.string().default('1.1'),
     ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
   }),
-  links: z.object({
-    self: z.string().default('/api/v2/ui/accessgroups/1')
-  }),
+  links: z
+    .object({
+      self: z.string().default('/api/v2/ui/accessgroups?page[size]=25'),
+      first: z.string().optional().default('/api/v2/ui/accessgroups?page[size]=25&page[after]=0'),
+      last: z.string().optional().default('/api/v2/ui/accessgroups?page[size]=25&page[before]=500'),
+      next: z.string().nullish().default('/api/v2/ui/accessgroups?page[size]=25&page[after]=25'),
+      previous: z.string().nullish().default('/api/v2/ui/accessgroups?page[size]=25&page[before]=25')
+    })
+    .optional(),
   data: z.object({
     id: z.int(),
     type: z.literal('accessGroup'),
     attributes: z.object({
       groupName: z.string()
-    }),
-    links: z.object({
-      self: z.string().default('/api/v2/ui/accessgroups/1')
-    }),
-    relationships: z.object({
+    })
+  }),
+  relationships: z
+    .object({
       agentMembers: z.object({
         links: z.object({
           self: z.string().default('/api/v2/ui/accessgroups/relationships/agentMembers'),
@@ -130,7 +70,7 @@ export const zAccessGroupResponse = z.object({
           .optional()
       })
     })
-  }),
+    .optional(),
   included: z
     .array(
       z.union([
@@ -145,7 +85,12 @@ export const zAccessGroupResponse = z.object({
             lastLoginDate: z.number().optional(),
             registeredSince: z.number().optional(),
             sessionLifetime: z.int().optional(),
-            globalPermissionGroupId: z.int().optional()
+            globalPermissionGroupId: z.int().optional(),
+            yubikey: z.string().optional(),
+            otp1: z.string().optional(),
+            otp2: z.string().optional(),
+            otp3: z.string().optional(),
+            otp4: z.string().optional()
           })
         }),
         z.object({
@@ -179,19 +124,40 @@ export const zAccessGroupPostPatchResponse = z.object({
     version: z.string().default('1.1'),
     ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
   }),
-  links: z.object({
-    self: z.string().default('/api/v2/ui/accessgroups/1')
-  }),
   data: z.object({
     id: z.int(),
     type: z.literal('accessGroup'),
     attributes: z.object({
       groupName: z.string()
-    }),
-    links: z.object({
-      self: z.string().default('/api/v2/ui/accessgroups/1')
-    }),
-    relationships: z.object({
+    })
+  })
+});
+
+export const zAccessGroupListResponse = z.object({
+  jsonapi: z.object({
+    version: z.string().default('1.1'),
+    ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
+  }),
+  links: z
+    .object({
+      self: z.string().default('/api/v2/ui/accessgroups?page[size]=25'),
+      first: z.string().optional().default('/api/v2/ui/accessgroups?page[size]=25&page[after]=0'),
+      last: z.string().optional().default('/api/v2/ui/accessgroups?page[size]=25&page[before]=500'),
+      next: z.string().nullish().default('/api/v2/ui/accessgroups?page[size]=25&page[after]=25'),
+      previous: z.string().nullish().default('/api/v2/ui/accessgroups?page[size]=25&page[before]=25')
+    })
+    .optional(),
+  data: z.array(
+    z.object({
+      id: z.int(),
+      type: z.literal('accessGroup'),
+      attributes: z.object({
+        groupName: z.string()
+      })
+    })
+  ),
+  relationships: z
+    .object({
       agentMembers: z.object({
         links: z.object({
           self: z.string().default('/api/v2/ui/accessgroups/relationships/agentMembers'),
@@ -221,7 +187,7 @@ export const zAccessGroupPostPatchResponse = z.object({
           .optional()
       })
     })
-  }),
+    .optional(),
   included: z
     .array(
       z.union([
@@ -236,7 +202,12 @@ export const zAccessGroupPostPatchResponse = z.object({
             lastLoginDate: z.number().optional(),
             registeredSince: z.number().optional(),
             sessionLifetime: z.int().optional(),
-            globalPermissionGroupId: z.int().optional()
+            globalPermissionGroupId: z.int().optional(),
+            yubikey: z.string().optional(),
+            otp1: z.string().optional(),
+            otp2: z.string().optional(),
+            otp3: z.string().optional(),
+            otp4: z.string().optional()
           })
         }),
         z.object({
@@ -263,160 +234,13 @@ export const zAccessGroupPostPatchResponse = z.object({
       ])
     )
     .optional()
-});
-
-export const zAccessGroupListResponse = z.object({
-  jsonapi: z.object({
-    version: z.string().default('1.1'),
-    ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
-  }),
-  links: z.object({
-    self: z.string().default('/api/v2/ui/accessgroups?page[size]=25'),
-    first: z.string().default('/api/v2/ui/accessgroups?page[size]=25'),
-    last: z
-      .string()
-      .nullable()
-      .default(
-        '/api/v2/ui/accessgroups?page[size]=25&page[before]=eyJwcmltYXJ5Ijp7InNvbWVVbnFpdWVGaWVsZCI6MTIzfSwic2Vjb25kYXJ5Ijp7InNvbWVPdGhlck9wdGlvbmFsRmllbGQiOiJGb28ifX0='
-      ),
-    next: z
-      .string()
-      .nullable()
-      .default(
-        '/api/v2/ui/accessgroups?page[size]=25&page[after]=eyJwcmltYXJ5Ijp7InNvbWVVbnFpdWVGaWVsZCI6MTIzfSwic2Vjb25kYXJ5Ijp7InNvbWVPdGhlck9wdGlvbmFsRmllbGQiOiJGb28ifX0='
-      ),
-    prev: z
-      .string()
-      .nullable()
-      .default(
-        '/api/v2/ui/accessgroups?page[size]=25&page[before]=eyJwcmltYXJ5Ijp7InNvbWVVbnFpdWVGaWVsZCI6MTIzfSwic2Vjb25kYXJ5Ijp7InNvbWVPdGhlck9wdGlvbmFsRmllbGQiOiJGb28ifX0='
-      )
-  }),
-  meta: z.object({
-    page: z.object({
-      total_elements: z.int()
-    })
-  }),
-  data: z.array(
-    z.object({
-      id: z.int(),
-      type: z.literal('accessGroup'),
-      attributes: z.object({
-        groupName: z.string()
-      }),
-      links: z.object({
-        self: z.string().default('/api/v2/ui/accessgroups/1')
-      }),
-      relationships: z.object({
-        agentMembers: z.object({
-          links: z.object({
-            self: z.string().default('/api/v2/ui/accessgroups/relationships/agentMembers'),
-            related: z.string().default('/api/v2/ui/accessgroups/agentMembers')
-          }),
-          data: z
-            .array(
-              z.object({
-                type: z.literal('agent'),
-                id: z.int()
-              })
-            )
-            .optional()
-        }),
-        userMembers: z.object({
-          links: z.object({
-            self: z.string().default('/api/v2/ui/accessgroups/relationships/userMembers'),
-            related: z.string().default('/api/v2/ui/accessgroups/userMembers')
-          }),
-          data: z
-            .array(
-              z.object({
-                type: z.literal('user'),
-                id: z.int()
-              })
-            )
-            .optional()
-        })
-      })
-    })
-  ),
-  included: z
-    .array(
-      z.union([
-        z.object({
-          id: z.int(),
-          type: z.literal('user'),
-          attributes: z.object({
-            name: z.string(),
-            email: z.string().optional(),
-            isValid: z.boolean().optional(),
-            isComputedPassword: z.boolean().optional(),
-            lastLoginDate: z.number().optional(),
-            registeredSince: z.number().optional(),
-            sessionLifetime: z.int().optional(),
-            globalPermissionGroupId: z.int().optional()
-          })
-        }),
-        z.object({
-          id: z.int(),
-          type: z.literal('agent'),
-          attributes: z.object({
-            agentName: z.string(),
-            uid: z.string(),
-            os: z.union([z.literal(0), z.literal(1), z.literal(2)]),
-            devices: z.string(),
-            cmdPars: z.string(),
-            ignoreErrors: z.union([z.literal(0), z.literal(1), z.literal(2)]),
-            isActive: z.boolean(),
-            isTrusted: z.boolean(),
-            token: z.string(),
-            lastAct: z.string(),
-            lastTime: z.number(),
-            lastIp: z.string(),
-            userId: z.int().nullable(),
-            cpuOnly: z.boolean(),
-            clientSignature: z.string()
-          })
-        })
-      ])
-    )
-    .optional()
-});
-
-export const zAccessGroupCountResponse = z.object({
-  jsonapi: z.object({
-    version: z.string().default('1.1'),
-    ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
-  }),
-  meta: z.object({
-    count: z.int(),
-    total_count: z.int().optional()
-  }),
-  data: z.array(z.record(z.string(), z.unknown())).max(0)
-});
-
-export const zAccessGroupRelationUserMembers = z.object({
-  data: z.array(
-    z.object({
-      type: z.literal('user'),
-      id: z.int()
-    })
-  )
-});
-
-export const zAccessGroupRelationUserMembersGetResponse = z.object({
-  data: z.array(
-    z.object({
-      type: z.literal('user'),
-      id: z.int()
-    })
-  )
 });
 
 export const zAccessGroupRelationAgentMembers = z.object({
   data: z.array(
     z.object({
-      type: z.literal('agent'),
-      id: z.int()
+      type: z.literal('agentMembers'),
+      id: z.int().default(1)
     })
   )
 });
@@ -424,29 +248,42 @@ export const zAccessGroupRelationAgentMembers = z.object({
 export const zAccessGroupRelationAgentMembersGetResponse = z.object({
   data: z.array(
     z.object({
-      type: z.literal('agent'),
-      id: z.int()
+      type: z.literal('agentMembers'),
+      id: z.int().default(1)
     })
   )
 });
 
-export const zDeleteAccessgroupsBody = zAccessGroupDeleteMultiple;
+export const zDeleteAccessgroupsData = z.object({
+  body: z.never().optional(),
+  path: z.never().optional(),
+  query: z.never().optional()
+});
 
-/**
- * successfully deleted
- */
-export const zDeleteAccessgroupsResponse = z.void();
-
-export const zGetAccessgroupsQuery = z.object({
-  'page[after]': z.string().optional(),
-  'page[before]': z.string().optional(),
-  'page[size]': z
-    .int()
-    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-    .optional(),
-  filter: z.record(z.string(), z.string()).optional(),
-  include: z.array(z.enum(['userMembers', 'agentMembers'])).optional()
+export const zGetAccessgroupsData = z.object({
+  body: z.never().optional(),
+  path: z.never().optional(),
+  query: z
+    .object({
+      'page[after]': z
+        .int()
+        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+        .optional(),
+      'page[before]': z
+        .int()
+        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+        .optional(),
+      'page[size]': z
+        .int()
+        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+        .optional(),
+      filter: z.record(z.string(), z.unknown()).optional(),
+      include: z.string().optional()
+    })
+    .optional()
 });
 
 /**
@@ -454,146 +291,136 @@ export const zGetAccessgroupsQuery = z.object({
  */
 export const zGetAccessgroupsResponse = zAccessGroupListResponse;
 
-export const zPatchAccessgroupsBody = zAccessGroupPatchMultiple;
+export const zPatchAccessgroupsData = z.object({
+  body: z.never().optional(),
+  path: z.never().optional(),
+  query: z.never().optional()
+});
 
-/**
- * successfully updated
- */
-export const zPatchAccessgroupsResponse = z.void();
-
-export const zPostAccessgroupsBody = zAccessGroupCreate;
+export const zPostAccessgroupsData = z.object({
+  body: zAccessGroupCreate,
+  path: z.never().optional(),
+  query: z.never().optional()
+});
 
 /**
  * successful operation
  */
 export const zPostAccessgroupsResponse = zAccessGroupPostPatchResponse;
 
-export const zGetAccessgroupsCountQuery = z.object({
-  filter: z.record(z.string(), z.string()).optional(),
-  include_total: z.boolean().optional()
+export const zGetAccessgroupsCountData = z.object({
+  body: z.never().optional(),
+  path: z.never().optional(),
+  query: z
+    .object({
+      'page[after]': z
+        .int()
+        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+        .optional(),
+      'page[before]': z
+        .int()
+        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+        .optional(),
+      'page[size]': z
+        .int()
+        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+        .optional(),
+      filter: z.record(z.string(), z.unknown()).optional(),
+      include: z.string().optional()
+    })
+    .optional()
 });
 
 /**
  * successful operation
  */
-export const zGetAccessgroupsCountResponse = zAccessGroupCountResponse;
+export const zGetAccessgroupsCountResponse = zAccessGroupListResponse;
 
-export const zGetAccessgroupsByIdUserMembersPath = z.object({
-  id: z
-    .int()
-    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+export const zGetAccessgroupsByIdByRelationData = z.object({
+  body: z.never().optional(),
+  path: z.object({
+    id: z
+      .int()
+      .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+      .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    relation: z.string()
+  }),
+  query: z.never().optional()
 });
 
 /**
  * successful operation
  */
-export const zGetAccessgroupsByIdUserMembersResponse = zUserListResponse;
+export const zGetAccessgroupsByIdByRelationResponse = zAccessGroupRelationAgentMembersGetResponse;
 
-export const zDeleteAccessgroupsByIdRelationshipsUserMembersBody = zAccessGroupRelationUserMembers;
-
-export const zDeleteAccessgroupsByIdRelationshipsUserMembersPath = z.object({
-  id: z.int()
+export const zDeleteAccessgroupsByIdRelationshipsByRelationData = z.object({
+  body: zAccessGroupRelationAgentMembers,
+  path: z.object({
+    id: z.int(),
+    relation: z.string()
+  }),
+  query: z.never().optional()
 });
 
 /**
  * successfully deleted
  */
-export const zDeleteAccessgroupsByIdRelationshipsUserMembersResponse = z.void();
+export const zDeleteAccessgroupsByIdRelationshipsByRelationResponse = z.void();
 
-export const zGetAccessgroupsByIdRelationshipsUserMembersPath = z.object({
-  id: z
-    .int()
-    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+export const zGetAccessgroupsByIdRelationshipsByRelationData = z.object({
+  body: z.never().optional(),
+  path: z.object({
+    id: z
+      .int()
+      .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+      .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    relation: z.string()
+  }),
+  query: z.never().optional()
 });
 
 /**
  * successful operation
  */
-export const zGetAccessgroupsByIdRelationshipsUserMembersResponse = zAccessGroupRelationUserMembersGetResponse;
+export const zGetAccessgroupsByIdRelationshipsByRelationResponse = zAccessGroupResponse;
 
-export const zPatchAccessgroupsByIdRelationshipsUserMembersBody = zAccessGroupRelationUserMembers;
-
-export const zPatchAccessgroupsByIdRelationshipsUserMembersPath = z.object({
-  id: z.int()
+export const zPatchAccessgroupsByIdRelationshipsByRelationData = z.object({
+  body: zAccessGroupRelationAgentMembers,
+  path: z.object({
+    id: z.int(),
+    relation: z.string()
+  }),
+  query: z.never().optional()
 });
 
 /**
  * Successfull operation
  */
-export const zPatchAccessgroupsByIdRelationshipsUserMembersResponse = z.void();
+export const zPatchAccessgroupsByIdRelationshipsByRelationResponse = z.void();
 
-export const zPostAccessgroupsByIdRelationshipsUserMembersBody = zAccessGroupRelationUserMembers;
-
-export const zPostAccessgroupsByIdRelationshipsUserMembersPath = z.object({
-  id: z.int()
+export const zPostAccessgroupsByIdRelationshipsByRelationData = z.object({
+  body: z.record(z.string(), z.unknown()),
+  path: z.object({
+    id: z.int(),
+    relation: z.string()
+  }),
+  query: z.never().optional()
 });
 
 /**
  * successfully created
  */
-export const zPostAccessgroupsByIdRelationshipsUserMembersResponse = z.void();
+export const zPostAccessgroupsByIdRelationshipsByRelationResponse = z.void();
 
-export const zGetAccessgroupsByIdAgentMembersPath = z.object({
-  id: z
-    .int()
-    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-});
-
-/**
- * successful operation
- */
-export const zGetAccessgroupsByIdAgentMembersResponse = zAgentListResponse;
-
-export const zDeleteAccessgroupsByIdRelationshipsAgentMembersBody = zAccessGroupRelationAgentMembers;
-
-export const zDeleteAccessgroupsByIdRelationshipsAgentMembersPath = z.object({
-  id: z.int()
-});
-
-/**
- * successfully deleted
- */
-export const zDeleteAccessgroupsByIdRelationshipsAgentMembersResponse = z.void();
-
-export const zGetAccessgroupsByIdRelationshipsAgentMembersPath = z.object({
-  id: z
-    .int()
-    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-});
-
-/**
- * successful operation
- */
-export const zGetAccessgroupsByIdRelationshipsAgentMembersResponse = zAccessGroupRelationAgentMembersGetResponse;
-
-export const zPatchAccessgroupsByIdRelationshipsAgentMembersBody = zAccessGroupRelationAgentMembers;
-
-export const zPatchAccessgroupsByIdRelationshipsAgentMembersPath = z.object({
-  id: z.int()
-});
-
-/**
- * Successfull operation
- */
-export const zPatchAccessgroupsByIdRelationshipsAgentMembersResponse = z.void();
-
-export const zPostAccessgroupsByIdRelationshipsAgentMembersBody = zAccessGroupRelationAgentMembers;
-
-export const zPostAccessgroupsByIdRelationshipsAgentMembersPath = z.object({
-  id: z.int()
-});
-
-/**
- * successfully created
- */
-export const zPostAccessgroupsByIdRelationshipsAgentMembersResponse = z.void();
-
-export const zDeleteAccessgroupsByIdPath = z.object({
-  id: z.int()
+export const zDeleteAccessgroupsByIdData = z.object({
+  body: z.record(z.string(), z.unknown()),
+  path: z.object({
+    id: z.int()
+  }),
+  query: z.never().optional()
 });
 
 /**
@@ -601,15 +428,19 @@ export const zDeleteAccessgroupsByIdPath = z.object({
  */
 export const zDeleteAccessgroupsByIdResponse = z.void();
 
-export const zGetAccessgroupsByIdPath = z.object({
-  id: z
-    .int()
-    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-});
-
-export const zGetAccessgroupsByIdQuery = z.object({
-  include: z.array(z.enum(['userMembers', 'agentMembers'])).optional()
+export const zGetAccessgroupsByIdData = z.object({
+  body: z.never().optional(),
+  path: z.object({
+    id: z
+      .int()
+      .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+      .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+  }),
+  query: z
+    .object({
+      include: z.string().optional()
+    })
+    .optional()
 });
 
 /**
@@ -617,10 +448,12 @@ export const zGetAccessgroupsByIdQuery = z.object({
  */
 export const zGetAccessgroupsByIdResponse = zAccessGroupResponse;
 
-export const zPatchAccessgroupsByIdBody = zAccessGroupPatch;
-
-export const zPatchAccessgroupsByIdPath = z.object({
-  id: z.int()
+export const zPatchAccessgroupsByIdData = z.object({
+  body: zAccessGroupPatch,
+  path: z.object({
+    id: z.int()
+  }),
+  query: z.never().optional()
 });
 
 /**

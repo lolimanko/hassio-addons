@@ -1,5 +1,3 @@
-import { HashListFormat } from '@constants/hashlist.config';
-import { HTTP_SKIP_ERROR_HEADER_CONFIG, HttpMethod } from '@constants/http.config';
 import { zHashlistResponse } from '@generated/api/zod';
 import { lastValueFrom } from 'rxjs';
 
@@ -22,8 +20,8 @@ import { GlobalService } from '@services/main.service';
 import { AlertService } from '@services/shared/alert.service';
 import { AutoTitleService } from '@services/shared/autotitle.service';
 
-import { HashSource, HashSourceOptions } from '@src/app/core/_constants/hashlist.config';
-import { StaticArrayKind, StaticArrayPipe } from '@src/app/core/_pipes/static-array.pipe';
+import { hashSource } from '@src/app/core/_constants/hashlist.config';
+import { StaticArrayPipe } from '@src/app/core/_pipes/static-array.pipe';
 import {
   ImportCrackedHashesForm,
   getImportCrackedHashesForm
@@ -56,10 +54,8 @@ export class ImportCrackedHashesComponent implements OnInit {
   editedHashlistIndex: number;
   hashtype: JHashtype;
   type: number; // Hashlist or Superhashlist
-  protected readonly HashListFormat = HashListFormat;
 
-  selectSource = HashSourceOptions;
-  protected readonly HashSource = HashSource;
+  selectSource = hashSource;
 
   selectedFiles: FileList | null = null;
   fileName: string;
@@ -100,22 +96,22 @@ export class ImportCrackedHashesComponent implements OnInit {
     this.getInitialization();
 
     const sourceTypeControl = this.form.controls.sourceType;
-    sourceTypeControl.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((sourceType: HashSource) => {
+    sourceTypeControl.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((sourceType: string) => {
       this.hashesAreRequired = false;
       this.resetHashesValidator();
       // Reload every time 'import' is selected so newly placed server files
       // appear without a re-login; the loading flag guards against overlap.
-      if (sourceType === HashSource.IMPORT && !this.isLoadingServerFiles) {
+      if (sourceType === 'import' && !this.isLoadingServerFiles) {
         void this.loadServerFiles();
       }
 
-      if (sourceType !== HashSource.UPLOAD) {
+      if (sourceType !== 'upload') {
         this.selectedFiles = null;
         this.fileName = '';
         this.uploadProgress = 0;
       }
 
-      if (sourceType === HashSource.PASTE) {
+      if (sourceType === 'paste') {
         this.hashesAreRequired = true;
 
         // set required validator now that control is visible
@@ -163,7 +159,7 @@ export class ImportCrackedHashesComponent implements OnInit {
 
       const sourceType = this.form.controls.sourceType.value;
 
-      if (sourceType === HashSource.UPLOAD) {
+      if (sourceType === 'upload') {
         if (!this.selectedFiles || this.selectedFiles.length === 0) {
           this.alert.showErrorMessage('Please select a file to upload.');
           return;
@@ -172,7 +168,7 @@ export class ImportCrackedHashesComponent implements OnInit {
         return;
       }
 
-      if (sourceType === HashSource.PASTE) {
+      if (sourceType === 'paste') {
         const hashes = this.form.controls.hashes.value;
         if (!hashes || hashes.trim() === '') {
           this.alert.showErrorMessage('Please paste hashes to import.');
@@ -191,7 +187,7 @@ export class ImportCrackedHashesComponent implements OnInit {
         return;
       }
 
-      if (sourceType === HashSource.IMPORT) {
+      if (sourceType === 'import') {
         const sourceData = this.form.controls.sourceData.value;
         if (!sourceData || sourceData.trim() === '') {
           this.alert.showErrorMessage('Please select a file from the server import directory.');
@@ -207,7 +203,7 @@ export class ImportCrackedHashesComponent implements OnInit {
         return;
       }
 
-      if (sourceType === HashSource.URL) {
+      if (sourceType === 'url') {
         const sourceData = this.form.controls.sourceData.value;
         if (!sourceData || sourceData.trim() === '') {
           this.alert.showErrorMessage('Please provide a URL to download cracked hashes from.');
@@ -241,15 +237,9 @@ export class ImportCrackedHashesComponent implements OnInit {
     this.isLoadingServerFiles = true;
     try {
       // Surface a single toast on failure; skip the global error dialog to avoid double messaging.
-      const httpOptions = { headers: new HttpHeaders(HTTP_SKIP_ERROR_HEADER_CONFIG) };
+      const httpOptions = { headers: new HttpHeaders({ 'X-Skip-Error-Dialog': 'true' }) };
       const response = await lastValueFrom(
-        this.gs.chelper<ResponseWrapper<ServerImportFile[]>>(
-          SERV.HELPER,
-          'importFile',
-          undefined,
-          HttpMethod.GET,
-          httpOptions
-        )
+        this.gs.chelper<ResponseWrapper<ServerImportFile[]>>(SERV.HELPER, 'importFile', undefined, 'GET', httpOptions)
       );
       this.serverFiles = response.meta || [];
       this.serverFileOptions = this.serverFiles.map((file) => ({ id: file.file, name: file.file }));
@@ -271,7 +261,7 @@ export class ImportCrackedHashesComponent implements OnInit {
     const alreadyExists = await this.fileExistsInServerImportDir(filename);
     if (alreadyExists) {
       this.submitImport({
-        sourceType: HashSource.IMPORT,
+        sourceType: 'import',
         hashlistId: this.editedHashlistIndex,
         separator: this.form.controls.fieldSeparator.value,
         sourceData: filename,
@@ -295,7 +285,7 @@ export class ImportCrackedHashesComponent implements OnInit {
         },
         complete: () => {
           this.submitImport({
-            sourceType: HashSource.IMPORT,
+            sourceType: 'import',
             hashlistId: this.editedHashlistIndex,
             separator: this.form.controls.fieldSeparator.value,
             sourceData: filename,
@@ -312,7 +302,7 @@ export class ImportCrackedHashesComponent implements OnInit {
 
     try {
       const response = await lastValueFrom(
-        this.gs.chelper<ResponseWrapper<ServerImportFile[]>>(SERV.HELPER, 'importFile', undefined, HttpMethod.GET)
+        this.gs.chelper<ResponseWrapper<ServerImportFile[]>>(SERV.HELPER, 'importFile', undefined, 'GET')
       );
       const files = response.meta || [];
       this.serverFiles = files;
@@ -332,16 +322,16 @@ export class ImportCrackedHashesComponent implements OnInit {
   }): void {
     this.isCreatingLoading = true;
     // Surface a single toast on failure; skip the global error dialog to avoid double messaging.
-    const httpOptions = { headers: new HttpHeaders(HTTP_SKIP_ERROR_HEADER_CONFIG) };
+    const httpOptions = { headers: new HttpHeaders({ 'X-Skip-Error-Dialog': 'true' }) };
     this.gs
-      .chelper(SERV.HELPER, 'importCrackedHashes', payload, HttpMethod.POST, httpOptions)
+      .chelper(SERV.HELPER, 'importCrackedHashes', payload, 'POST', httpOptions)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (response: ResponseWrapper) => {
           this.alert.showSuccessMessage(
             `Processed pre-cracked hashes: ${response.meta.totalLines} total lines, ${response.meta.newCracked} new cracked hashes, ${response.meta.alreadyCracked} were already cracked, ${response.meta.invalid} invalid lines, ${response.meta.notFound} not matching entries (0s)!`
           );
-          const path = this.type === HashListFormat.SUPERHASHLIST ? '/hashlists/superhashlist' : '/hashlists/hashlist';
+          const path = this.type === 3 ? '/hashlists/superhashlist' : '/hashlists/hashlist';
           this.router.navigate([path]);
         },
         error: (error) => {
@@ -369,16 +359,16 @@ export class ImportCrackedHashesComponent implements OnInit {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((response: ResponseWrapper) => {
         const hashlist: JHashlist = new JsonAPISerializer().deserialize(response, zHashlistResponse);
-        this.type = hashlist.format ?? HashListFormat.TEXT;
+        this.type = hashlist.format ?? 0;
         this.hashtype = hashlist.hashType!;
 
         this.form.setValue({
           name: hashlist.name,
-          hashlistFormat: this.format.transform(hashlist.format, StaticArrayKind.FORMATS),
+          hashlistFormat: this.format.transform(hashlist.format, 'formats'),
           fieldSeparator: ':',
           isSalted: hashlist.isSalted,
           hashCount: hashlist.hashCount,
-          sourceType: HashSource.PASTE,
+          sourceType: 'paste',
           sourceData: '',
           hashes: '',
           conflictResolution: false

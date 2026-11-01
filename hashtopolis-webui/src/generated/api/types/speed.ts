@@ -1,14 +1,16 @@
-import type { AgentResponse } from './agent';
-import type { ErrorResponse } from './common';
-import type { TaskResponse } from './task';
+import type { ErrorResponse, NotFoundResponse } from './common';
 
 export type SpeedResponse = {
   jsonapi: {
     version: string;
     ext?: Array<string>;
   };
-  links: {
+  links?: {
     self: string;
+    first?: string;
+    last?: string;
+    next?: string | null;
+    previous?: string | null;
   };
   data: {
     id: number;
@@ -19,30 +21,27 @@ export type SpeedResponse = {
       speed: number;
       time: number;
     };
-    links: {
-      self: string;
+  };
+  relationships?: {
+    agent: {
+      links: {
+        self: string;
+        related: string;
+      };
+      data?: {
+        type: 'agent';
+        id: number;
+      } | null;
     };
-    relationships: {
-      agent: {
-        links: {
-          self: string;
-          related: string;
-        };
-        data?: {
-          type: 'agent';
-          id: number;
-        } | null;
+    task: {
+      links: {
+        self: string;
+        related: string;
       };
-      task: {
-        links: {
-          self: string;
-          related: string;
-        };
-        data?: {
-          type: 'task';
-          id: number;
-        } | null;
-      };
+      data?: {
+        type: 'task';
+        id: number;
+      } | null;
     };
   };
   included?: Array<
@@ -104,17 +103,12 @@ export type SpeedListResponse = {
     version: string;
     ext?: Array<string>;
   };
-  links: {
+  links?: {
     self: string;
-    first: string;
-    last: string | null;
-    next: string | null;
-    prev: string | null;
-  };
-  meta: {
-    page: {
-      total_elements: number;
-    };
+    first?: string;
+    last?: string;
+    next?: string | null;
+    previous?: string | null;
   };
   data: Array<{
     id: number;
@@ -125,32 +119,29 @@ export type SpeedListResponse = {
       speed: number;
       time: number;
     };
-    links: {
-      self: string;
-    };
-    relationships: {
-      agent: {
-        links: {
-          self: string;
-          related: string;
-        };
-        data?: {
-          type: 'agent';
-          id: number;
-        } | null;
-      };
-      task: {
-        links: {
-          self: string;
-          related: string;
-        };
-        data?: {
-          type: 'task';
-          id: number;
-        } | null;
-      };
-    };
   }>;
+  relationships?: {
+    agent: {
+      links: {
+        self: string;
+        related: string;
+      };
+      data?: {
+        type: 'agent';
+        id: number;
+      } | null;
+    };
+    task: {
+      links: {
+        self: string;
+        related: string;
+      };
+      data?: {
+        type: 'task';
+        id: number;
+      } | null;
+    };
+  };
   included?: Array<
     | {
         id: number;
@@ -205,43 +196,6 @@ export type SpeedListResponse = {
   >;
 };
 
-export type SpeedCountResponse = {
-  jsonapi: {
-    version: string;
-    ext?: Array<string>;
-  };
-  meta: {
-    /**
-     * Number of objects accessible to the current user matching the given filters
-     */
-    count: number;
-    /**
-     * Number of objects accessible to the current user without any filter applied, only present when `include_total=true` was requested
-     */
-    total_count?: number;
-  };
-  /**
-   * Always empty: the count is reported under meta.
-   */
-  data: Array<{
-    [key: string]: unknown;
-  }>;
-};
-
-export type SpeedRelationAgent = {
-  data: {
-    type: 'agent';
-    id: number;
-  };
-};
-
-export type SpeedRelationAgentGetResponse = {
-  data: {
-    type: 'agent';
-    id: number;
-  } | null;
-};
-
 export type SpeedRelationTask = {
   data: {
     type: 'task';
@@ -253,7 +207,7 @@ export type SpeedRelationTaskGetResponse = {
   data: {
     type: 'task';
     id: number;
-  } | null;
+  };
 };
 
 export type GetSpeedsData = {
@@ -261,39 +215,27 @@ export type GetSpeedsData = {
   path?: never;
   query?: {
     /**
-     * Pointer to paginate to retrieve the data after the object provided. Specify the `base64` encoded JSON string in a **uniquely identifiable** manner (e.g. object IDs), i.e. by using one (primary) or two (primary and secondary) fields that allow for **stable** sorting.
-     *
-     *
-     * Format: `{"primary":{"someField": 123},"secondary":{"someOtherOptionalField": "Foo"}}`
-     *
-     *
-     * Example: `{"primary":{"speedId": 123}}` -> `eyJwcmltYXJ5Ijp7InNwZWVkSWQiOiAxMjN9fQ==`
+     * Pointer to paginate to retrieve the data after the value provided
      */
-    'page[after]'?: string;
+    'page[after]'?: number;
     /**
-     * Pointer to paginate to retrieve the data before the object provided. Specify the `base64` encoded JSON string in a **uniquely identifiable** manner (e.g. object IDs), i.e. by using one (primary) or two (primary and secondary) fields that allow for **stable** sorting.
-     *
-     *
-     * Format: `{"primary":{"someField": 123},"secondary":{"someOtherOptionalField": "Foo"}}`
-     *
-     *
-     * Example: `{"primary":{"speedId": 123}}` -> `eyJwcmltYXJ5Ijp7InNwZWVkSWQiOiAxMjN9fQ==`
+     * Pointer to paginate to retrieve the data before the value provided
      */
-    'page[before]'?: string;
+    'page[before]'?: number;
     /**
      * Amout of data to retrieve inside a single page
      */
     'page[size]'?: number;
     /**
-     * Filters results using a query. Every key is an attribute name optionally suffixed with a comparison operator, e.g. `filter[speedId__gt]=200`.
+     * Filters results using a query
      */
     filter?: {
-      [key: string]: string;
+      [key: string]: unknown;
     };
     /**
-     * Relationships to include in the response, comma seperated. Possible options: agent, task
+     * Items to include, comma seperated. Possible options: Array
      */
-    include?: Array<'agent' | 'task'>;
+    include?: string;
   };
   url: '/api/v2/ui/speeds';
 };
@@ -307,10 +249,6 @@ export type GetSpeedsErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
 };
 
 export type GetSpeedsError = GetSpeedsErrors[keyof GetSpeedsErrors];
@@ -329,15 +267,27 @@ export type GetSpeedsCountData = {
   path?: never;
   query?: {
     /**
-     * Filters results using a query. Every key is an attribute name optionally suffixed with a comparison operator, e.g. `filter[speedId__gt]=200`.
+     * Pointer to paginate to retrieve the data after the value provided
+     */
+    'page[after]'?: number;
+    /**
+     * Pointer to paginate to retrieve the data before the value provided
+     */
+    'page[before]'?: number;
+    /**
+     * Amout of data to retrieve inside a single page
+     */
+    'page[size]'?: number;
+    /**
+     * Filters results using a query
      */
     filter?: {
-      [key: string]: string;
+      [key: string]: unknown;
     };
     /**
-     * Also report the number of accessible objects without any filter applied, as `meta.total_count`
+     * Items to include, comma seperated. Possible options: Array
      */
-    include_total?: boolean;
+    include?: string;
   };
   url: '/api/v2/ui/speeds/count';
 };
@@ -351,10 +301,6 @@ export type GetSpeedsCountErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
 };
 
 export type GetSpeedsCountError = GetSpeedsCountErrors[keyof GetSpeedsCountErrors];
@@ -363,21 +309,22 @@ export type GetSpeedsCountResponses = {
   /**
    * successful operation
    */
-  200: SpeedCountResponse;
+  200: SpeedListResponse;
 };
 
 export type GetSpeedsCountResponse = GetSpeedsCountResponses[keyof GetSpeedsCountResponses];
 
-export type GetSpeedsByIdAgentData = {
+export type GetSpeedsByIdByRelationData = {
   body?: never;
   path: {
     id: number;
+    relation: string;
   };
   query?: never;
-  url: '/api/v2/ui/speeds/{id}/agent';
+  url: '/api/v2/ui/speeds/{id}/{relation}';
 };
 
-export type GetSpeedsByIdAgentErrors = {
+export type GetSpeedsByIdByRelationErrors = {
   /**
    * Invalid request
    */
@@ -387,202 +334,33 @@ export type GetSpeedsByIdAgentErrors = {
    */
   401: ErrorResponse;
   /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
    * Not Found
    */
-  404: ErrorResponse;
+  404: NotFoundResponse;
 };
 
-export type GetSpeedsByIdAgentError = GetSpeedsByIdAgentErrors[keyof GetSpeedsByIdAgentErrors];
+export type GetSpeedsByIdByRelationError = GetSpeedsByIdByRelationErrors[keyof GetSpeedsByIdByRelationErrors];
 
-export type GetSpeedsByIdAgentResponses = {
-  /**
-   * successful operation
-   */
-  200: AgentResponse;
-};
-
-export type GetSpeedsByIdAgentResponse = GetSpeedsByIdAgentResponses[keyof GetSpeedsByIdAgentResponses];
-
-export type GetSpeedsByIdRelationshipsAgentData = {
-  body?: never;
-  path: {
-    id: number;
-  };
-  query?: never;
-  url: '/api/v2/ui/speeds/{id}/relationships/agent';
-};
-
-export type GetSpeedsByIdRelationshipsAgentErrors = {
-  /**
-   * Invalid request
-   */
-  400: ErrorResponse;
-  /**
-   * Authentication failed
-   */
-  401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
-   * Not Found
-   */
-  404: ErrorResponse;
-};
-
-export type GetSpeedsByIdRelationshipsAgentError =
-  GetSpeedsByIdRelationshipsAgentErrors[keyof GetSpeedsByIdRelationshipsAgentErrors];
-
-export type GetSpeedsByIdRelationshipsAgentResponses = {
-  /**
-   * successful operation
-   */
-  200: SpeedRelationAgentGetResponse;
-};
-
-export type GetSpeedsByIdRelationshipsAgentResponse =
-  GetSpeedsByIdRelationshipsAgentResponses[keyof GetSpeedsByIdRelationshipsAgentResponses];
-
-export type PatchSpeedsByIdRelationshipsAgentData = {
-  body: SpeedRelationAgent;
-  path: {
-    id: number;
-  };
-  query?: never;
-  url: '/api/v2/ui/speeds/{id}/relationships/agent';
-};
-
-export type PatchSpeedsByIdRelationshipsAgentErrors = {
-  /**
-   * Invalid request
-   */
-  400: ErrorResponse;
-  /**
-   * Authentication failed
-   */
-  401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
-   * Not Found
-   */
-  404: ErrorResponse;
-  /**
-   * Resource already exists
-   */
-  409: ErrorResponse;
-};
-
-export type PatchSpeedsByIdRelationshipsAgentError =
-  PatchSpeedsByIdRelationshipsAgentErrors[keyof PatchSpeedsByIdRelationshipsAgentErrors];
-
-export type PatchSpeedsByIdRelationshipsAgentResponses = {
-  /**
-   * Successfull operation
-   */
-  204: void;
-};
-
-export type PatchSpeedsByIdRelationshipsAgentResponse =
-  PatchSpeedsByIdRelationshipsAgentResponses[keyof PatchSpeedsByIdRelationshipsAgentResponses];
-
-export type GetSpeedsByIdTaskData = {
-  body?: never;
-  path: {
-    id: number;
-  };
-  query?: never;
-  url: '/api/v2/ui/speeds/{id}/task';
-};
-
-export type GetSpeedsByIdTaskErrors = {
-  /**
-   * Invalid request
-   */
-  400: ErrorResponse;
-  /**
-   * Authentication failed
-   */
-  401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
-   * Not Found
-   */
-  404: ErrorResponse;
-};
-
-export type GetSpeedsByIdTaskError = GetSpeedsByIdTaskErrors[keyof GetSpeedsByIdTaskErrors];
-
-export type GetSpeedsByIdTaskResponses = {
-  /**
-   * successful operation
-   */
-  200: TaskResponse;
-};
-
-export type GetSpeedsByIdTaskResponse = GetSpeedsByIdTaskResponses[keyof GetSpeedsByIdTaskResponses];
-
-export type GetSpeedsByIdRelationshipsTaskData = {
-  body?: never;
-  path: {
-    id: number;
-  };
-  query?: never;
-  url: '/api/v2/ui/speeds/{id}/relationships/task';
-};
-
-export type GetSpeedsByIdRelationshipsTaskErrors = {
-  /**
-   * Invalid request
-   */
-  400: ErrorResponse;
-  /**
-   * Authentication failed
-   */
-  401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
-   * Not Found
-   */
-  404: ErrorResponse;
-};
-
-export type GetSpeedsByIdRelationshipsTaskError =
-  GetSpeedsByIdRelationshipsTaskErrors[keyof GetSpeedsByIdRelationshipsTaskErrors];
-
-export type GetSpeedsByIdRelationshipsTaskResponses = {
+export type GetSpeedsByIdByRelationResponses = {
   /**
    * successful operation
    */
   200: SpeedRelationTaskGetResponse;
 };
 
-export type GetSpeedsByIdRelationshipsTaskResponse =
-  GetSpeedsByIdRelationshipsTaskResponses[keyof GetSpeedsByIdRelationshipsTaskResponses];
+export type GetSpeedsByIdByRelationResponse = GetSpeedsByIdByRelationResponses[keyof GetSpeedsByIdByRelationResponses];
 
-export type PatchSpeedsByIdRelationshipsTaskData = {
-  body: SpeedRelationTask;
+export type GetSpeedsByIdRelationshipsByRelationData = {
+  body?: never;
   path: {
     id: number;
+    relation: string;
   };
   query?: never;
-  url: '/api/v2/ui/speeds/{id}/relationships/task';
+  url: '/api/v2/ui/speeds/{id}/relationships/{relation}';
 };
 
-export type PatchSpeedsByIdRelationshipsTaskErrors = {
+export type GetSpeedsByIdRelationshipsByRelationErrors = {
   /**
    * Invalid request
    */
@@ -592,31 +370,61 @@ export type PatchSpeedsByIdRelationshipsTaskErrors = {
    */
   401: ErrorResponse;
   /**
-   * Permission denied
+   * Not Found
    */
-  403: ErrorResponse;
+  404: NotFoundResponse;
+};
+
+export type GetSpeedsByIdRelationshipsByRelationError =
+  GetSpeedsByIdRelationshipsByRelationErrors[keyof GetSpeedsByIdRelationshipsByRelationErrors];
+
+export type GetSpeedsByIdRelationshipsByRelationResponses = {
+  /**
+   * successful operation
+   */
+  200: SpeedResponse;
+};
+
+export type GetSpeedsByIdRelationshipsByRelationResponse =
+  GetSpeedsByIdRelationshipsByRelationResponses[keyof GetSpeedsByIdRelationshipsByRelationResponses];
+
+export type PatchSpeedsByIdRelationshipsByRelationData = {
+  body: SpeedRelationTask;
+  path: {
+    id: number;
+    relation: string;
+  };
+  query?: never;
+  url: '/api/v2/ui/speeds/{id}/relationships/{relation}';
+};
+
+export type PatchSpeedsByIdRelationshipsByRelationErrors = {
+  /**
+   * Invalid request
+   */
+  400: ErrorResponse;
+  /**
+   * Authentication failed
+   */
+  401: ErrorResponse;
   /**
    * Not Found
    */
-  404: ErrorResponse;
-  /**
-   * Resource already exists
-   */
-  409: ErrorResponse;
+  404: NotFoundResponse;
 };
 
-export type PatchSpeedsByIdRelationshipsTaskError =
-  PatchSpeedsByIdRelationshipsTaskErrors[keyof PatchSpeedsByIdRelationshipsTaskErrors];
+export type PatchSpeedsByIdRelationshipsByRelationError =
+  PatchSpeedsByIdRelationshipsByRelationErrors[keyof PatchSpeedsByIdRelationshipsByRelationErrors];
 
-export type PatchSpeedsByIdRelationshipsTaskResponses = {
+export type PatchSpeedsByIdRelationshipsByRelationResponses = {
   /**
    * Successfull operation
    */
   204: void;
 };
 
-export type PatchSpeedsByIdRelationshipsTaskResponse =
-  PatchSpeedsByIdRelationshipsTaskResponses[keyof PatchSpeedsByIdRelationshipsTaskResponses];
+export type PatchSpeedsByIdRelationshipsByRelationResponse =
+  PatchSpeedsByIdRelationshipsByRelationResponses[keyof PatchSpeedsByIdRelationshipsByRelationResponses];
 
 export type GetSpeedsByIdData = {
   body?: never;
@@ -625,9 +433,9 @@ export type GetSpeedsByIdData = {
   };
   query?: {
     /**
-     * Relationships to include in the response, comma seperated. Possible options: agent, task
+     * Items to include. Comma seperated
      */
-    include?: Array<'agent' | 'task'>;
+    include?: string;
   };
   url: '/api/v2/ui/speeds/{id}';
 };
@@ -642,13 +450,9 @@ export type GetSpeedsByIdErrors = {
    */
   401: ErrorResponse;
   /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
    * Not Found
    */
-  404: ErrorResponse;
+  404: NotFoundResponse;
 };
 
 export type GetSpeedsByIdError = GetSpeedsByIdErrors[keyof GetSpeedsByIdErrors];

@@ -3,7 +3,6 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { BaseModel } from '@models/base.model';
 import { UIConfig } from '@models/config-ui.model';
-import { BuiltInTheme } from '@models/config-ui.model';
 
 import { AuthService } from '@services/access/auth.service';
 import { PermissionService } from '@services/permission/permission.service';
@@ -66,7 +65,7 @@ export class HeaderComponent implements OnInit {
   protected uiSettings: UISettingsUtilityClass;
   private username = '';
   isDarkMode = false;
-  currentTheme: string = BuiltInTheme.LIGHT;
+  currentTheme = 'light';
   themeOptions: RuntimeThemeOption[] = [];
 
   // Before showing header check Authentification
@@ -139,11 +138,11 @@ export class HeaderComponent implements OnInit {
       return option.icon;
     }
 
-    if (this.currentTheme === BuiltInTheme.LIGHT) {
+    if (this.currentTheme === 'light') {
       return 'light_mode';
     }
 
-    if (this.currentTheme === BuiltInTheme.DARK) {
+    if (this.currentTheme === 'dark') {
       return 'dark_mode';
     }
 
@@ -463,7 +462,7 @@ export class HeaderComponent implements OnInit {
         ]
       });
     }
-    if (this.configRoleWrapper.hasHashTypesRole('update')) {
+    if (this.configRoleWrapper.hasHashTypesRole('read')) {
       actions.push({
         label: HeaderMenuLabel.HASHTYPES,
         routerLink: ['config', 'hashtypes']
@@ -479,12 +478,6 @@ export class HeaderComponent implements OnInit {
       actions.push({
         label: HeaderMenuLabel.LOG,
         routerLink: ['config', 'log']
-      });
-    }
-    if (this.configRoleWrapper.hasBackgroundJobRole('read')) {
-      actions.push({
-        label: HeaderMenuLabel.BACKGROUND_JOBS,
-        routerLink: ['config', 'background-jobs']
       });
     }
     return {

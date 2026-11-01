@@ -1,4 +1,3 @@
-import { HTTP_SKIP_ERROR_HEADER_CONFIG } from '@constants/http.config';
 import { zHashTypeListResponse } from '@generated/api/zod';
 import { EMPTY, catchError, finalize } from 'rxjs';
 
@@ -29,7 +28,7 @@ export class HashtypesDataSource extends BaseDataSource<JHashtype> {
     let params = new RequestParamBuilder().addInitial(this);
     params = this.applyFilterWithPaginationReset(params, activeFilter, query);
 
-    const httpOptions = { headers: new HttpHeaders(HTTP_SKIP_ERROR_HEADER_CONFIG) };
+    const httpOptions = { headers: new HttpHeaders({ 'X-Skip-Error-Dialog': 'true' }) };
     const hashtypes$ = this.service.getAll(SERV.HASHTYPES, params.create(), httpOptions);
     this.subscriptions.push(
       hashtypes$

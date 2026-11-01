@@ -7,7 +7,7 @@ import { ActivatedRoute, Params, Router } from '@angular/router';
 
 import { DynamicModel } from '@models/base.model';
 import { JCrackerBinaryType, zCrackerBinaryTypeList } from '@models/cracker-binary.model';
-import { FileType, JFile, TaskSelectFile } from '@models/file.model';
+import { JFile, TaskSelectFile } from '@models/file.model';
 import { CrackerBinaryTypeId } from '@models/id.types';
 import { JPretask } from '@models/pretask.model';
 import { ResponseWrapper } from '@models/response.model';
@@ -22,7 +22,7 @@ import { AutoTitleService } from '@services/shared/autotitle.service';
 import { UIConfigService } from '@services/shared/storage.service';
 
 import { CRACKER_TYPE_FIELD_MAPPING } from '@src/app/core/_constants/select.config';
-import { BenchmarkTypeOptions } from '@src/app/core/_constants/tasks.config';
+import { benchmarkType } from '@src/app/core/_constants/tasks.config';
 import { SelectOption, transformSelectOptions } from '@src/app/shared/utils/forms';
 import { NewPretaskForm, getNewPretaskForm } from '@src/app/tasks/new-preconfigured-tasks/new-preconfigured-tasks.form';
 
@@ -34,10 +34,9 @@ import { NewPretaskForm, getNewPretaskForm } from '@src/app/tasks/new-preconfigu
   standalone: false
 })
 export class NewPreconfiguredTasksComponent implements OnInit {
-  protected readonly FileType = FileType;
   createForm: FormGroup<NewPretaskForm>;
 
-  selectBenchmarktype = BenchmarkTypeOptions;
+  selectBenchmarktype = benchmarkType;
   selectCrackertype: SelectOption<CrackerBinaryTypeId>[];
   isCreatingLoading = false;
 

@@ -4,7 +4,6 @@
 
 import { FormControl, FormGroup, Validators } from '@angular/forms';
 
-import { FileSource } from '@models/file.model';
 import { AccessGroupId } from '@models/id.types';
 
 /**
@@ -15,7 +14,7 @@ export interface NewFilesForm {
   isSecret: FormControl<boolean>;
   fileType: FormControl<number | null>;
   accessGroupId: FormControl<AccessGroupId>;
-  sourceType: FormControl<FileSource>;
+  sourceType: FormControl<string>;
   sourceData: FormControl<string>;
   url: FormControl<string>;
 }
@@ -37,7 +36,7 @@ export const getNewFilesForm = () => {
     isSecret: new FormControl<boolean>(true, { nonNullable: true }),
     fileType: new FormControl<number | null>(null),
     accessGroupId: new FormControl<number>(1, { nonNullable: true }),
-    sourceType: new FormControl<FileSource>(FileSource.IMPORT, { nonNullable: true }),
+    sourceType: new FormControl<string>('import', { nonNullable: true }),
     sourceData: new FormControl<string>('', { nonNullable: true }),
     url: new FormControl<string>('', { nonNullable: true, validators: [Validators.required] })
   });

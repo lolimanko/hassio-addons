@@ -1,13 +1,13 @@
-export const ExportMenuLabel = {
-  EXCEL: 'Download Excel',
-  CSV: 'Download CSV',
-  PRINT: 'Print',
-  COPY: 'Copy'
-} as const;
+export class ExportMenuLabel {
+  static readonly EXCEL = 'Download Excel';
+  static readonly CSV = 'Download CSV';
+  static readonly PRINT = 'Print';
+  static readonly COPY = 'Copy';
+}
 
-export const ExportMenuAction = {
-  EXCEL: 'excel',
-  CSV: 'csv',
-  PRINT: 'print',
-  COPY: 'copy'
-} as const;
+export class ExportMenuAction {
+  static readonly EXCEL = 'excel';
+  static readonly CSV = 'csv';
+  static readonly PRINT = 'print';
+  static readonly COPY = 'copy';
+}

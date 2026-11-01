@@ -1,7 +1,5 @@
 import { Pipe, PipeTransform } from '@angular/core';
 
-import { HealthCheckStatus } from '@models/health-check.model';
-
 /**
  * Reusable pipe to get the health check status
  * @param value - The input number linked with the health check status
@@ -20,15 +18,15 @@ export class HealthCheckStatusPipe implements PipeTransform {
   transform(value: number): string {
     let status = '';
     switch (value) {
-      case HealthCheckStatus.RUNNING:
+      case 0:
         status = 'RUNNING';
         break;
 
-      case HealthCheckStatus.COMPLETED:
+      case 1:
         status = 'COMPLETED';
         break;
 
-      case HealthCheckStatus.ABORTED:
+      case -1:
         status = 'ABORTED';
         break;
     }

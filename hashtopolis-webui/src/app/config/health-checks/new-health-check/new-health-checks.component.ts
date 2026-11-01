@@ -16,12 +16,7 @@ import { GlobalService } from '@services/main.service';
 import { AlertService } from '@services/shared/alert.service';
 import { AutoTitleService } from '@services/shared/autotitle.service';
 
-import {
-  HealthCheckHashType,
-  HealthCheckHashTypeOptions,
-  HealthCheckType,
-  HealthCheckTypeOptions
-} from '@src/app/core/_constants/healthchecks.config';
+import { attack, hashtype } from '@src/app/core/_constants/healthchecks.config';
 import { CRACKER_TYPE_FIELD_MAPPING, CRACKER_VERSION_FIELD_MAPPING } from '@src/app/core/_constants/select.config';
 import { SelectOption, transformSelectOptions } from '@src/app/shared/utils/forms';
 
@@ -45,8 +40,8 @@ export class NewHealthChecksComponent implements OnInit {
   isCreatingLoading = false;
 
   // Lists of Selected inputs
-  selectAttack = HealthCheckTypeOptions;
-  selectHashtypes = HealthCheckHashTypeOptions;
+  selectAttack = attack;
+  selectHashtypes = hashtype;
   selectCrackertype: SelectOption<CrackerBinaryTypeId>[];
   selectCrackerversions: SelectOption<CrackerBinaryId>[] = [];
 
@@ -73,8 +68,8 @@ export class NewHealthChecksComponent implements OnInit {
    */
   buildForm(): void {
     this.form = new FormGroup<NewHealthCheckForm>({
-      checkType: new FormControl<number | null>(HealthCheckType.BRUTE_FORCE),
-      hashtypeId: new FormControl<number | null>(HealthCheckHashType.MD5, [Validators.required]),
+      checkType: new FormControl<number | null>(0),
+      hashtypeId: new FormControl<number | null>(0, [Validators.required]),
       crackerBinaryId: new FormControl<CrackerBinaryId | string | null>('', [Validators.required]),
       crackerBinaryType: new FormControl<string | null>('')
     });

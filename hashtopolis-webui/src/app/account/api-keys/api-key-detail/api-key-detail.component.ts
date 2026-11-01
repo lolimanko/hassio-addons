@@ -1,4 +1,3 @@
-import { HttpStatus } from '@constants/http.config';
 import { zApiTokenResponse } from '@generated/api/zod';
 import { lastValueFrom } from 'rxjs';
 
@@ -69,7 +68,7 @@ export class ApiKeyDetailComponent implements OnInit {
       this.token = token;
       this.status = computeApiTokenStatus(token);
     } catch (error) {
-      if (error instanceof HttpErrorResponse && error.status === HttpStatus.NOT_FOUND) {
+      if (error instanceof HttpErrorResponse && error.status === 404) {
         this.notFound = true;
         this.alert.showErrorMessage('Could not load API key.');
       } else {

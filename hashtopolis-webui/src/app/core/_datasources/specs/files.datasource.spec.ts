@@ -54,6 +54,7 @@ const MOCK_PRETASK: JPretask = {
 describe('FilesDataSource', () => {
   let dataSource: FilesDataSource;
   let gsSpy: jasmine.SpyObj<GlobalService>;
+  let _deserializeSpy: jasmine.Spy;
 
   beforeEach(() => {
     gsSpy = jasmine.createSpyObj('GlobalService', ['get', 'getAll']);
@@ -73,12 +74,14 @@ describe('FilesDataSource', () => {
     gsSpy.getAll.and.returnValue(of(mockResponse()));
     gsSpy.get.and.returnValue(of(mockResponse()));
 
-    spyOn(JsonAPISerializer.prototype, 'deserialize').and.callFake((_body: unknown, schema?: unknown) => {
-      if (schema === zTaskResponse) return MOCK_TASK;
-      if (schema === zPreTaskResponse) return MOCK_PRETASK;
-      if (schema === zFileListResponse) return [MOCK_FILE];
-      return [];
-    });
+    _deserializeSpy = spyOn(JsonAPISerializer.prototype, 'deserialize').and.callFake(
+      (_body: unknown, schema?: unknown) => {
+        if (schema === zTaskResponse) return MOCK_TASK;
+        if (schema === zPreTaskResponse) return MOCK_PRETASK;
+        if (schema === zFileListResponse) return [MOCK_FILE];
+        return [];
+      }
+    );
 
     TestBed.configureTestingModule({
       providers: [

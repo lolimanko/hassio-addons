@@ -1,4 +1,3 @@
-import { HttpStatus } from '@constants/http.config';
 import { BehaviorSubject, Observable, Subject, Subscription } from 'rxjs';
 
 import { CollectionViewer, DataSource, SelectionModel } from '@angular/cdk/collections';
@@ -8,7 +7,7 @@ import { MatPaginator } from '@angular/material/paginator';
 import { MatSort } from '@angular/material/sort';
 
 import { BaseModel, DynamicModel } from '@models/base.model';
-import { DEFAULT_PAGE_SIZE, TableSortDirection, UIConfig } from '@models/config-ui.model';
+import { UIConfig } from '@models/config-ui.model';
 import { Filter } from '@models/request-params.model';
 
 import { JsonAPISerializer } from '@services/api/serializer-service';
@@ -38,7 +37,7 @@ export abstract class BaseDataSource<
   T extends BaseModel,
   P extends MatPaginator = MatPaginator
 > implements DataSource<T> {
-  public pageSize = DEFAULT_PAGE_SIZE;
+  public pageSize = 25;
   public currentPage = 0;
   public totalItems = 0;
   public sortingColumn: SortingColumn;
@@ -91,6 +90,8 @@ export abstract class BaseDataSource<
    */
   protected originalData: T[] = [];
 
+  private readonly chunkTime: number = 600;
+
   public autoRefreshEnabled = false;
   lastUpdated: Date;
 
@@ -112,9 +113,14 @@ export abstract class BaseDataSource<
     this.service = injector.get(GlobalService);
     this.uiService = injector.get(UIConfigService);
     this.permissionService = injector.get(PermissionService);
-    this.serializer = injector.get(JsonAPISerializer);
+    this.serializer = new JsonAPISerializer();
     this.autoRefreshService = injector.get(AutoRefreshService);
     this.cacheService = injector.get(HttpCacheService);
+
+    const chunktime = this.uiService.getUISettings()?.chunktime;
+    if (chunktime !== undefined) {
+      this.chunkTime = chunktime;
+    }
 
     // Create util manually instead of injector.get
     const localStorageService = injector.get(LocalStorageService<UIConfig>);
@@ -166,9 +172,9 @@ export abstract class BaseDataSource<
     // Handle filter validation errors gracefully
     if (error?.error?.title) {
       this.filterError$.next(error.error.title);
-    } else if (error?.status === HttpStatus.FORBIDDEN) {
+    } else if (error?.status === 403) {
       this.filterError$.next('Access forbidden. Please check your permissions.');
-    } else if (error?.status === HttpStatus.BAD_REQUEST) {
+    } else if (error?.status === 400) {
       const message = error?.error?.title || 'Invalid filter parameter';
       this.filterError$.next(message);
     } else if (error?.status) {
@@ -241,7 +247,7 @@ export abstract class BaseDataSource<
    */
   protected applySorting(data: T[]): T[] {
     if (!this.sortingColumn) return data;
-    const isAscending = this.sortingColumn.direction === TableSortDirection.ASC;
+    const isAscending = this.sortingColumn.direction === 'asc';
     const sortKey = this.sortingColumn.dataKey;
     return [...data].sort((a, b) => {
       const aValue = (a as DynamicModel)[sortKey];

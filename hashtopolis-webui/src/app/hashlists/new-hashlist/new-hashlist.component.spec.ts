@@ -1,5 +1,3 @@
-import { HttpHeaderName } from '@constants/http.config';
-import { zConfigResponse, zGetAccessGroupsHelperApiResponse, zHashTypeListResponse } from '@generated/api/zod';
 import { concat, of, throwError } from 'rxjs';
 
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
@@ -25,9 +23,9 @@ import { ButtonsModule } from '@src/app/shared/buttons/buttons.module';
 import { ComponentsModule } from '@src/app/shared/components.module';
 import { InputModule } from '@src/app/shared/input/input.module';
 import { PageSubTitleComponent } from '@src/app/shared/page-headers/page-subtitle/page-subtitle.component';
-import { mockResponse, mockValidResponse } from '@src/app/testing/mock-response';
+import { mockResponse } from '@src/app/testing/mock-response';
 
-const mockAccessGroups: ResponseWrapper = mockValidResponse(zGetAccessGroupsHelperApiResponse, {
+const mockAccessGroups: ResponseWrapper = mockResponse({
   data: [
     {
       id: 1,
@@ -46,7 +44,7 @@ const mockAccessGroups: ResponseWrapper = mockValidResponse(zGetAccessGroupsHelp
   ]
 });
 
-const mockHashtypes: ResponseWrapper = mockValidResponse(zHashTypeListResponse, {
+const mockHashtypes: ResponseWrapper = mockResponse({
   data: [
     {
       id: 2500,
@@ -78,7 +76,7 @@ const mockHashtypes: ResponseWrapper = mockValidResponse(zHashTypeListResponse, 
   ]
 });
 
-const mockConfigs: ResponseWrapper = mockValidResponse(zConfigResponse, {
+const mockConfigs: ResponseWrapper = mockResponse({
   data: {
     id: 66,
     type: 'config',
@@ -336,7 +334,7 @@ describe('NewHashlistComponent', () => {
 
       // The component handles the error itself, so it tells the interceptor to skip the modal.
       const httpOptions = gsSpy.create.calls.mostRecent().args[2];
-      expect(httpOptions?.headers?.get(HttpHeaderName.SKIP_ERROR_DIALOG)).toBe('true');
+      expect(httpOptions?.headers?.get('X-Skip-Error-Dialog')).toBe('true');
 
       expect(alertSpy.showErrorMessage).toHaveBeenCalledWith('Failed to create Hashlist: Hashlist has too many lines!');
       expect(routerSpy.navigate).not.toHaveBeenCalled();
@@ -351,7 +349,7 @@ describe('NewHashlistComponent', () => {
       const call = gsSpy.chelper.calls.mostRecent();
       expect(call.args[1]).toBe('importFile');
       const httpOptions = call.args[4];
-      expect(httpOptions?.headers?.get(HttpHeaderName.SKIP_ERROR_DIALOG)).toBe('true');
+      expect(httpOptions?.headers?.get('X-Skip-Error-Dialog')).toBe('true');
     }));
   });
 
@@ -409,7 +407,7 @@ describe('NewHashlistComponent', () => {
     });
 
     it('should NOT show brain section when brain is globally disabled', fakeAsync(() => {
-      const disabledConfig: ResponseWrapper = mockValidResponse(zConfigResponse, {
+      const disabledConfig: ResponseWrapper = mockResponse({
         data: {
           id: 66,
           type: 'config',

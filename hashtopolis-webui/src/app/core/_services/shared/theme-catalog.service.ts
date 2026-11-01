@@ -5,8 +5,6 @@ import { catchError, map, shareReplay } from 'rxjs/operators';
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 
-import { BuiltInTheme } from '@models/config-ui.model';
-
 export interface RuntimeThemeOption {
   value: string;
   description: string;
@@ -39,7 +37,7 @@ export class ThemeCatalogService {
     ...theme,
     icon: BUILT_IN_THEME_ICONS[theme.value] ?? 'palette',
     source: 'builtin',
-    isDark: theme.value === BuiltInTheme.DARK
+    isDark: theme.value === 'dark'
   }));
 
   private themes$?: Observable<RuntimeThemeOption[]>;

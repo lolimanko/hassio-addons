@@ -1,4 +1,4 @@
-import { zGetCracksOfTaskHelperResponse, zHashListResponse, zHashlistResponse } from '@generated/api/zod';
+import { zHashListResponse, zHashlistResponse } from '@generated/api/zod';
 import { EMPTY, Observable, catchError, finalize, of, switchMap } from 'rxjs';
 import { z } from 'zod';
 
@@ -12,21 +12,20 @@ import { RequestParamBuilder } from '@services/params/builder-implementation.ser
 
 import { BaseDataSource } from '@datasources/base.datasource';
 
-import { HashesFilter, HashesViewType } from '@src/app/core/_constants/hashes.config';
 import { HashListFormat } from '@src/app/core/_constants/hashlist.config';
 
 const crackedFilterSchema = z.enum(['cracked', 'uncracked']);
 
 export class HashesDataSource extends BaseDataSource<JHash> {
   private _id = 0;
-  private _dataType: HashesViewType;
+  private _dataType: string;
   private _filterparam: string;
 
   setId(id: number): void {
     this._id = id;
   }
 
-  setDataType(type: HashesViewType): void {
+  setDataType(type: string): void {
     this._dataType = type;
   }
 
@@ -37,7 +36,7 @@ export class HashesDataSource extends BaseDataSource<JHash> {
   loadAll(query?: Filter): void {
     this.loading = true;
 
-    if (this._dataType === HashesViewType.TASKS) {
+    if (this._dataType === 'tasks') {
       const hashesService = this.service.ghelper(SERV.HELPER, 'getCracksOfTask', { task: this._id });
 
       this.subscriptions.push(
@@ -47,7 +46,7 @@ export class HashesDataSource extends BaseDataSource<JHash> {
             finalize(() => (this.loading = false))
           )
           .subscribe((response: ResponseWrapper) => {
-            const hashes: JHash[] = this.serializer.deserialize(response, zGetCracksOfTaskHelperResponse);
+            const hashes: JHash[] = this.serializer.deserialize(response, zHashListResponse);
 
             this.setData(hashes);
           })
@@ -55,7 +54,7 @@ export class HashesDataSource extends BaseDataSource<JHash> {
       return;
     }
 
-    if (this._dataType === HashesViewType.HASHLISTS) {
+    if (this._dataType === 'hashlists') {
       this.loadHashlistHashes(query);
       return;
     }
@@ -64,7 +63,7 @@ export class HashesDataSource extends BaseDataSource<JHash> {
     if (query) {
       params.addFilter(query);
     }
-    if (this._dataType === HashesViewType.CHUNKS) {
+    if (this._dataType === 'chunks') {
       params.addFilter({ field: 'chunkId', operator: FilterType.EQUAL, value: this._id });
     }
 
@@ -112,7 +111,7 @@ export class HashesDataSource extends BaseDataSource<JHash> {
               params.addFilter({
                 field: 'isCracked',
                 operator: FilterType.EQUAL,
-                value: crackedFilter.data === HashesFilter.CRACKED
+                value: crackedFilter.data === 'cracked'
               });
             }
 

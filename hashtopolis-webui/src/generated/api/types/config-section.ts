@@ -1,12 +1,16 @@
-import type { ErrorResponse } from './common';
+import type { ErrorResponse, NotFoundResponse } from './common';
 
 export type ConfigSectionResponse = {
   jsonapi: {
     version: string;
     ext?: Array<string>;
   };
-  links: {
+  links?: {
     self: string;
+    first?: string;
+    last?: string;
+    next?: string | null;
+    previous?: string | null;
   };
   data: {
     id: number;
@@ -14,10 +18,11 @@ export type ConfigSectionResponse = {
     attributes: {
       sectionName: string;
     };
-    links: {
-      self: string;
-    };
   };
+  relationships?: {
+    [key: string]: unknown;
+  };
+  included?: Array<unknown>;
 };
 
 export type ConfigSectionListResponse = {
@@ -25,17 +30,12 @@ export type ConfigSectionListResponse = {
     version: string;
     ext?: Array<string>;
   };
-  links: {
+  links?: {
     self: string;
-    first: string;
-    last: string | null;
-    next: string | null;
-    prev: string | null;
-  };
-  meta: {
-    page: {
-      total_elements: number;
-    };
+    first?: string;
+    last?: string;
+    next?: string | null;
+    previous?: string | null;
   };
   data: Array<{
     id: number;
@@ -43,33 +43,11 @@ export type ConfigSectionListResponse = {
     attributes: {
       sectionName: string;
     };
-    links: {
-      self: string;
-    };
   }>;
-};
-
-export type ConfigSectionCountResponse = {
-  jsonapi: {
-    version: string;
-    ext?: Array<string>;
-  };
-  meta: {
-    /**
-     * Number of objects accessible to the current user matching the given filters
-     */
-    count: number;
-    /**
-     * Number of objects accessible to the current user without any filter applied, only present when `include_total=true` was requested
-     */
-    total_count?: number;
-  };
-  /**
-   * Always empty: the count is reported under meta.
-   */
-  data: Array<{
+  relationships?: {
     [key: string]: unknown;
-  }>;
+  };
+  included?: Array<unknown>;
 };
 
 export type GetConfigsectionsData = {
@@ -77,39 +55,27 @@ export type GetConfigsectionsData = {
   path?: never;
   query?: {
     /**
-     * Pointer to paginate to retrieve the data after the object provided. Specify the `base64` encoded JSON string in a **uniquely identifiable** manner (e.g. object IDs), i.e. by using one (primary) or two (primary and secondary) fields that allow for **stable** sorting.
-     *
-     *
-     * Format: `{"primary":{"someField": 123},"secondary":{"someOtherOptionalField": "Foo"}}`
-     *
-     *
-     * Example: `{"primary":{"configSectionId": 123}}` -> `eyJwcmltYXJ5Ijp7ImNvbmZpZ1NlY3Rpb25JZCI6IDEyM319`
+     * Pointer to paginate to retrieve the data after the value provided
      */
-    'page[after]'?: string;
+    'page[after]'?: number;
     /**
-     * Pointer to paginate to retrieve the data before the object provided. Specify the `base64` encoded JSON string in a **uniquely identifiable** manner (e.g. object IDs), i.e. by using one (primary) or two (primary and secondary) fields that allow for **stable** sorting.
-     *
-     *
-     * Format: `{"primary":{"someField": 123},"secondary":{"someOtherOptionalField": "Foo"}}`
-     *
-     *
-     * Example: `{"primary":{"configSectionId": 123}}` -> `eyJwcmltYXJ5Ijp7ImNvbmZpZ1NlY3Rpb25JZCI6IDEyM319`
+     * Pointer to paginate to retrieve the data before the value provided
      */
-    'page[before]'?: string;
+    'page[before]'?: number;
     /**
      * Amout of data to retrieve inside a single page
      */
     'page[size]'?: number;
     /**
-     * Filters results using a query. Every key is an attribute name optionally suffixed with a comparison operator, e.g. `filter[configSectionId__gt]=200`.
+     * Filters results using a query
      */
     filter?: {
-      [key: string]: string;
+      [key: string]: unknown;
     };
     /**
-     * Relationships to include in the response, comma seperated. Possible options:
+     * Items to include, comma seperated. Possible options: Array
      */
-    include?: Array<string>;
+    include?: string;
   };
   url: '/api/v2/ui/configsections';
 };
@@ -123,10 +89,6 @@ export type GetConfigsectionsErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
 };
 
 export type GetConfigsectionsError = GetConfigsectionsErrors[keyof GetConfigsectionsErrors];
@@ -145,15 +107,27 @@ export type GetConfigsectionsCountData = {
   path?: never;
   query?: {
     /**
-     * Filters results using a query. Every key is an attribute name optionally suffixed with a comparison operator, e.g. `filter[configSectionId__gt]=200`.
+     * Pointer to paginate to retrieve the data after the value provided
+     */
+    'page[after]'?: number;
+    /**
+     * Pointer to paginate to retrieve the data before the value provided
+     */
+    'page[before]'?: number;
+    /**
+     * Amout of data to retrieve inside a single page
+     */
+    'page[size]'?: number;
+    /**
+     * Filters results using a query
      */
     filter?: {
-      [key: string]: string;
+      [key: string]: unknown;
     };
     /**
-     * Also report the number of accessible objects without any filter applied, as `meta.total_count`
+     * Items to include, comma seperated. Possible options: Array
      */
-    include_total?: boolean;
+    include?: string;
   };
   url: '/api/v2/ui/configsections/count';
 };
@@ -167,10 +141,6 @@ export type GetConfigsectionsCountErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
 };
 
 export type GetConfigsectionsCountError = GetConfigsectionsCountErrors[keyof GetConfigsectionsCountErrors];
@@ -179,7 +149,7 @@ export type GetConfigsectionsCountResponses = {
   /**
    * successful operation
    */
-  200: ConfigSectionCountResponse;
+  200: ConfigSectionListResponse;
 };
 
 export type GetConfigsectionsCountResponse = GetConfigsectionsCountResponses[keyof GetConfigsectionsCountResponses];
@@ -191,9 +161,9 @@ export type GetConfigsectionsByIdData = {
   };
   query?: {
     /**
-     * Relationships to include in the response, comma seperated. Possible options:
+     * Items to include. Comma seperated
      */
-    include?: Array<string>;
+    include?: string;
   };
   url: '/api/v2/ui/configsections/{id}';
 };
@@ -208,13 +178,9 @@ export type GetConfigsectionsByIdErrors = {
    */
   401: ErrorResponse;
   /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
    * Not Found
    */
-  404: ErrorResponse;
+  404: NotFoundResponse;
 };
 
 export type GetConfigsectionsByIdError = GetConfigsectionsByIdErrors[keyof GetConfigsectionsByIdErrors];

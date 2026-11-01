@@ -5,9 +5,6 @@ import { z } from 'zod';
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 
-/** Local-storage key the resolved API endpoint is persisted under. */
-export const API_ENDPOINT_STORAGE_KEY = 'prodApiEndpoint';
-
 /**
  * Interface for the expected shape of `assets/config.json`.
  */
@@ -61,11 +58,11 @@ export class ConfigService {
         } else {
           ApiEndPoint = environment.config.prodApiEndpoint;
         }
-        localStorage.setItem(API_ENDPOINT_STORAGE_KEY, ApiEndPoint, z.string());
+        localStorage.setItem('prodApiEndpoint', ApiEndPoint, z.string());
       },
       error: () => {
         ApiEndPoint = environment.config.prodApiEndpoint;
-        localStorage.setItem(API_ENDPOINT_STORAGE_KEY, ApiEndPoint, z.string());
+        localStorage.setItem('prodApiEndpoint', ApiEndPoint, z.string());
       }
     });
   }
@@ -80,10 +77,10 @@ export class ConfigService {
    * @returns The active API endpoint as a string.
    */
   public getEndpoint(): string {
-    let ApiEndPoint = localStorage.getItem<string>(API_ENDPOINT_STORAGE_KEY, z.string());
+    let ApiEndPoint = localStorage.getItem<string>('prodApiEndpoint', z.string());
     if (!ApiEndPoint) {
       this.refreshEndpoint();
-      ApiEndPoint = localStorage.getItem<string>(API_ENDPOINT_STORAGE_KEY, z.string());
+      ApiEndPoint = localStorage.getItem<string>('prodApiEndpoint', z.string());
     }
     return ApiEndPoint ?? environment.config.prodApiEndpoint;
   }

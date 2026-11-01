@@ -1,8 +1,7 @@
 /**
  * This module contains the component class to create a new hashlist
  */
-import { HTTP_SKIP_ERROR_HEADER_CONFIG, HttpMethod } from '@constants/http.config';
-import { zConfigResponse, zGetAccessGroupsHelperApiResponse, zHashTypeListResponse } from '@generated/api/zod';
+import { zAccessGroupListResponse, zConfigResponse, zHashTypeListResponse } from '@generated/api/zod';
 import { firstValueFrom, lastValueFrom } from 'rxjs';
 
 import { HttpHeaders } from '@angular/common/http';
@@ -26,22 +25,12 @@ import { GlobalService } from '@services/main.service';
 import { AlertService } from '@services/shared/alert.service';
 import { AutoTitleService } from '@services/shared/autotitle.service';
 
-import {
-  HCCAPX_PMKID_HASH_TYPE_IDS,
-  HashListFormat,
-  HashListFormatOptions,
-  HashSource,
-  HashSourceOptions,
-  HashcatBrainFeatureOptions
-} from '@src/app/core/_constants/hashlist.config';
+import { hashSource, hashcatbrainFormat, hashlistFormat } from '@src/app/core/_constants/hashlist.config';
 import { ACCESS_GROUP_FIELD_MAPPING, HASHTYPE_FIELD_MAPPING } from '@src/app/core/_constants/select.config';
 import { FileSizePipe } from '@src/app/core/_pipes/file-size.pipe';
 import { NewHashlistForm, getNewHashlistForm } from '@src/app/hashlists/new-hashlist/new-hashlist.form';
 import { HashtypeDetectorComponent } from '@src/app/shared/hashtype-detector/hashtype-detector.component';
 import { SelectOption, handleEncode, removeFakePath, transformSelectOptions } from '@src/app/shared/utils/forms';
-
-/** Id of the server config entry that toggles hashcat brain support. */
-const HASHCAT_BRAIN_ENABLE_CONFIG_ID = 66;
 
 /** Backend error payload shape carried on a failed request. */
 type WithError = { error?: { title?: string; message?: string }; message?: string };
@@ -76,16 +65,15 @@ export class NewHashlistComponent implements OnInit {
   // Lists of Selected inputs
   selectAccessgroup: SelectOption<AccessGroupId>[];
   selectHashtypes: SelectOption<HashTypeId>[];
-  selectFormat = HashListFormatOptions;
-  selectSource = HashSourceOptions;
-  protected readonly HashSource = HashSource;
+  selectFormat = hashlistFormat;
+  selectSource = hashSource;
 
   // Lists of Hashtypes
   hashtypes: JHashtype[] = [];
 
   //Hashcat Brain Mode
   brainenabled: number;
-  selectFormatbrain = HashcatBrainFeatureOptions;
+  selectFormatbrain = hashcatbrainFormat;
 
   // Upload Hashlists
   selectedFiles: FileList | null = null;
@@ -140,12 +128,12 @@ export class NewHashlistComponent implements OnInit {
 
     this.form.controls.sourceType.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((sourceType: HashSource) => {
-        if (sourceType === HashSource.IMPORT && !this.isLoadingServerFiles) {
+      .subscribe((sourceType: string) => {
+        if (sourceType === 'import' && !this.isLoadingServerFiles) {
           void this.loadServerFiles();
         }
 
-        if (sourceType !== HashSource.UPLOAD) {
+        if (sourceType !== 'upload') {
           this.selectedFiles = null;
           this.fileName = '';
           this.uploadProgress = 0;
@@ -174,10 +162,7 @@ export class NewHashlistComponent implements OnInit {
       .ghelper(SERV.HELPER, 'getAccessGroups')
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((response: ResponseWrapper) => {
-        const accessGroups: JAccessGroup[] = new JsonAPISerializer().deserialize(
-          response,
-          zGetAccessGroupsHelperApiResponse
-        );
+        const accessGroups: JAccessGroup[] = new JsonAPISerializer().deserialize(response, zAccessGroupListResponse);
         this.selectAccessgroup = transformSelectOptions(accessGroups, ACCESS_GROUP_FIELD_MAPPING);
         if (this.selectAccessgroup.length > 0 && this.form.controls.accessGroupId.value === null) {
           this.form.patchValue({ accessGroupId: this.selectAccessgroup[0].id });
@@ -211,7 +196,7 @@ export class NewHashlistComponent implements OnInit {
    */
   loadConfigs() {
     this.gs
-      .get(SERV.CONFIGS, HASHCAT_BRAIN_ENABLE_CONFIG_ID)
+      .get(SERV.CONFIGS, 66)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((response: ResponseWrapper) => {
         const config: JConfig = new JsonAPISerializer().deserialize(response, zConfigResponse);
@@ -236,7 +221,7 @@ export class NewHashlistComponent implements OnInit {
 
     newForm.sourceData = removeFakePath(this.fileName || files[0].name);
 
-    newForm.sourceType = HashSource.IMPORT;
+    newForm.sourceType = 'import';
 
     this.uploadService
       .uploadFile(files[0], files[0].name, SERV.HASHLISTS, newForm, ['/hashlists/hashlist'])
@@ -280,15 +265,9 @@ export class NewHashlistComponent implements OnInit {
     this.changeDetectorRef.detectChanges();
     try {
       // Surface a single toast on failure; skip the global error dialog to avoid double messaging.
-      const httpOptions = { headers: new HttpHeaders(HTTP_SKIP_ERROR_HEADER_CONFIG) };
+      const httpOptions = { headers: new HttpHeaders({ 'X-Skip-Error-Dialog': 'true' }) };
       const response = await lastValueFrom(
-        this.gs.chelper<ResponseWrapper<ServerImportFile[]>>(
-          SERV.HELPER,
-          'importFile',
-          undefined,
-          HttpMethod.GET,
-          httpOptions
-        )
+        this.gs.chelper<ResponseWrapper<ServerImportFile[]>>(SERV.HELPER, 'importFile', undefined, 'GET', httpOptions)
       );
       this.serverFiles = response.meta || [];
       this.serverFileOptions = this.serverFiles.map((file) => ({ id: file.file, name: file.file }));
@@ -314,12 +293,12 @@ export class NewHashlistComponent implements OnInit {
     const sourceType = this.form.controls.sourceType.value;
 
     // Validate required input based on sourceType
-    if (sourceType === HashSource.UPLOAD) {
+    if (sourceType === 'upload') {
       if (!this.selectedFiles || this.selectedFiles.length === 0) {
         this.alert.showErrorMessage('Please select a hash file to upload.');
         return; // stop submission
       }
-    } else if (sourceType === HashSource.PASTE) {
+    } else if (sourceType === 'paste') {
       const sourceData = this.form.controls.sourceData.value;
       if (!sourceData || sourceData.trim() === '') {
         this.alert.showErrorMessage('Please paste your hashes.');
@@ -341,13 +320,13 @@ export class NewHashlistComponent implements OnInit {
           }
         }
       }
-    } else if (sourceType === HashSource.IMPORT) {
+    } else if (sourceType === 'import') {
       const sourceData = this.form.controls.sourceData.value;
       if (!sourceData || sourceData.trim() === '') {
         this.alert.showErrorMessage('Please select a file from the server import directory.');
         return;
       }
-    } else if (sourceType === HashSource.URL) {
+    } else if (sourceType === 'url') {
       const sourceData = this.form.controls.sourceData.value;
       if (!sourceData || sourceData.trim() === '') {
         this.alert.showErrorMessage('Please provide a URL to download hashes from.');
@@ -359,14 +338,14 @@ export class NewHashlistComponent implements OnInit {
     }
 
     // Proceed with existing logic now that input is validated
-    if (sourceType === HashSource.PASTE || sourceType === HashSource.IMPORT || sourceType === HashSource.URL) {
+    if (sourceType === 'paste' || sourceType === 'import' || sourceType === 'url') {
       const payload =
-        sourceType === HashSource.PASTE
+        sourceType === 'paste'
           ? { ...this.form.getRawValue(), sourceData: handleEncode(this.form.controls.sourceData.value) }
           : this.form.getRawValue();
 
       // Handle the error here so we can surface the backend reason; skip the global error dialog to avoid double messaging.
-      const httpOptions = { headers: new HttpHeaders(HTTP_SKIP_ERROR_HEADER_CONFIG) };
+      const httpOptions = { headers: new HttpHeaders({ 'X-Skip-Error-Dialog': 'true' }) };
 
       this.isCreatingLoading = true;
       try {
@@ -407,9 +386,9 @@ export class NewHashlistComponent implements OnInit {
     const filter = this.hashtypes.filter((hashtype) => hashtype.id === hashTypeId);
     const salted = filter.length > 0 ? filter[0]['isSalted'] : false;
 
-    if (HCCAPX_PMKID_HASH_TYPE_IDS.includes(hashTypeId)) {
+    if (hashTypeId === 2500 || hashTypeId === 16800 || hashTypeId === 16801) {
       this.form.patchValue({
-        format: HashListFormat.HCCAPX_PMKID,
+        format: Number(1),
         isSalted: salted
       });
     } else {

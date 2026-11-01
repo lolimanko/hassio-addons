@@ -32,13 +32,12 @@ import { formatUnixTimestamp } from '@src/app/shared/utils/datetime';
 import { convertCrackingSpeed } from '@src/app/shared/utils/util';
 
 /**
- * How a series of agent stat samples is reduced to a single displayed value.
+ * Provides static constants for different types of statistical calculations.
  */
-export const STATCALCULATION = {
-  AVG_VALUE: 1,
-  MAX_VALUE: 2
-} as const;
-export type STATCALCULATION = (typeof STATCALCULATION)[keyof typeof STATCALCULATION];
+export class STATCALCULATION {
+  public static AVG_VALUE = 1;
+  public static MAX_VALUE = 2;
+}
 
 @Component({
   selector: 'app-agents-status-table',
@@ -484,9 +483,9 @@ export class AgentsStatusTableComponent extends BaseTableComponent implements On
     const stat = (agent.agentStats ?? []).filter((u) => u.statType == statType);
     if (stat && stat.length > 0) {
       switch (avgOrMax) {
-        case STATCALCULATION.AVG_VALUE:
+        case 1:
           return Math.round(stat.map((element) => element.value[0]).reduce((a, b) => a + b) / stat.length);
-        case STATCALCULATION.MAX_VALUE:
+        case 2:
           return Math.round(stat.map((element) => element.value[0]).reduce((a, b) => Math.max(a, b)));
       }
     }

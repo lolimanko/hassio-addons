@@ -4,7 +4,6 @@ import { FormControl, FormGroup, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 
 import { UIConfig } from '@models/config-ui.model';
-import { BuiltInTheme } from '@models/config-ui.model';
 
 import { SERV } from '@services/main.config';
 import { GlobalService } from '@services/main.service';
@@ -47,7 +46,7 @@ export class ForgotPasswordComponent implements AfterViewInit {
   constructor() {
     this.headerConfig = environment.config.header;
     this.uiSettings = new UISettingsUtilityClass(this.storage);
-    this.isDarkMode = this.uiSettings.getSetting('theme') === BuiltInTheme.DARK;
+    this.isDarkMode = this.uiSettings.getSetting('theme') === 'dark';
     this.buildForm();
   }
 

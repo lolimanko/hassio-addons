@@ -3,7 +3,6 @@
  * @module
  */
 
-import { HTTP_SKIP_ERROR_HEADER_CONFIG } from '@constants/http.config';
 import { zFileListResponse, zPreTaskResponse, zTaskResponse } from '@generated/api/zod';
 import { EMPTY, catchError, finalize } from 'rxjs';
 
@@ -24,7 +23,7 @@ import { BaseDataSource } from '@datasources/base.datasource';
  * Data source class definition for files
  */
 export class FilesDataSource extends BaseDataSource<JFile> {
-  private fileType: FileType = FileType.WORDLIST;
+  private fileType: FileType = 0;
   private editIndex?: number;
   private editType?: number;
   private _currentFilter: Filter | null = null;
@@ -57,7 +56,7 @@ export class FilesDataSource extends BaseDataSource<JFile> {
     this.loading = true;
 
     let files$: ReturnType<typeof this.service.get> | ReturnType<typeof this.service.getAll> | undefined;
-    const httpOptions = { headers: new HttpHeaders(HTTP_SKIP_ERROR_HEADER_CONFIG) };
+    const httpOptions = { headers: new HttpHeaders({ 'X-Skip-Error-Dialog': 'true' }) };
 
     const paramsBuilder = new RequestParamBuilder();
 

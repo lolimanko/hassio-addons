@@ -217,13 +217,6 @@ export class TasksTableComponent extends BaseTableComponent implements OnInit, O
         dataKey: 'hashlistName',
         routerLink: (wrapper: JTaskWrapperDisplayOverview) => this.renderHashlistLinkFromWrapper(wrapper),
         icon: (wrapper: JTaskWrapperDisplayOverview) => {
-          if (wrapper.hashlistIsSecret) {
-            return {
-              name: 'lock',
-              tooltip: 'Secret hashlist',
-              cls: 'text-warning'
-            };
-          }
           const allHashesCracked =
             wrapper.hashCount && wrapper.hashlistCracked && wrapper.hashCount === wrapper.hashlistCracked;
           if (allHashesCracked) {

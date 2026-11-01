@@ -20,13 +20,16 @@ export type FormRouteType = (typeof FormRouteType)[keyof typeof FormRouteType];
 
 export const FormRouteKind = {
   EditAgentBinary: 'editagentbinary',
+  EditCrackerVersion: 'editcrackerversion',
   EditHashtype: 'edithashtype',
   EditOther: 'editother',
   EditRule: 'editrule',
   EditWordlist: 'editwordlist',
   NewAccessGroups: 'newaccessgroups',
   NewAgentBinary: 'newagentbinary',
-  NewGlobalPermissionsGroup: 'newglobalpermissionsgp'
+  NewCrackerVersion: 'newcrackerversion',
+  NewGlobalPermissionsGroup: 'newglobalpermissionsgp',
+  NewHashtype: 'newhashtype'
 } as const;
 
 export type FormRouteKind = (typeof FormRouteKind)[keyof typeof FormRouteKind];
@@ -153,4 +156,10 @@ export const zOptionalIdRouteParams = z.object({
 
 export const zHashesRouteParams = z.object({
   id: z.string()
+});
+
+export const zHashesQueryParams = z.object({
+  crackpos: z.string().optional(),
+  filter: z.string().optional(),
+  display: z.string().optional()
 });

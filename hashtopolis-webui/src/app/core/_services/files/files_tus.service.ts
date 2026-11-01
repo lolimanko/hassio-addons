@@ -1,8 +1,7 @@
-import { HTTP_SKIP_ERROR_HEADER_CONFIG } from '@constants/http.config';
 import { Observable } from 'rxjs';
 import * as tus from 'tus-js-client';
 
-import { HttpHeaders } from '@angular/common/http';
+import { HttpEvent, HttpEventType, HttpHeaders, HttpProgressEvent } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 
@@ -31,8 +30,18 @@ export class UploadTUSService {
    */
   private chunked = environment.config.chunkSizeTUS;
 
+  /**
+   * The storage key for retrieving user data from local storage.
+   */
+  static readonly STORAGE_KEY = 'userData';
+
+  /**
+   * Represents the ongoing TUS upload. It is initialized as null.
+   */
+  private tusUpload: tus.Upload | null = null;
+
   private readonly skipErrorDialogHeaders = {
-    headers: new HttpHeaders(HTTP_SKIP_ERROR_HEADER_CONFIG)
+    headers: new HttpHeaders({ 'X-Skip-Error-Dialog': 'true' })
   };
 
   /**
@@ -159,6 +168,8 @@ export class UploadTUSService {
         }
       });
 
+      this.tusUpload = upload;
+
       checkPreviousuploads(upload).catch((error) => {
         console.error(error);
       });
@@ -190,5 +201,14 @@ export class UploadTUSService {
       // Start or continue the upload
       upload.start();
     }
+  }
+
+  /**
+   * Checks if an HTTP event is a progress event.
+   * @param event - The HTTP event to check.
+   * @returns True if the event is a progress event, false otherwise.
+   */
+  isHttpProgressEvent(event: HttpEvent<unknown>): event is HttpProgressEvent {
+    return event.type === HttpEventType.DownloadProgress || event.type === HttpEventType.UploadProgress;
   }
 }

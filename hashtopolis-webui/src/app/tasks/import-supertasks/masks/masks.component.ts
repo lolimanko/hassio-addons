@@ -1,5 +1,5 @@
 import { CRACKER_TYPE_FIELD_MAPPING } from '@constants/select.config';
-import { BenchmarkTypeOptions } from '@constants/tasks.config';
+import { benchmarkType } from '@constants/tasks.config';
 import { zCrackerBinaryTypeListResponse } from '@generated/api/zod';
 
 import { Component, DestroyRef, OnInit, inject } from '@angular/core';
@@ -14,6 +14,7 @@ import { CrackerBinaryTypeId } from '@models/id.types';
 import { SERV } from '@services/main.config';
 import { GlobalService } from '@services/main.service';
 import { AlertService } from '@services/shared/alert.service';
+import { AutoTitleService } from '@services/shared/autotitle.service';
 
 import { ResponseWrapper } from '@src/app/core/_models/response.model';
 import { JsonAPISerializer } from '@src/app/core/_services/api/serializer-service';
@@ -31,6 +32,7 @@ import { SelectOption, transformSelectOptions } from '@src/app/shared/utils/form
 export class MasksComponent implements OnInit {
   /**
    * @private changeDetectorRef - The reference to the Angular ChangeDetectorRef.
+   * @private titleService - The service responsible for setting the page title.
    * @private alert - The service for displaying alert messages.
    * @private gs - The service providing global functionality.
    * @private router - The Angular Router service for navigation.
@@ -38,6 +40,7 @@ export class MasksComponent implements OnInit {
    */
 
   private destroyRef = inject(DestroyRef);
+  private titleService = inject(AutoTitleService);
   private alert = inject(AlertService);
   private gs = inject(GlobalService);
   private router = inject(Router);
@@ -58,7 +61,7 @@ export class MasksComponent implements OnInit {
   createForm: FormGroup;
 
   /** Select Options. */
-  selectBenchmarktype = BenchmarkTypeOptions;
+  selectBenchmarktype = benchmarkType;
   selectCrackertype: SelectOption<CrackerBinaryTypeId>[] | undefined = undefined;
 
   /** Select Options Mapping */

@@ -1,6 +1,4 @@
-import type { ErrorResponse } from './common';
-import type { CrackerBinaryListResponse } from './cracker-binary';
-import type { TaskListResponse } from './task';
+import type { ErrorResponse, NotFoundResponse } from './common';
 
 export type CrackerBinaryTypeCreate = {
   data: {
@@ -15,28 +13,10 @@ export type CrackerBinaryTypePatch = {
   data: {
     type: 'crackerBinaryType';
     attributes: {
-      isChunkingAvailable?: boolean | null;
+      isChunkingAvailable: boolean | null;
       typeName?: string;
     };
   };
-};
-
-export type CrackerBinaryTypePatchMultiple = {
-  data: Array<{
-    id: number;
-    type: 'crackerBinaryType';
-    attributes: {
-      isChunkingAvailable?: boolean | null;
-      typeName?: string;
-    };
-  }>;
-};
-
-export type CrackerBinaryTypeDeleteMultiple = {
-  data: Array<{
-    id: number;
-    type: 'crackerBinaryType';
-  }>;
 };
 
 export type CrackerBinaryTypeResponse = {
@@ -44,8 +24,12 @@ export type CrackerBinaryTypeResponse = {
     version: string;
     ext?: Array<string>;
   };
-  links: {
+  links?: {
     self: string;
+    first?: string;
+    last?: string;
+    next?: string | null;
+    previous?: string | null;
   };
   data: {
     id: number;
@@ -54,30 +38,27 @@ export type CrackerBinaryTypeResponse = {
       typeName: string;
       isChunkingAvailable: boolean | null;
     };
-    links: {
-      self: string;
+  };
+  relationships?: {
+    crackerVersions: {
+      links: {
+        self: string;
+        related: string;
+      };
+      data?: Array<{
+        type: 'crackerBinary';
+        id: number;
+      }>;
     };
-    relationships: {
-      crackerVersions: {
-        links: {
-          self: string;
-          related: string;
-        };
-        data?: Array<{
-          type: 'crackerBinary';
-          id: number;
-        }>;
+    tasks: {
+      links: {
+        self: string;
+        related: string;
       };
-      tasks: {
-        links: {
-          self: string;
-          related: string;
-        };
-        data?: Array<{
-          type: 'task';
-          id: number;
-        }>;
-      };
+      data?: Array<{
+        type: 'task';
+        id: number;
+      }>;
     };
   };
   included?: Array<
@@ -87,19 +68,8 @@ export type CrackerBinaryTypeResponse = {
         attributes: {
           crackerBinaryTypeId: number;
           version: string;
-          /**
-           * External http/https url where the agent downloads the binary archive from. The server keeps a local copy of the archive for later analysis: on creation it is downloaded from this url, and changing the url re-downloads it from the new url. The creation or change is rejected if that download fails or the archive is not a valid 7z file. Mutually exclusive with sourceType: when the archive is uploaded with sourceType, this url is set automatically to the download endpoint of this server and cannot be changed afterwards.
-           */
-          downloadUrl: string | null;
+          downloadUrl: string;
           binaryName: string;
-          /**
-           * Filename of the locally stored 7z archive, null when the binary is downloaded from the downloadUrl. Cannot be provided.
-           */
-          filename: string | null;
-          /**
-           * Access group containing this cracker binary. Required on creation; the requesting user must belong to the group. It can be changed only when the user belongs to both the current and new groups.
-           */
-          accessGroupId: number;
         };
       }
     | {
@@ -139,9 +109,6 @@ export type CrackerBinaryTypePostPatchResponse = {
     version: string;
     ext?: Array<string>;
   };
-  links: {
-    self: string;
-  };
   data: {
     id: number;
     type: 'crackerBinaryType';
@@ -149,84 +116,7 @@ export type CrackerBinaryTypePostPatchResponse = {
       typeName: string;
       isChunkingAvailable: boolean | null;
     };
-    links: {
-      self: string;
-    };
-    relationships: {
-      crackerVersions: {
-        links: {
-          self: string;
-          related: string;
-        };
-        data?: Array<{
-          type: 'crackerBinary';
-          id: number;
-        }>;
-      };
-      tasks: {
-        links: {
-          self: string;
-          related: string;
-        };
-        data?: Array<{
-          type: 'task';
-          id: number;
-        }>;
-      };
-    };
   };
-  included?: Array<
-    | {
-        id: number;
-        type: 'crackerBinary';
-        attributes: {
-          crackerBinaryTypeId: number;
-          version: string;
-          /**
-           * External http/https url where the agent downloads the binary archive from. The server keeps a local copy of the archive for later analysis: on creation it is downloaded from this url, and changing the url re-downloads it from the new url. The creation or change is rejected if that download fails or the archive is not a valid 7z file. Mutually exclusive with sourceType: when the archive is uploaded with sourceType, this url is set automatically to the download endpoint of this server and cannot be changed afterwards.
-           */
-          downloadUrl: string | null;
-          binaryName: string;
-          /**
-           * Filename of the locally stored 7z archive, null when the binary is downloaded from the downloadUrl. Cannot be provided.
-           */
-          filename: string | null;
-          /**
-           * Access group containing this cracker binary. Required on creation; the requesting user must belong to the group. It can be changed only when the user belongs to both the current and new groups.
-           */
-          accessGroupId: number;
-        };
-      }
-    | {
-        id: number;
-        type: 'task';
-        attributes: {
-          taskName: string;
-          attackCmd: string;
-          chunkTime: number;
-          statusTimer: number;
-          keyspace: number;
-          keyspaceProgress: number;
-          priority: number;
-          maxAgents: number;
-          color: string | null;
-          isSmall: boolean;
-          isCpuTask: boolean;
-          useNewBench: boolean;
-          skipKeyspace: number;
-          crackerBinaryId: number;
-          crackerBinaryTypeId: number | null;
-          taskWrapperId: number;
-          isArchived: boolean;
-          notes: string;
-          staticChunks: number;
-          chunkSize: number;
-          forcePipe: boolean;
-          preprocessorId: number;
-          preprocessorCommand: string;
-        };
-      }
-  >;
 };
 
 export type CrackerBinaryTypeListResponse = {
@@ -234,17 +124,12 @@ export type CrackerBinaryTypeListResponse = {
     version: string;
     ext?: Array<string>;
   };
-  links: {
+  links?: {
     self: string;
-    first: string;
-    last: string | null;
-    next: string | null;
-    prev: string | null;
-  };
-  meta: {
-    page: {
-      total_elements: number;
-    };
+    first?: string;
+    last?: string;
+    next?: string | null;
+    previous?: string | null;
   };
   data: Array<{
     id: number;
@@ -253,32 +138,29 @@ export type CrackerBinaryTypeListResponse = {
       typeName: string;
       isChunkingAvailable: boolean | null;
     };
-    links: {
-      self: string;
-    };
-    relationships: {
-      crackerVersions: {
-        links: {
-          self: string;
-          related: string;
-        };
-        data?: Array<{
-          type: 'crackerBinary';
-          id: number;
-        }>;
-      };
-      tasks: {
-        links: {
-          self: string;
-          related: string;
-        };
-        data?: Array<{
-          type: 'task';
-          id: number;
-        }>;
-      };
-    };
   }>;
+  relationships?: {
+    crackerVersions: {
+      links: {
+        self: string;
+        related: string;
+      };
+      data?: Array<{
+        type: 'crackerBinary';
+        id: number;
+      }>;
+    };
+    tasks: {
+      links: {
+        self: string;
+        related: string;
+      };
+      data?: Array<{
+        type: 'task';
+        id: number;
+      }>;
+    };
+  };
   included?: Array<
     | {
         id: number;
@@ -286,19 +168,8 @@ export type CrackerBinaryTypeListResponse = {
         attributes: {
           crackerBinaryTypeId: number;
           version: string;
-          /**
-           * External http/https url where the agent downloads the binary archive from. The server keeps a local copy of the archive for later analysis: on creation it is downloaded from this url, and changing the url re-downloads it from the new url. The creation or change is rejected if that download fails or the archive is not a valid 7z file. Mutually exclusive with sourceType: when the archive is uploaded with sourceType, this url is set automatically to the download endpoint of this server and cannot be changed afterwards.
-           */
-          downloadUrl: string | null;
+          downloadUrl: string;
           binaryName: string;
-          /**
-           * Filename of the locally stored 7z archive, null when the binary is downloaded from the downloadUrl. Cannot be provided.
-           */
-          filename: string | null;
-          /**
-           * Access group containing this cracker binary. Required on creation; the requesting user must belong to the group. It can be changed only when the user belongs to both the current and new groups.
-           */
-          accessGroupId: number;
         };
       }
     | {
@@ -333,59 +204,22 @@ export type CrackerBinaryTypeListResponse = {
   >;
 };
 
-export type CrackerBinaryTypeCountResponse = {
-  jsonapi: {
-    version: string;
-    ext?: Array<string>;
-  };
-  meta: {
-    /**
-     * Number of objects accessible to the current user matching the given filters
-     */
-    count: number;
-    /**
-     * Number of objects accessible to the current user without any filter applied, only present when `include_total=true` was requested
-     */
-    total_count?: number;
-  };
-  /**
-   * Always empty: the count is reported under meta.
-   */
-  data: Array<{
-    [key: string]: unknown;
-  }>;
-};
-
-export type CrackerBinaryTypeRelationCrackerVersions = {
-  data: Array<{
-    type: 'crackerBinary';
-    id: number;
-  }>;
-};
-
-export type CrackerBinaryTypeRelationCrackerVersionsGetResponse = {
-  data: Array<{
-    type: 'crackerBinary';
-    id: number;
-  }>;
-};
-
 export type CrackerBinaryTypeRelationTasks = {
   data: Array<{
-    type: 'task';
+    type: 'tasks';
     id: number;
   }>;
 };
 
 export type CrackerBinaryTypeRelationTasksGetResponse = {
   data: Array<{
-    type: 'task';
+    type: 'tasks';
     id: number;
   }>;
 };
 
 export type DeleteCrackertypesData = {
-  body: CrackerBinaryTypeDeleteMultiple;
+  body?: never;
   path?: never;
   query?: never;
   url: '/api/v2/ui/crackertypes';
@@ -400,65 +234,43 @@ export type DeleteCrackertypesErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
-   * Not Found
-   */
-  404: ErrorResponse;
 };
 
 export type DeleteCrackertypesError = DeleteCrackertypesErrors[keyof DeleteCrackertypesErrors];
 
 export type DeleteCrackertypesResponses = {
   /**
-   * successfully deleted
+   * successful operation
    */
-  204: void;
+  200: unknown;
 };
-
-export type DeleteCrackertypesResponse = DeleteCrackertypesResponses[keyof DeleteCrackertypesResponses];
 
 export type GetCrackertypesData = {
   body?: never;
   path?: never;
   query?: {
     /**
-     * Pointer to paginate to retrieve the data after the object provided. Specify the `base64` encoded JSON string in a **uniquely identifiable** manner (e.g. object IDs), i.e. by using one (primary) or two (primary and secondary) fields that allow for **stable** sorting.
-     *
-     *
-     * Format: `{"primary":{"someField": 123},"secondary":{"someOtherOptionalField": "Foo"}}`
-     *
-     *
-     * Example: `{"primary":{"crackerBinaryTypeId": 123}}` -> `eyJwcmltYXJ5Ijp7ImNyYWNrZXJCaW5hcnlUeXBlSWQiOiAxMjN9fQ==`
+     * Pointer to paginate to retrieve the data after the value provided
      */
-    'page[after]'?: string;
+    'page[after]'?: number;
     /**
-     * Pointer to paginate to retrieve the data before the object provided. Specify the `base64` encoded JSON string in a **uniquely identifiable** manner (e.g. object IDs), i.e. by using one (primary) or two (primary and secondary) fields that allow for **stable** sorting.
-     *
-     *
-     * Format: `{"primary":{"someField": 123},"secondary":{"someOtherOptionalField": "Foo"}}`
-     *
-     *
-     * Example: `{"primary":{"crackerBinaryTypeId": 123}}` -> `eyJwcmltYXJ5Ijp7ImNyYWNrZXJCaW5hcnlUeXBlSWQiOiAxMjN9fQ==`
+     * Pointer to paginate to retrieve the data before the value provided
      */
-    'page[before]'?: string;
+    'page[before]'?: number;
     /**
      * Amout of data to retrieve inside a single page
      */
     'page[size]'?: number;
     /**
-     * Filters results using a query. Every key is an attribute name optionally suffixed with a comparison operator, e.g. `filter[crackerBinaryTypeId__gt]=200`.
+     * Filters results using a query
      */
     filter?: {
-      [key: string]: string;
+      [key: string]: unknown;
     };
     /**
-     * Relationships to include in the response, comma seperated. Possible options: crackerVersions, tasks
+     * Items to include, comma seperated. Possible options: Array
      */
-    include?: Array<'crackerVersions' | 'tasks'>;
+    include?: string;
   };
   url: '/api/v2/ui/crackertypes';
 };
@@ -472,10 +284,6 @@ export type GetCrackertypesErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
 };
 
 export type GetCrackertypesError = GetCrackertypesErrors[keyof GetCrackertypesErrors];
@@ -490,7 +298,7 @@ export type GetCrackertypesResponses = {
 export type GetCrackertypesResponse = GetCrackertypesResponses[keyof GetCrackertypesResponses];
 
 export type PatchCrackertypesData = {
-  body: CrackerBinaryTypePatchMultiple;
+  body?: never;
   path?: never;
   query?: never;
   url: '/api/v2/ui/crackertypes';
@@ -505,30 +313,16 @@ export type PatchCrackertypesErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
-   * Not Found
-   */
-  404: ErrorResponse;
-  /**
-   * Resource already exists
-   */
-  409: ErrorResponse;
 };
 
 export type PatchCrackertypesError = PatchCrackertypesErrors[keyof PatchCrackertypesErrors];
 
 export type PatchCrackertypesResponses = {
   /**
-   * successfully updated
+   * successful operation
    */
-  204: void;
+  200: unknown;
 };
-
-export type PatchCrackertypesResponse = PatchCrackertypesResponses[keyof PatchCrackertypesResponses];
 
 export type PostCrackertypesData = {
   body: CrackerBinaryTypeCreate;
@@ -546,14 +340,6 @@ export type PostCrackertypesErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
-   * Resource already exists
-   */
-  409: ErrorResponse;
 };
 
 export type PostCrackertypesError = PostCrackertypesErrors[keyof PostCrackertypesErrors];
@@ -572,15 +358,27 @@ export type GetCrackertypesCountData = {
   path?: never;
   query?: {
     /**
-     * Filters results using a query. Every key is an attribute name optionally suffixed with a comparison operator, e.g. `filter[crackerBinaryTypeId__gt]=200`.
+     * Pointer to paginate to retrieve the data after the value provided
+     */
+    'page[after]'?: number;
+    /**
+     * Pointer to paginate to retrieve the data before the value provided
+     */
+    'page[before]'?: number;
+    /**
+     * Amout of data to retrieve inside a single page
+     */
+    'page[size]'?: number;
+    /**
+     * Filters results using a query
      */
     filter?: {
-      [key: string]: string;
+      [key: string]: unknown;
     };
     /**
-     * Also report the number of accessible objects without any filter applied, as `meta.total_count`
+     * Items to include, comma seperated. Possible options: Array
      */
-    include_total?: boolean;
+    include?: string;
   };
   url: '/api/v2/ui/crackertypes/count';
 };
@@ -594,10 +392,6 @@ export type GetCrackertypesCountErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
 };
 
 export type GetCrackertypesCountError = GetCrackertypesCountErrors[keyof GetCrackertypesCountErrors];
@@ -606,21 +400,22 @@ export type GetCrackertypesCountResponses = {
   /**
    * successful operation
    */
-  200: CrackerBinaryTypeCountResponse;
+  200: CrackerBinaryTypeListResponse;
 };
 
 export type GetCrackertypesCountResponse = GetCrackertypesCountResponses[keyof GetCrackertypesCountResponses];
 
-export type GetCrackertypesByIdCrackerVersionsData = {
+export type GetCrackertypesByIdByRelationData = {
   body?: never;
   path: {
     id: number;
+    relation: string;
   };
   query?: never;
-  url: '/api/v2/ui/crackertypes/{id}/crackerVersions';
+  url: '/api/v2/ui/crackertypes/{id}/{relation}';
 };
 
-export type GetCrackertypesByIdCrackerVersionsErrors = {
+export type GetCrackertypesByIdByRelationErrors = {
   /**
    * Invalid request
    */
@@ -630,332 +425,35 @@ export type GetCrackertypesByIdCrackerVersionsErrors = {
    */
   401: ErrorResponse;
   /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
    * Not Found
    */
-  404: ErrorResponse;
+  404: NotFoundResponse;
 };
 
-export type GetCrackertypesByIdCrackerVersionsError =
-  GetCrackertypesByIdCrackerVersionsErrors[keyof GetCrackertypesByIdCrackerVersionsErrors];
+export type GetCrackertypesByIdByRelationError =
+  GetCrackertypesByIdByRelationErrors[keyof GetCrackertypesByIdByRelationErrors];
 
-export type GetCrackertypesByIdCrackerVersionsResponses = {
-  /**
-   * successful operation
-   */
-  200: CrackerBinaryListResponse;
-};
-
-export type GetCrackertypesByIdCrackerVersionsResponse =
-  GetCrackertypesByIdCrackerVersionsResponses[keyof GetCrackertypesByIdCrackerVersionsResponses];
-
-export type DeleteCrackertypesByIdRelationshipsCrackerVersionsData = {
-  body: CrackerBinaryTypeRelationCrackerVersions;
-  path: {
-    id: number;
-  };
-  query?: never;
-  url: '/api/v2/ui/crackertypes/{id}/relationships/crackerVersions';
-};
-
-export type DeleteCrackertypesByIdRelationshipsCrackerVersionsErrors = {
-  /**
-   * Invalid request
-   */
-  400: ErrorResponse;
-  /**
-   * Authentication failed
-   */
-  401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
-   * Not Found
-   */
-  404: ErrorResponse;
-};
-
-export type DeleteCrackertypesByIdRelationshipsCrackerVersionsError =
-  DeleteCrackertypesByIdRelationshipsCrackerVersionsErrors[keyof DeleteCrackertypesByIdRelationshipsCrackerVersionsErrors];
-
-export type DeleteCrackertypesByIdRelationshipsCrackerVersionsResponses = {
-  /**
-   * successfully deleted
-   */
-  204: void;
-};
-
-export type DeleteCrackertypesByIdRelationshipsCrackerVersionsResponse =
-  DeleteCrackertypesByIdRelationshipsCrackerVersionsResponses[keyof DeleteCrackertypesByIdRelationshipsCrackerVersionsResponses];
-
-export type GetCrackertypesByIdRelationshipsCrackerVersionsData = {
-  body?: never;
-  path: {
-    id: number;
-  };
-  query?: never;
-  url: '/api/v2/ui/crackertypes/{id}/relationships/crackerVersions';
-};
-
-export type GetCrackertypesByIdRelationshipsCrackerVersionsErrors = {
-  /**
-   * Invalid request
-   */
-  400: ErrorResponse;
-  /**
-   * Authentication failed
-   */
-  401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
-   * Not Found
-   */
-  404: ErrorResponse;
-};
-
-export type GetCrackertypesByIdRelationshipsCrackerVersionsError =
-  GetCrackertypesByIdRelationshipsCrackerVersionsErrors[keyof GetCrackertypesByIdRelationshipsCrackerVersionsErrors];
-
-export type GetCrackertypesByIdRelationshipsCrackerVersionsResponses = {
-  /**
-   * successful operation
-   */
-  200: CrackerBinaryTypeRelationCrackerVersionsGetResponse;
-};
-
-export type GetCrackertypesByIdRelationshipsCrackerVersionsResponse =
-  GetCrackertypesByIdRelationshipsCrackerVersionsResponses[keyof GetCrackertypesByIdRelationshipsCrackerVersionsResponses];
-
-export type PatchCrackertypesByIdRelationshipsCrackerVersionsData = {
-  body: CrackerBinaryTypeRelationCrackerVersions;
-  path: {
-    id: number;
-  };
-  query?: never;
-  url: '/api/v2/ui/crackertypes/{id}/relationships/crackerVersions';
-};
-
-export type PatchCrackertypesByIdRelationshipsCrackerVersionsErrors = {
-  /**
-   * Invalid request
-   */
-  400: ErrorResponse;
-  /**
-   * Authentication failed
-   */
-  401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
-   * Not Found
-   */
-  404: ErrorResponse;
-  /**
-   * Resource already exists
-   */
-  409: ErrorResponse;
-};
-
-export type PatchCrackertypesByIdRelationshipsCrackerVersionsError =
-  PatchCrackertypesByIdRelationshipsCrackerVersionsErrors[keyof PatchCrackertypesByIdRelationshipsCrackerVersionsErrors];
-
-export type PatchCrackertypesByIdRelationshipsCrackerVersionsResponses = {
-  /**
-   * Successfull operation
-   */
-  204: void;
-};
-
-export type PatchCrackertypesByIdRelationshipsCrackerVersionsResponse =
-  PatchCrackertypesByIdRelationshipsCrackerVersionsResponses[keyof PatchCrackertypesByIdRelationshipsCrackerVersionsResponses];
-
-export type PostCrackertypesByIdRelationshipsCrackerVersionsData = {
-  body: CrackerBinaryTypeRelationCrackerVersions;
-  path: {
-    id: number;
-  };
-  query?: never;
-  url: '/api/v2/ui/crackertypes/{id}/relationships/crackerVersions';
-};
-
-export type PostCrackertypesByIdRelationshipsCrackerVersionsErrors = {
-  /**
-   * Invalid request
-   */
-  400: ErrorResponse;
-  /**
-   * Authentication failed
-   */
-  401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
-   * Not Found
-   */
-  404: ErrorResponse;
-  /**
-   * Resource already exists
-   */
-  409: ErrorResponse;
-};
-
-export type PostCrackertypesByIdRelationshipsCrackerVersionsError =
-  PostCrackertypesByIdRelationshipsCrackerVersionsErrors[keyof PostCrackertypesByIdRelationshipsCrackerVersionsErrors];
-
-export type PostCrackertypesByIdRelationshipsCrackerVersionsResponses = {
-  /**
-   * successfully created
-   */
-  204: void;
-};
-
-export type PostCrackertypesByIdRelationshipsCrackerVersionsResponse =
-  PostCrackertypesByIdRelationshipsCrackerVersionsResponses[keyof PostCrackertypesByIdRelationshipsCrackerVersionsResponses];
-
-export type GetCrackertypesByIdTasksData = {
-  body?: never;
-  path: {
-    id: number;
-  };
-  query?: never;
-  url: '/api/v2/ui/crackertypes/{id}/tasks';
-};
-
-export type GetCrackertypesByIdTasksErrors = {
-  /**
-   * Invalid request
-   */
-  400: ErrorResponse;
-  /**
-   * Authentication failed
-   */
-  401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
-   * Not Found
-   */
-  404: ErrorResponse;
-};
-
-export type GetCrackertypesByIdTasksError = GetCrackertypesByIdTasksErrors[keyof GetCrackertypesByIdTasksErrors];
-
-export type GetCrackertypesByIdTasksResponses = {
-  /**
-   * successful operation
-   */
-  200: TaskListResponse;
-};
-
-export type GetCrackertypesByIdTasksResponse =
-  GetCrackertypesByIdTasksResponses[keyof GetCrackertypesByIdTasksResponses];
-
-export type DeleteCrackertypesByIdRelationshipsTasksData = {
-  body: CrackerBinaryTypeRelationTasks;
-  path: {
-    id: number;
-  };
-  query?: never;
-  url: '/api/v2/ui/crackertypes/{id}/relationships/tasks';
-};
-
-export type DeleteCrackertypesByIdRelationshipsTasksErrors = {
-  /**
-   * Invalid request
-   */
-  400: ErrorResponse;
-  /**
-   * Authentication failed
-   */
-  401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
-   * Not Found
-   */
-  404: ErrorResponse;
-};
-
-export type DeleteCrackertypesByIdRelationshipsTasksError =
-  DeleteCrackertypesByIdRelationshipsTasksErrors[keyof DeleteCrackertypesByIdRelationshipsTasksErrors];
-
-export type DeleteCrackertypesByIdRelationshipsTasksResponses = {
-  /**
-   * successfully deleted
-   */
-  204: void;
-};
-
-export type DeleteCrackertypesByIdRelationshipsTasksResponse =
-  DeleteCrackertypesByIdRelationshipsTasksResponses[keyof DeleteCrackertypesByIdRelationshipsTasksResponses];
-
-export type GetCrackertypesByIdRelationshipsTasksData = {
-  body?: never;
-  path: {
-    id: number;
-  };
-  query?: never;
-  url: '/api/v2/ui/crackertypes/{id}/relationships/tasks';
-};
-
-export type GetCrackertypesByIdRelationshipsTasksErrors = {
-  /**
-   * Invalid request
-   */
-  400: ErrorResponse;
-  /**
-   * Authentication failed
-   */
-  401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
-   * Not Found
-   */
-  404: ErrorResponse;
-};
-
-export type GetCrackertypesByIdRelationshipsTasksError =
-  GetCrackertypesByIdRelationshipsTasksErrors[keyof GetCrackertypesByIdRelationshipsTasksErrors];
-
-export type GetCrackertypesByIdRelationshipsTasksResponses = {
+export type GetCrackertypesByIdByRelationResponses = {
   /**
    * successful operation
    */
   200: CrackerBinaryTypeRelationTasksGetResponse;
 };
 
-export type GetCrackertypesByIdRelationshipsTasksResponse =
-  GetCrackertypesByIdRelationshipsTasksResponses[keyof GetCrackertypesByIdRelationshipsTasksResponses];
+export type GetCrackertypesByIdByRelationResponse =
+  GetCrackertypesByIdByRelationResponses[keyof GetCrackertypesByIdByRelationResponses];
 
-export type PatchCrackertypesByIdRelationshipsTasksData = {
+export type DeleteCrackertypesByIdRelationshipsByRelationData = {
   body: CrackerBinaryTypeRelationTasks;
   path: {
     id: number;
+    relation: string;
   };
   query?: never;
-  url: '/api/v2/ui/crackertypes/{id}/relationships/tasks';
+  url: '/api/v2/ui/crackertypes/{id}/relationships/{relation}';
 };
 
-export type PatchCrackertypesByIdRelationshipsTasksErrors = {
+export type DeleteCrackertypesByIdRelationshipsByRelationErrors = {
   /**
    * Invalid request
    */
@@ -965,42 +463,113 @@ export type PatchCrackertypesByIdRelationshipsTasksErrors = {
    */
   401: ErrorResponse;
   /**
-   * Permission denied
+   * Not Found
    */
-  403: ErrorResponse;
+  404: NotFoundResponse;
+};
+
+export type DeleteCrackertypesByIdRelationshipsByRelationError =
+  DeleteCrackertypesByIdRelationshipsByRelationErrors[keyof DeleteCrackertypesByIdRelationshipsByRelationErrors];
+
+export type DeleteCrackertypesByIdRelationshipsByRelationResponses = {
+  /**
+   * successfully deleted
+   */
+  204: void;
+};
+
+export type DeleteCrackertypesByIdRelationshipsByRelationResponse =
+  DeleteCrackertypesByIdRelationshipsByRelationResponses[keyof DeleteCrackertypesByIdRelationshipsByRelationResponses];
+
+export type GetCrackertypesByIdRelationshipsByRelationData = {
+  body?: never;
+  path: {
+    id: number;
+    relation: string;
+  };
+  query?: never;
+  url: '/api/v2/ui/crackertypes/{id}/relationships/{relation}';
+};
+
+export type GetCrackertypesByIdRelationshipsByRelationErrors = {
+  /**
+   * Invalid request
+   */
+  400: ErrorResponse;
+  /**
+   * Authentication failed
+   */
+  401: ErrorResponse;
   /**
    * Not Found
    */
-  404: ErrorResponse;
-  /**
-   * Resource already exists
-   */
-  409: ErrorResponse;
+  404: NotFoundResponse;
 };
 
-export type PatchCrackertypesByIdRelationshipsTasksError =
-  PatchCrackertypesByIdRelationshipsTasksErrors[keyof PatchCrackertypesByIdRelationshipsTasksErrors];
+export type GetCrackertypesByIdRelationshipsByRelationError =
+  GetCrackertypesByIdRelationshipsByRelationErrors[keyof GetCrackertypesByIdRelationshipsByRelationErrors];
 
-export type PatchCrackertypesByIdRelationshipsTasksResponses = {
+export type GetCrackertypesByIdRelationshipsByRelationResponses = {
+  /**
+   * successful operation
+   */
+  200: CrackerBinaryTypeResponse;
+};
+
+export type GetCrackertypesByIdRelationshipsByRelationResponse =
+  GetCrackertypesByIdRelationshipsByRelationResponses[keyof GetCrackertypesByIdRelationshipsByRelationResponses];
+
+export type PatchCrackertypesByIdRelationshipsByRelationData = {
+  body: CrackerBinaryTypeRelationTasks;
+  path: {
+    id: number;
+    relation: string;
+  };
+  query?: never;
+  url: '/api/v2/ui/crackertypes/{id}/relationships/{relation}';
+};
+
+export type PatchCrackertypesByIdRelationshipsByRelationErrors = {
+  /**
+   * Invalid request
+   */
+  400: ErrorResponse;
+  /**
+   * Authentication failed
+   */
+  401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: NotFoundResponse;
+};
+
+export type PatchCrackertypesByIdRelationshipsByRelationError =
+  PatchCrackertypesByIdRelationshipsByRelationErrors[keyof PatchCrackertypesByIdRelationshipsByRelationErrors];
+
+export type PatchCrackertypesByIdRelationshipsByRelationResponses = {
   /**
    * Successfull operation
    */
   204: void;
 };
 
-export type PatchCrackertypesByIdRelationshipsTasksResponse =
-  PatchCrackertypesByIdRelationshipsTasksResponses[keyof PatchCrackertypesByIdRelationshipsTasksResponses];
+export type PatchCrackertypesByIdRelationshipsByRelationResponse =
+  PatchCrackertypesByIdRelationshipsByRelationResponses[keyof PatchCrackertypesByIdRelationshipsByRelationResponses];
 
-export type PostCrackertypesByIdRelationshipsTasksData = {
-  body: CrackerBinaryTypeRelationTasks;
+export type PostCrackertypesByIdRelationshipsByRelationData = {
+  body: {
+    [key: string]: unknown;
+  };
   path: {
     id: number;
+    relation: string;
   };
   query?: never;
-  url: '/api/v2/ui/crackertypes/{id}/relationships/tasks';
+  url: '/api/v2/ui/crackertypes/{id}/relationships/{relation}';
 };
 
-export type PostCrackertypesByIdRelationshipsTasksErrors = {
+export type PostCrackertypesByIdRelationshipsByRelationErrors = {
   /**
    * Invalid request
    */
@@ -1010,34 +579,28 @@ export type PostCrackertypesByIdRelationshipsTasksErrors = {
    */
   401: ErrorResponse;
   /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
    * Not Found
    */
-  404: ErrorResponse;
-  /**
-   * Resource already exists
-   */
-  409: ErrorResponse;
+  404: NotFoundResponse;
 };
 
-export type PostCrackertypesByIdRelationshipsTasksError =
-  PostCrackertypesByIdRelationshipsTasksErrors[keyof PostCrackertypesByIdRelationshipsTasksErrors];
+export type PostCrackertypesByIdRelationshipsByRelationError =
+  PostCrackertypesByIdRelationshipsByRelationErrors[keyof PostCrackertypesByIdRelationshipsByRelationErrors];
 
-export type PostCrackertypesByIdRelationshipsTasksResponses = {
+export type PostCrackertypesByIdRelationshipsByRelationResponses = {
   /**
    * successfully created
    */
   204: void;
 };
 
-export type PostCrackertypesByIdRelationshipsTasksResponse =
-  PostCrackertypesByIdRelationshipsTasksResponses[keyof PostCrackertypesByIdRelationshipsTasksResponses];
+export type PostCrackertypesByIdRelationshipsByRelationResponse =
+  PostCrackertypesByIdRelationshipsByRelationResponses[keyof PostCrackertypesByIdRelationshipsByRelationResponses];
 
 export type DeleteCrackertypesByIdData = {
-  body?: never;
+  body: {
+    [key: string]: unknown;
+  };
   path: {
     id: number;
   };
@@ -1055,13 +618,9 @@ export type DeleteCrackertypesByIdErrors = {
    */
   401: ErrorResponse;
   /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
    * Not Found
    */
-  404: ErrorResponse;
+  404: NotFoundResponse;
 };
 
 export type DeleteCrackertypesByIdError = DeleteCrackertypesByIdErrors[keyof DeleteCrackertypesByIdErrors];
@@ -1082,9 +641,9 @@ export type GetCrackertypesByIdData = {
   };
   query?: {
     /**
-     * Relationships to include in the response, comma seperated. Possible options: crackerVersions, tasks
+     * Items to include. Comma seperated
      */
-    include?: Array<'crackerVersions' | 'tasks'>;
+    include?: string;
   };
   url: '/api/v2/ui/crackertypes/{id}';
 };
@@ -1099,13 +658,9 @@ export type GetCrackertypesByIdErrors = {
    */
   401: ErrorResponse;
   /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
    * Not Found
    */
-  404: ErrorResponse;
+  404: NotFoundResponse;
 };
 
 export type GetCrackertypesByIdError = GetCrackertypesByIdErrors[keyof GetCrackertypesByIdErrors];
@@ -1138,17 +693,9 @@ export type PatchCrackertypesByIdErrors = {
    */
   401: ErrorResponse;
   /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
    * Not Found
    */
-  404: ErrorResponse;
-  /**
-   * Resource already exists
-   */
-  409: ErrorResponse;
+  404: NotFoundResponse;
 };
 
 export type PatchCrackertypesByIdError = PatchCrackertypesByIdErrors[keyof PatchCrackertypesByIdErrors];

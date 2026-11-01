@@ -1,5 +1,4 @@
-import { HttpStatus } from '@constants/http.config';
-import { zGetAccessGroupsHelperApiResponse, zHashlistResponse } from '@generated/api/zod';
+import { zAccessGroupListResponse, zHashlistResponse } from '@generated/api/zod';
 import { lastValueFrom } from 'rxjs';
 
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
@@ -28,7 +27,7 @@ import { TasksTableComponent } from '@components/tables/tasks-table/tasks-table.
 import { HashListFormat } from '@src/app/core/_constants/hashlist.config';
 import { ACCESS_GROUP_FIELD_MAPPING } from '@src/app/core/_constants/select.config';
 import { CanComponentDeactivate } from '@src/app/core/_guards/pendingchanges.guard';
-import { StaticArrayKind, StaticArrayPipe } from '@src/app/core/_pipes/static-array.pipe';
+import { StaticArrayPipe } from '@src/app/core/_pipes/static-array.pipe';
 import { getEditHashlistForm } from '@src/app/hashlists/edit-hashlist/edit-hashlist.form';
 import { SelectOption, transformSelectOptions } from '@src/app/shared/utils/forms';
 
@@ -111,12 +110,12 @@ export class EditHashlistComponent implements OnInit, CanComponentDeactivate {
       } catch (e: unknown) {
         const status = e instanceof HttpErrorResponse ? e.status : undefined;
 
-        if (status === HttpStatus.FORBIDDEN) {
+        if (status === 403) {
           this.router.navigateByUrl('/forbidden');
           return;
         }
 
-        if (status === HttpStatus.NOT_FOUND) {
+        if (status === 404) {
           this.router.navigateByUrl('/not-found');
           return;
         }
@@ -151,7 +150,7 @@ export class EditHashlistComponent implements OnInit, CanComponentDeactivate {
         hashlistId: hashlist.id,
         accessGroupId: hashlist.accessGroupId,
         useBrain: hashlist.useBrain,
-        format: this.format.transform(hashlist.format, StaticArrayKind.FORMATS),
+        format: this.format.transform(hashlist.format, 'formats'),
         hashCount: (hashlist.hashCount ?? 0).toLocaleString(),
         cracked: (hashlist.cracked ?? 0).toLocaleString(),
         remaining: ((hashlist.hashCount ?? 0) - (hashlist.cracked ?? 0)).toLocaleString(),
@@ -164,7 +163,7 @@ export class EditHashlistComponent implements OnInit, CanComponentDeactivate {
       });
       return;
     } catch (err: unknown) {
-      if (err instanceof HttpErrorResponse && err.status && err.status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      if (err instanceof HttpErrorResponse && err.status && err.status >= 500) {
         // Retry without includes if server failed resolving relationships
 
         console.warn('loadHashlist(): request with includes failed, retrying without includes', err);
@@ -179,7 +178,7 @@ export class EditHashlistComponent implements OnInit, CanComponentDeactivate {
           hashlistId: hashlist.id,
           accessGroupId: hashlist.accessGroupId,
           useBrain: hashlist.useBrain,
-          format: this.format.transform(hashlist.format, StaticArrayKind.FORMATS),
+          format: this.format.transform(hashlist.format, 'formats'),
           hashCount: (hashlist.hashCount ?? 0).toLocaleString(),
           cracked: (hashlist.cracked ?? 0).toLocaleString(),
           remaining: ((hashlist.hashCount ?? 0) - (hashlist.cracked ?? 0)).toLocaleString(),
@@ -205,7 +204,7 @@ export class EditHashlistComponent implements OnInit, CanComponentDeactivate {
     }
     const response = await lastValueFrom<ResponseWrapper>(this.gs.ghelper(SERV.HELPER, 'getAccessGroups'));
 
-    const accessGroups = new JsonAPISerializer().deserialize(response, zGetAccessGroupsHelperApiResponse);
+    const accessGroups = new JsonAPISerializer().deserialize(response, zAccessGroupListResponse);
 
     this.selectAccessgroup = transformSelectOptions(accessGroups, ACCESS_GROUP_FIELD_MAPPING);
     this.changeDetectorRef.detectChanges();

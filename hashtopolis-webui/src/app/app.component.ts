@@ -7,7 +7,7 @@ import { AfterViewInit, Component, ElementRef, OnInit, PLATFORM_ID, inject } fro
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { NavigationEnd, Router } from '@angular/router';
 
-import { Layout, UIConfig } from '@models/config-ui.model';
+import { UIConfig } from '@models/config-ui.model';
 import { UiSettings, uisSettingsSchema } from '@models/config-ui.schema';
 import { UserData, userDataSchema } from '@models/user-data.schema';
 
@@ -47,7 +47,11 @@ export class AppComponent implements OnInit, AfterViewInit {
   private elementRef = inject(ElementRef);
   private platformId = inject(PLATFORM_ID);
 
+  currentUrl: string;
+  currentStep: string;
+  idleState = 'Not Started';
   timedOut = false;
+  lastPing: Date | null = null;
   timeoutCountdown: number | null = null;
   timeoutMax = this.onTimeout();
   idleTime: number = this.onTimeout();
@@ -62,7 +66,9 @@ export class AppComponent implements OnInit, AfterViewInit {
     const idle = this.idle;
 
     inject(CheckTokenService);
-    this.router.events.pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd)).subscribe(() => {
+    this.router.events.pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd)).subscribe((e) => {
+      this.currentUrl = e.url;
+      this.findCurrentStep(this.currentUrl);
       if (isPlatformBrowser(this.platformId)) {
         window.scrollTo(0, 0);
       }
@@ -75,9 +81,11 @@ export class AppComponent implements OnInit, AfterViewInit {
     idle.onIdleStart.subscribe(() => {
       idle.clearInterrupts();
       this.checkLogin();
+      this.idleState = "You'll be logged out in 15 seconds!";
     });
 
     idle.onIdleEnd.subscribe(() => {
+      this.idleState = 'NOT_IDLE.';
       this.dialogData.timedOut = false;
       this.timeoutCountdown = null;
       this.reset();
@@ -85,6 +93,7 @@ export class AppComponent implements OnInit, AfterViewInit {
     });
 
     idle.onTimeout.subscribe(() => {
+      this.idleState = 'TIMED_OUT';
       this.timedOut = true;
       this.timeoutCountdown = null;
       this.dialogData.timedOut = true;
@@ -100,6 +109,7 @@ export class AppComponent implements OnInit, AfterViewInit {
     });
 
     this.keepalive.interval(15);
+    this.keepalive.onPing.subscribe(() => (this.lastPing = new Date()));
 
     this.authService.getUserLoggedIn().subscribe((userLoggedIn) => {
       if (userLoggedIn) {
@@ -145,9 +155,9 @@ export class AppComponent implements OnInit, AfterViewInit {
     const classes: string[] = [];
     if (this.uiSettings) {
       const layout = this.uiSettings.getSetting('layout');
-      if (layout === Layout.FIXED) {
+      if (layout === 'fixed') {
         classes.push('fixed-width-layout');
-      } else if (layout === Layout.FULL) {
+      } else if (layout === 'full') {
         classes.push('full-width-layout');
       }
 
@@ -161,8 +171,14 @@ export class AppComponent implements OnInit, AfterViewInit {
     }
   }
 
+  private findCurrentStep(currentRoute: string) {
+    const currRouteFragments = currentRoute.split('/');
+    const length = currRouteFragments.length;
+    this.currentStep = currentRoute.split('/')[length - 1];
+  }
+
   checkLogin() {
-    const userData = localStorage.getItem<UserData>(AuthService.STORAGE_KEY, userDataSchema);
+    const userData = localStorage.getItem<UserData>('userData', userDataSchema);
     if (!userData) {
       return;
     }
@@ -176,8 +192,10 @@ export class AppComponent implements OnInit, AfterViewInit {
     this.idle.setTimeout(false);
     this.idle.watch();
     this.idle.setInterrupts(DEFAULT_INTERRUPTSOURCES);
+    this.idleState = 'NOT_IDLE.';
     this.timedOut = false;
     this.timeoutCountdown = 0;
+    this.lastPing = null;
     this.closeModal();
   }
 

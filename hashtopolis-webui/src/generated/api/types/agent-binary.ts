@@ -1,4 +1,4 @@
-import type { ErrorResponse } from './common';
+import type { ErrorResponse, NotFoundResponse } from './common';
 
 export type AgentBinaryCreate = {
   data: {
@@ -26,34 +26,17 @@ export type AgentBinaryPatch = {
   };
 };
 
-export type AgentBinaryPatchMultiple = {
-  data: Array<{
-    id: number;
-    type: 'agentBinary';
-    attributes: {
-      binaryType?: string;
-      filename?: string;
-      operatingSystems?: string;
-      updateTrack?: string;
-      version?: string;
-    };
-  }>;
-};
-
-export type AgentBinaryDeleteMultiple = {
-  data: Array<{
-    id: number;
-    type: 'agentBinary';
-  }>;
-};
-
 export type AgentBinaryResponse = {
   jsonapi: {
     version: string;
     ext?: Array<string>;
   };
-  links: {
+  links?: {
     self: string;
+    first?: string;
+    last?: string;
+    next?: string | null;
+    previous?: string | null;
   };
   data: {
     id: number;
@@ -66,10 +49,11 @@ export type AgentBinaryResponse = {
       updateTrack: string;
       updateAvailable: string;
     };
-    links: {
-      self: string;
-    };
   };
+  relationships?: {
+    [key: string]: unknown;
+  };
+  included?: Array<unknown>;
 };
 
 export type AgentBinaryPostPatchResponse = {
@@ -77,9 +61,6 @@ export type AgentBinaryPostPatchResponse = {
     version: string;
     ext?: Array<string>;
   };
-  links: {
-    self: string;
-  };
   data: {
     id: number;
     type: 'agentBinary';
@@ -90,9 +71,6 @@ export type AgentBinaryPostPatchResponse = {
       filename: string;
       updateTrack: string;
       updateAvailable: string;
-    };
-    links: {
-      self: string;
     };
   };
 };
@@ -102,17 +80,12 @@ export type AgentBinaryListResponse = {
     version: string;
     ext?: Array<string>;
   };
-  links: {
+  links?: {
     self: string;
-    first: string;
-    last: string | null;
-    next: string | null;
-    prev: string | null;
-  };
-  meta: {
-    page: {
-      total_elements: number;
-    };
+    first?: string;
+    last?: string;
+    next?: string | null;
+    previous?: string | null;
   };
   data: Array<{
     id: number;
@@ -125,37 +98,15 @@ export type AgentBinaryListResponse = {
       updateTrack: string;
       updateAvailable: string;
     };
-    links: {
-      self: string;
-    };
   }>;
-};
-
-export type AgentBinaryCountResponse = {
-  jsonapi: {
-    version: string;
-    ext?: Array<string>;
-  };
-  meta: {
-    /**
-     * Number of objects accessible to the current user matching the given filters
-     */
-    count: number;
-    /**
-     * Number of objects accessible to the current user without any filter applied, only present when `include_total=true` was requested
-     */
-    total_count?: number;
-  };
-  /**
-   * Always empty: the count is reported under meta.
-   */
-  data: Array<{
+  relationships?: {
     [key: string]: unknown;
-  }>;
+  };
+  included?: Array<unknown>;
 };
 
 export type DeleteAgentbinariesData = {
-  body: AgentBinaryDeleteMultiple;
+  body?: never;
   path?: never;
   query?: never;
   url: '/api/v2/ui/agentbinaries';
@@ -170,65 +121,43 @@ export type DeleteAgentbinariesErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
-   * Not Found
-   */
-  404: ErrorResponse;
 };
 
 export type DeleteAgentbinariesError = DeleteAgentbinariesErrors[keyof DeleteAgentbinariesErrors];
 
 export type DeleteAgentbinariesResponses = {
   /**
-   * successfully deleted
+   * successful operation
    */
-  204: void;
+  200: unknown;
 };
-
-export type DeleteAgentbinariesResponse = DeleteAgentbinariesResponses[keyof DeleteAgentbinariesResponses];
 
 export type GetAgentbinariesData = {
   body?: never;
   path?: never;
   query?: {
     /**
-     * Pointer to paginate to retrieve the data after the object provided. Specify the `base64` encoded JSON string in a **uniquely identifiable** manner (e.g. object IDs), i.e. by using one (primary) or two (primary and secondary) fields that allow for **stable** sorting.
-     *
-     *
-     * Format: `{"primary":{"someField": 123},"secondary":{"someOtherOptionalField": "Foo"}}`
-     *
-     *
-     * Example: `{"primary":{"agentBinaryId": 123}}` -> `eyJwcmltYXJ5Ijp7ImFnZW50QmluYXJ5SWQiOiAxMjN9fQ==`
+     * Pointer to paginate to retrieve the data after the value provided
      */
-    'page[after]'?: string;
+    'page[after]'?: number;
     /**
-     * Pointer to paginate to retrieve the data before the object provided. Specify the `base64` encoded JSON string in a **uniquely identifiable** manner (e.g. object IDs), i.e. by using one (primary) or two (primary and secondary) fields that allow for **stable** sorting.
-     *
-     *
-     * Format: `{"primary":{"someField": 123},"secondary":{"someOtherOptionalField": "Foo"}}`
-     *
-     *
-     * Example: `{"primary":{"agentBinaryId": 123}}` -> `eyJwcmltYXJ5Ijp7ImFnZW50QmluYXJ5SWQiOiAxMjN9fQ==`
+     * Pointer to paginate to retrieve the data before the value provided
      */
-    'page[before]'?: string;
+    'page[before]'?: number;
     /**
      * Amout of data to retrieve inside a single page
      */
     'page[size]'?: number;
     /**
-     * Filters results using a query. Every key is an attribute name optionally suffixed with a comparison operator, e.g. `filter[agentBinaryId__gt]=200`.
+     * Filters results using a query
      */
     filter?: {
-      [key: string]: string;
+      [key: string]: unknown;
     };
     /**
-     * Relationships to include in the response, comma seperated. Possible options:
+     * Items to include, comma seperated. Possible options: Array
      */
-    include?: Array<string>;
+    include?: string;
   };
   url: '/api/v2/ui/agentbinaries';
 };
@@ -242,10 +171,6 @@ export type GetAgentbinariesErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
 };
 
 export type GetAgentbinariesError = GetAgentbinariesErrors[keyof GetAgentbinariesErrors];
@@ -260,7 +185,7 @@ export type GetAgentbinariesResponses = {
 export type GetAgentbinariesResponse = GetAgentbinariesResponses[keyof GetAgentbinariesResponses];
 
 export type PatchAgentbinariesData = {
-  body: AgentBinaryPatchMultiple;
+  body?: never;
   path?: never;
   query?: never;
   url: '/api/v2/ui/agentbinaries';
@@ -275,30 +200,16 @@ export type PatchAgentbinariesErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
-   * Not Found
-   */
-  404: ErrorResponse;
-  /**
-   * Resource already exists
-   */
-  409: ErrorResponse;
 };
 
 export type PatchAgentbinariesError = PatchAgentbinariesErrors[keyof PatchAgentbinariesErrors];
 
 export type PatchAgentbinariesResponses = {
   /**
-   * successfully updated
+   * successful operation
    */
-  204: void;
+  200: unknown;
 };
-
-export type PatchAgentbinariesResponse = PatchAgentbinariesResponses[keyof PatchAgentbinariesResponses];
 
 export type PostAgentbinariesData = {
   body: AgentBinaryCreate;
@@ -316,14 +227,6 @@ export type PostAgentbinariesErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
-   * Resource already exists
-   */
-  409: ErrorResponse;
 };
 
 export type PostAgentbinariesError = PostAgentbinariesErrors[keyof PostAgentbinariesErrors];
@@ -342,15 +245,27 @@ export type GetAgentbinariesCountData = {
   path?: never;
   query?: {
     /**
-     * Filters results using a query. Every key is an attribute name optionally suffixed with a comparison operator, e.g. `filter[agentBinaryId__gt]=200`.
+     * Pointer to paginate to retrieve the data after the value provided
+     */
+    'page[after]'?: number;
+    /**
+     * Pointer to paginate to retrieve the data before the value provided
+     */
+    'page[before]'?: number;
+    /**
+     * Amout of data to retrieve inside a single page
+     */
+    'page[size]'?: number;
+    /**
+     * Filters results using a query
      */
     filter?: {
-      [key: string]: string;
+      [key: string]: unknown;
     };
     /**
-     * Also report the number of accessible objects without any filter applied, as `meta.total_count`
+     * Items to include, comma seperated. Possible options: Array
      */
-    include_total?: boolean;
+    include?: string;
   };
   url: '/api/v2/ui/agentbinaries/count';
 };
@@ -364,10 +279,6 @@ export type GetAgentbinariesCountErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
-  /**
-   * Permission denied
-   */
-  403: ErrorResponse;
 };
 
 export type GetAgentbinariesCountError = GetAgentbinariesCountErrors[keyof GetAgentbinariesCountErrors];
@@ -376,13 +287,15 @@ export type GetAgentbinariesCountResponses = {
   /**
    * successful operation
    */
-  200: AgentBinaryCountResponse;
+  200: AgentBinaryListResponse;
 };
 
 export type GetAgentbinariesCountResponse = GetAgentbinariesCountResponses[keyof GetAgentbinariesCountResponses];
 
 export type DeleteAgentbinariesByIdData = {
-  body?: never;
+  body: {
+    [key: string]: unknown;
+  };
   path: {
     id: number;
   };
@@ -400,13 +313,9 @@ export type DeleteAgentbinariesByIdErrors = {
    */
   401: ErrorResponse;
   /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
    * Not Found
    */
-  404: ErrorResponse;
+  404: NotFoundResponse;
 };
 
 export type DeleteAgentbinariesByIdError = DeleteAgentbinariesByIdErrors[keyof DeleteAgentbinariesByIdErrors];
@@ -427,9 +336,9 @@ export type GetAgentbinariesByIdData = {
   };
   query?: {
     /**
-     * Relationships to include in the response, comma seperated. Possible options:
+     * Items to include. Comma seperated
      */
-    include?: Array<string>;
+    include?: string;
   };
   url: '/api/v2/ui/agentbinaries/{id}';
 };
@@ -444,13 +353,9 @@ export type GetAgentbinariesByIdErrors = {
    */
   401: ErrorResponse;
   /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
    * Not Found
    */
-  404: ErrorResponse;
+  404: NotFoundResponse;
 };
 
 export type GetAgentbinariesByIdError = GetAgentbinariesByIdErrors[keyof GetAgentbinariesByIdErrors];
@@ -483,17 +388,9 @@ export type PatchAgentbinariesByIdErrors = {
    */
   401: ErrorResponse;
   /**
-   * Permission denied
-   */
-  403: ErrorResponse;
-  /**
    * Not Found
    */
-  404: ErrorResponse;
-  /**
-   * Resource already exists
-   */
-  409: ErrorResponse;
+  404: NotFoundResponse;
 };
 
 export type PatchAgentbinariesByIdError = PatchAgentbinariesByIdErrors[keyof PatchAgentbinariesByIdErrors];

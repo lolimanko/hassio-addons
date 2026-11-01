@@ -1,5 +1,3 @@
-import { HashListFormat } from '@constants/hashlist.config';
-import { HTTP_SKIP_CACHE_HEADER_CONFIG } from '@constants/http.config';
 import {
   zAgentAssignmentListResponse,
   zAgentListResponse,
@@ -18,7 +16,6 @@ import { ActivatedRoute, Router } from '@angular/router';
 
 import { JAgentAssignment } from '@models/agent-assignment.model';
 import { ThinJAgent } from '@models/agent.model';
-import { TableSortDirection } from '@models/config-ui.model';
 import { JCrackerBinary } from '@models/cracker-binary.model';
 import { JHashlist } from '@models/hashlist.model';
 import { JHashtype } from '@models/hashtype.model';
@@ -99,6 +96,7 @@ export class EditTasksComponent implements OnInit, OnDestroy {
   searched: string;
 
   chunkview: number;
+  isactive = 0;
   currenspeed = 0;
 
   isReadOnly = false;
@@ -166,7 +164,7 @@ export class EditTasksComponent implements OnInit, OnDestroy {
 
       this.updateForm.setValue({
         taskId: task.id,
-        forcePipe: task.forcePipe ? 'Yes' : 'No',
+        forcePipe: task.forcePipe === true ? 'Yes' : 'No',
         staticChunks: this.getStaticChunkingLabel(task.staticChunks, task.chunkSize),
         skipKeyspace: task.skipKeyspace > 0 ? task.skipKeyspace : 'N/A',
         keyspace: task.keyspace,
@@ -268,7 +266,7 @@ export class EditTasksComponent implements OnInit, OnDestroy {
   }
 
   private async loadTask(): Promise<EditedTask> {
-    const noCacheHeaders = new HttpHeaders(HTTP_SKIP_CACHE_HEADER_CONFIG);
+    const noCacheHeaders = new HttpHeaders({ 'X-Cache-Skip': 'true' });
     const params = new RequestParamBuilder()
       .addInclude('hashlist')
       .addInclude('crackerBinary')
@@ -431,7 +429,8 @@ export class EditTasksComponent implements OnInit, OnDestroy {
     }
 
     this.gs.getAll(SERV.AGENTS, params.create()).subscribe((responseAgents: ResponseWrapper) => {
-      this.availAgents = this.serializer.deserialize(responseAgents, zAgentListResponse);
+      const agents: ThinJAgent[] = this.serializer.deserialize(responseAgents, zAgentListResponse);
+      this.availAgents = agents;
       this.selectAgents = transformSelectOptions(this.availAgents, AGENT_MAPPING);
       this.isLoadingAgents = false;
     });
@@ -535,7 +534,7 @@ export class EditTasksComponent implements OnInit, OnDestroy {
         value: this.editedTaskIndex,
         operator: FilterType.EQUAL
       })
-      .addSorting({ dataKey: 'speedId', direction: TableSortDirection.DESC, isSortable: true })
+      .addSorting({ dataKey: 'speedId', direction: 'desc', isSortable: true })
       .setPageSize(requestLimit);
 
     this.gs.getAll(SERV.SPEEDS, speedParams.create()).subscribe((response: ResponseWrapper) => {
@@ -554,6 +553,4 @@ export class EditTasksComponent implements OnInit, OnDestroy {
         return 'No';
     }
   }
-
-  protected readonly HashListFormat = HashListFormat;
 }

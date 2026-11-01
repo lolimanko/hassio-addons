@@ -2,44 +2,32 @@
  * Agent Stats Constants
  **/
 
-/**
- * Stat type recorded per agent, matching the `statType` field on agent stats.
- */
-export const ASC = {
-  GPU_TEMP: 1,
-  GPU_UTIL: 2,
-  CPU_UTIL: 3
-} as const;
-export type ASC = (typeof ASC)[keyof typeof ASC];
+export class ASC {
+  public static GPU_TEMP = 1;
+  public static GPU_UTIL = 2;
+  public static CPU_UTIL = 3;
+}
 
 /**
- * Agent operating system
+ * Enum for agent operating system
  */
-export const AgentOS = {
-  LINUX: 0,
-  WINDOWS: 1,
-  MACOS: 2
-} as const;
-export type AgentOS = (typeof AgentOS)[keyof typeof AgentOS];
+export enum AgentOS {
+  LINUX = 0,
+  WINDOWS = 1,
+  MACOS = 2
+}
 
 /**
- * Agent behaviour when a cracking error occurs
+ * Enum for agent ignore errors
  */
-export const IgnoreErrors = {
-  NO: 0,
-  IGNORE_SAVE: 1,
-  IGNORE_NOSAVE: 2
-} as const;
-export type IgnoreErrors = (typeof IgnoreErrors)[keyof typeof IgnoreErrors];
+export enum IgnoreErrors {
+  NO = 0,
+  IGNORE_SAVE = 1,
+  IGNORE_NOSAVE = 2
+}
 
-export const IgnoreErrorsLabels: Record<IgnoreErrors, string> = {
-  [IgnoreErrors.NO]: 'Deactivate agent on error',
-  [IgnoreErrors.IGNORE_SAVE]: 'Keep agent running, but save errors',
-  [IgnoreErrors.IGNORE_NOSAVE]: 'Keep agent running and discard errors'
-};
-
-export const IgnoreErrorsOptions = [
-  { id: IgnoreErrors.NO, name: IgnoreErrorsLabels[IgnoreErrors.NO] },
-  { id: IgnoreErrors.IGNORE_SAVE, name: IgnoreErrorsLabels[IgnoreErrors.IGNORE_SAVE] },
-  { id: IgnoreErrors.IGNORE_NOSAVE, name: IgnoreErrorsLabels[IgnoreErrors.IGNORE_NOSAVE] }
+export const IGNORE_ERROR_CHOICES = [
+  { id: IgnoreErrors.NO, name: 'Deactivate agent on error' },
+  { id: IgnoreErrors.IGNORE_SAVE, name: 'Keep agent running, but save errors' },
+  { id: IgnoreErrors.IGNORE_NOSAVE, name: 'Keep agent running and discard errors' }
 ];

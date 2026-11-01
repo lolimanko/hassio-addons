@@ -1,16 +1,19 @@
 import * as z from 'zod';
 
-import { zAgentResponse } from './agent';
-import { zHealthCheckResponse } from './health-check';
-
 export const zHealthCheckAgentResponse = z.object({
   jsonapi: z.object({
     version: z.string().default('1.1'),
     ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
   }),
-  links: z.object({
-    self: z.string().default('/api/v2/ui/healthcheckagents/1')
-  }),
+  links: z
+    .object({
+      self: z.string().default('/api/v2/ui/healthcheckagents?page[size]=25'),
+      first: z.string().optional().default('/api/v2/ui/healthcheckagents?page[size]=25&page[after]=0'),
+      last: z.string().optional().default('/api/v2/ui/healthcheckagents?page[size]=25&page[before]=500'),
+      next: z.string().nullish().default('/api/v2/ui/healthcheckagents?page[size]=25&page[after]=25'),
+      previous: z.string().nullish().default('/api/v2/ui/healthcheckagents?page[size]=25&page[before]=25')
+    })
+    .optional(),
   data: z.object({
     id: z.int(),
     type: z.literal('healthCheckAgent'),
@@ -23,11 +26,10 @@ export const zHealthCheckAgentResponse = z.object({
       start: z.number(),
       end: z.number(),
       errors: z.string()
-    }),
-    links: z.object({
-      self: z.string().default('/api/v2/ui/healthcheckagents/1')
-    }),
-    relationships: z.object({
+    })
+  }),
+  relationships: z
+    .object({
       agent: z.object({
         links: z.object({
           self: z.string().default('/api/v2/ui/healthcheckagents/relationships/agent'),
@@ -53,7 +55,7 @@ export const zHealthCheckAgentResponse = z.object({
           .nullish()
       })
     })
-  }),
+    .optional(),
   included: z
     .array(
       z.union([
@@ -101,33 +103,15 @@ export const zHealthCheckAgentListResponse = z.object({
     version: z.string().default('1.1'),
     ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
   }),
-  links: z.object({
-    self: z.string().default('/api/v2/ui/healthcheckagents?page[size]=25'),
-    first: z.string().default('/api/v2/ui/healthcheckagents?page[size]=25'),
-    last: z
-      .string()
-      .nullable()
-      .default(
-        '/api/v2/ui/healthcheckagents?page[size]=25&page[before]=eyJwcmltYXJ5Ijp7InNvbWVVbnFpdWVGaWVsZCI6MTIzfSwic2Vjb25kYXJ5Ijp7InNvbWVPdGhlck9wdGlvbmFsRmllbGQiOiJGb28ifX0='
-      ),
-    next: z
-      .string()
-      .nullable()
-      .default(
-        '/api/v2/ui/healthcheckagents?page[size]=25&page[after]=eyJwcmltYXJ5Ijp7InNvbWVVbnFpdWVGaWVsZCI6MTIzfSwic2Vjb25kYXJ5Ijp7InNvbWVPdGhlck9wdGlvbmFsRmllbGQiOiJGb28ifX0='
-      ),
-    prev: z
-      .string()
-      .nullable()
-      .default(
-        '/api/v2/ui/healthcheckagents?page[size]=25&page[before]=eyJwcmltYXJ5Ijp7InNvbWVVbnFpdWVGaWVsZCI6MTIzfSwic2Vjb25kYXJ5Ijp7InNvbWVPdGhlck9wdGlvbmFsRmllbGQiOiJGb28ifX0='
-      )
-  }),
-  meta: z.object({
-    page: z.object({
-      total_elements: z.int()
+  links: z
+    .object({
+      self: z.string().default('/api/v2/ui/healthcheckagents?page[size]=25'),
+      first: z.string().optional().default('/api/v2/ui/healthcheckagents?page[size]=25&page[after]=0'),
+      last: z.string().optional().default('/api/v2/ui/healthcheckagents?page[size]=25&page[before]=500'),
+      next: z.string().nullish().default('/api/v2/ui/healthcheckagents?page[size]=25&page[after]=25'),
+      previous: z.string().nullish().default('/api/v2/ui/healthcheckagents?page[size]=25&page[before]=25')
     })
-  }),
+    .optional(),
   data: z.array(
     z.object({
       id: z.int(),
@@ -141,38 +125,37 @@ export const zHealthCheckAgentListResponse = z.object({
         start: z.number(),
         end: z.number(),
         errors: z.string()
-      }),
-      links: z.object({
-        self: z.string().default('/api/v2/ui/healthcheckagents/1')
-      }),
-      relationships: z.object({
-        agent: z.object({
-          links: z.object({
-            self: z.string().default('/api/v2/ui/healthcheckagents/relationships/agent'),
-            related: z.string().default('/api/v2/ui/healthcheckagents/agent')
-          }),
-          data: z
-            .object({
-              type: z.literal('agent'),
-              id: z.int()
-            })
-            .nullish()
-        }),
-        healthCheck: z.object({
-          links: z.object({
-            self: z.string().default('/api/v2/ui/healthcheckagents/relationships/healthCheck'),
-            related: z.string().default('/api/v2/ui/healthcheckagents/healthCheck')
-          }),
-          data: z
-            .object({
-              type: z.literal('healthCheck'),
-              id: z.int()
-            })
-            .nullish()
-        })
       })
     })
   ),
+  relationships: z
+    .object({
+      agent: z.object({
+        links: z.object({
+          self: z.string().default('/api/v2/ui/healthcheckagents/relationships/agent'),
+          related: z.string().default('/api/v2/ui/healthcheckagents/agent')
+        }),
+        data: z
+          .object({
+            type: z.literal('agent'),
+            id: z.int()
+          })
+          .nullish()
+      }),
+      healthCheck: z.object({
+        links: z.object({
+          self: z.string().default('/api/v2/ui/healthcheckagents/relationships/healthCheck'),
+          related: z.string().default('/api/v2/ui/healthcheckagents/healthCheck')
+        }),
+        data: z
+          .object({
+            type: z.literal('healthCheck'),
+            id: z.int()
+          })
+          .nullish()
+      })
+    })
+    .optional(),
   included: z
     .array(
       z.union([
@@ -215,60 +198,44 @@ export const zHealthCheckAgentListResponse = z.object({
     .optional()
 });
 
-export const zHealthCheckAgentCountResponse = z.object({
-  jsonapi: z.object({
-    version: z.string().default('1.1'),
-    ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
-  }),
-  meta: z.object({
-    count: z.int(),
-    total_count: z.int().optional()
-  }),
-  data: z.array(z.record(z.string(), z.unknown())).max(0)
-});
-
-export const zHealthCheckAgentRelationAgent = z.object({
-  data: z.object({
-    type: z.literal('agent'),
-    id: z.int()
-  })
-});
-
-export const zHealthCheckAgentRelationAgentGetResponse = z.object({
-  data: z
-    .object({
-      type: z.literal('agent'),
-      id: z.int()
-    })
-    .nullable()
-});
-
 export const zHealthCheckAgentRelationHealthCheck = z.object({
   data: z.object({
     type: z.literal('healthCheck'),
-    id: z.int()
+    id: z.int().default(1)
   })
 });
 
 export const zHealthCheckAgentRelationHealthCheckGetResponse = z.object({
-  data: z
-    .object({
-      type: z.literal('healthCheck'),
-      id: z.int()
-    })
-    .nullable()
+  data: z.object({
+    type: z.literal('healthCheck'),
+    id: z.int().default(1)
+  })
 });
 
-export const zGetHealthcheckagentsQuery = z.object({
-  'page[after]': z.string().optional(),
-  'page[before]': z.string().optional(),
-  'page[size]': z
-    .int()
-    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-    .optional(),
-  filter: z.record(z.string(), z.string()).optional(),
-  include: z.array(z.enum(['agent', 'healthCheck'])).optional()
+export const zGetHealthcheckagentsData = z.object({
+  body: z.never().optional(),
+  path: z.never().optional(),
+  query: z
+    .object({
+      'page[after]': z
+        .int()
+        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+        .optional(),
+      'page[before]': z
+        .int()
+        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+        .optional(),
+      'page[size]': z
+        .int()
+        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+        .optional(),
+      filter: z.record(z.string(), z.unknown()).optional(),
+      include: z.string().optional()
+    })
+    .optional()
 });
 
 /**
@@ -276,96 +243,98 @@ export const zGetHealthcheckagentsQuery = z.object({
  */
 export const zGetHealthcheckagentsResponse = zHealthCheckAgentListResponse;
 
-export const zGetHealthcheckagentsCountQuery = z.object({
-  filter: z.record(z.string(), z.string()).optional(),
-  include_total: z.boolean().optional()
+export const zGetHealthcheckagentsCountData = z.object({
+  body: z.never().optional(),
+  path: z.never().optional(),
+  query: z
+    .object({
+      'page[after]': z
+        .int()
+        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+        .optional(),
+      'page[before]': z
+        .int()
+        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+        .optional(),
+      'page[size]': z
+        .int()
+        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+        .optional(),
+      filter: z.record(z.string(), z.unknown()).optional(),
+      include: z.string().optional()
+    })
+    .optional()
 });
 
 /**
  * successful operation
  */
-export const zGetHealthcheckagentsCountResponse = zHealthCheckAgentCountResponse;
+export const zGetHealthcheckagentsCountResponse = zHealthCheckAgentListResponse;
 
-export const zGetHealthcheckagentsByIdAgentPath = z.object({
-  id: z
-    .int()
-    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+export const zGetHealthcheckagentsByIdByRelationData = z.object({
+  body: z.never().optional(),
+  path: z.object({
+    id: z
+      .int()
+      .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+      .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    relation: z.string()
+  }),
+  query: z.never().optional()
 });
 
 /**
  * successful operation
  */
-export const zGetHealthcheckagentsByIdAgentResponse = zAgentResponse;
+export const zGetHealthcheckagentsByIdByRelationResponse = zHealthCheckAgentRelationHealthCheckGetResponse;
 
-export const zGetHealthcheckagentsByIdRelationshipsAgentPath = z.object({
-  id: z
-    .int()
-    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+export const zGetHealthcheckagentsByIdRelationshipsByRelationData = z.object({
+  body: z.never().optional(),
+  path: z.object({
+    id: z
+      .int()
+      .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+      .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    relation: z.string()
+  }),
+  query: z.never().optional()
 });
 
 /**
  * successful operation
  */
-export const zGetHealthcheckagentsByIdRelationshipsAgentResponse = zHealthCheckAgentRelationAgentGetResponse;
+export const zGetHealthcheckagentsByIdRelationshipsByRelationResponse = zHealthCheckAgentResponse;
 
-export const zPatchHealthcheckagentsByIdRelationshipsAgentBody = zHealthCheckAgentRelationAgent;
-
-export const zPatchHealthcheckagentsByIdRelationshipsAgentPath = z.object({
-  id: z.int()
+export const zPatchHealthcheckagentsByIdRelationshipsByRelationData = z.object({
+  body: zHealthCheckAgentRelationHealthCheck,
+  path: z.object({
+    id: z.int(),
+    relation: z.string()
+  }),
+  query: z.never().optional()
 });
 
 /**
  * Successfull operation
  */
-export const zPatchHealthcheckagentsByIdRelationshipsAgentResponse = z.void();
+export const zPatchHealthcheckagentsByIdRelationshipsByRelationResponse = z.void();
 
-export const zGetHealthcheckagentsByIdHealthCheckPath = z.object({
-  id: z
-    .int()
-    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-});
-
-/**
- * successful operation
- */
-export const zGetHealthcheckagentsByIdHealthCheckResponse = zHealthCheckResponse;
-
-export const zGetHealthcheckagentsByIdRelationshipsHealthCheckPath = z.object({
-  id: z
-    .int()
-    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-});
-
-/**
- * successful operation
- */
-export const zGetHealthcheckagentsByIdRelationshipsHealthCheckResponse =
-  zHealthCheckAgentRelationHealthCheckGetResponse;
-
-export const zPatchHealthcheckagentsByIdRelationshipsHealthCheckBody = zHealthCheckAgentRelationHealthCheck;
-
-export const zPatchHealthcheckagentsByIdRelationshipsHealthCheckPath = z.object({
-  id: z.int()
-});
-
-/**
- * Successfull operation
- */
-export const zPatchHealthcheckagentsByIdRelationshipsHealthCheckResponse = z.void();
-
-export const zGetHealthcheckagentsByIdPath = z.object({
-  id: z
-    .int()
-    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-});
-
-export const zGetHealthcheckagentsByIdQuery = z.object({
-  include: z.array(z.enum(['agent', 'healthCheck'])).optional()
+export const zGetHealthcheckagentsByIdData = z.object({
+  body: z.never().optional(),
+  path: z.object({
+    id: z
+      .int()
+      .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+      .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+  }),
+  query: z
+    .object({
+      include: z.string().optional()
+    })
+    .optional()
 });
 
 /**

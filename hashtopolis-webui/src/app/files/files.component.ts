@@ -14,7 +14,7 @@ import { AutoTitleService } from '@services/shared/autotitle.service';
   standalone: false
 })
 export class FilesComponent implements OnInit {
-  fileType: FileType = FileType.WORDLIST;
+  fileType: FileType = 0;
   FileType = FileType;
   name: TableSettingsKey = 'filesTable';
 
@@ -32,13 +32,13 @@ export class FilesComponent implements OnInit {
     this.loadFiles();
     this.showCreateButton = this.fileRolesService.hasRole('create');
     switch (this.fileType) {
-      case FileType.WORDLIST:
+      case 0:
         this.name = 'filesWordlistTable';
         break;
-      case FileType.RULES:
+      case 1:
         this.name = 'filesRuleTable';
         break;
-      case FileType.OTHER:
+      case 2:
         this.name = 'filesOtherTable';
         break;
     }

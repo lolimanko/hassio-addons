@@ -1,13 +1,11 @@
 import { catchError } from 'rxjs';
 
-import { AfterViewInit, Component, OnInit, inject } from '@angular/core';
+import { AfterViewInit, Component, OnInit } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
-import { CrackerBinaryTypeId } from '@models/id.types';
 import { JSuperTask, JSuperTaskAggregateFields } from '@models/supertask.model';
 
 import { SuperTaskContextMenuService } from '@services/context-menu/tasks/supertask-menu.service';
-import { CrackerBinaryTypesService, fallbackCrackerTypeName } from '@services/crackers/cracker-binary-types.service';
 import { SERV } from '@services/main.config';
 
 import { ActionMenuEvent } from '@components/menus/action-menu/action-menu.model';
@@ -25,6 +23,7 @@ import { DialogData } from '@components/tables/table-dialog/table-dialog.model';
 import { SuperTasksDataSource } from '@datasources/supertasks.datasource';
 
 import { FilterType } from '@src/app/core/_models/request-params.model';
+import { ModalPretasksComponent } from '@src/app/tasks/supertasks/modal-pretasks/modal-pretasks.component';
 
 @Component({
   selector: 'app-supertasks-table',
@@ -35,9 +34,6 @@ export class SuperTasksTableComponent extends BaseTableComponent implements OnIn
   tableColumns: HTTableColumn[] = [];
   dataSource: SuperTasksDataSource;
   selectedFilterColumn: HTTableColumn;
-
-  private crackerTypeNames: ReadonlyMap<CrackerBinaryTypeId, string> = new Map();
-  private crackerBinaryTypes = inject(CrackerBinaryTypesService);
 
   ngOnInit(): void {
     this.setColumnLabels(SupertasksTableColumnLabel);
@@ -50,14 +46,8 @@ export class SuperTasksTableComponent extends BaseTableComponent implements OnIn
   }
 
   ngAfterViewInit(): void {
-    // the type names are needed to render the rows; getTypeNames never fails, so the rows always load
-    this.crackerBinaryTypes
-      .getTypeNames()
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((names) => {
-        this.crackerTypeNames = names;
-        this.dataSource.loadAll();
-      });
+    // Wait until paginator is defined
+    this.dataSource.loadAll();
   }
 
   filter(input: string) {
@@ -108,20 +98,8 @@ export class SuperTasksTableComponent extends BaseTableComponent implements OnIn
         render: (supertask: JSuperTaskAggregateFields) => (supertask.amountPretasks ? supertask.amountPretasks : ''),
         export: async (supertask: JSuperTaskAggregateFields) =>
           supertask.amountPretasks ? supertask.amountPretasks.toString() : ''
-      },
-      {
-        id: SupertasksTableCol.CRACKER_TYPE,
-        dataKey: 'crackerBinaryTypeId',
-        isSortable: true,
-        render: (supertask: JSuperTask) => this.crackerTypeName(supertask.crackerBinaryTypeId),
-        export: async (supertask: JSuperTask) => this.crackerTypeName(supertask.crackerBinaryTypeId)
       }
     ];
-  }
-
-  /** Name of a cracker binary type, `Type #<id>` if the type list does not contain it */
-  private crackerTypeName(id: CrackerBinaryTypeId): string {
-    return this.crackerTypeNames.get(id) ?? fallbackCrackerTypeName(id);
   }
 
   openDialog(data: DialogData<JSuperTask>) {
@@ -167,6 +145,9 @@ export class SuperTasksTableComponent extends BaseTableComponent implements OnIn
         break;
       case RowActionMenuAction.APPLY_TO_HASHLIST:
         this.rowActionApplyToHashlist(event.data);
+        break;
+      case RowActionMenuAction.EDIT_SUBTASKS:
+        this.rowActionEditSubtasks(event.data);
         break;
       case RowActionMenuAction.DELETE:
         this.openDialog({
@@ -228,6 +209,19 @@ export class SuperTasksTableComponent extends BaseTableComponent implements OnIn
 
   private rowActionApplyToHashlist(supertask: JSuperTask): void {
     this.router.navigate(['/tasks/', supertask.id, 'applyhashlist']).then(() => {});
+  }
+
+  private rowActionEditSubtasks(supertask: JSuperTask): void {
+    const dialogRef = this.dialog.open(ModalPretasksComponent, {
+      width: '80vw',
+      maxWidth: '80vw',
+      data: {
+        supertaskId: supertask.id,
+        supertaskName: supertask.supertaskName
+      }
+    });
+
+    dialogRef.afterClosed().subscribe();
   }
 
   private rowActionEdit(supertask: JSuperTask): void {

@@ -17,16 +17,16 @@ import { UIConfigService } from '@services/shared/storage.service';
 import { LocalStorageService } from '@services/storage/local-storage.service';
 
 import { NotificationsDataSource } from '@src/app/core/_datasources/notifications.datasource';
-import { mockResource, mockResponse } from '@src/app/testing/mock-response';
+import { mockResponse } from '@src/app/testing/mock-response';
 
 // Mock data
 
 const MOCK_NOTIFICATION: JNotification = {
   id: 1,
   type: 'notificationSetting',
-  action: 'agentError',
+  action: 'createNotification',
   isActive: true,
-  notification: 'ChatBot',
+  notification: 'agentError',
   receiver: 'user@example.org',
   userId: 1,
   objectId: undefined
@@ -35,9 +35,9 @@ const MOCK_NOTIFICATION: JNotification = {
 const MOCK_NOTIFICATION_WITH_OBJECT: JNotification = {
   id: 3,
   type: 'notificationSetting',
-  action: 'hashlistAllCracked',
+  action: 'createNotification',
   isActive: true,
-  notification: 'Slack',
+  notification: 'hashlistAllCracked',
   receiver: 'user@example.org',
   userId: 1,
   objectId: 4
@@ -190,7 +190,7 @@ describe('NotificationsDataSource', () => {
       dataSource.loadAll();
       const data = dataSource.getOriginalData();
       expect(data[0].objectId).toBe(4);
-      expect(data[0].action).toBe('hashlistAllCracked');
+      expect(data[0].notification).toBe('hashlistAllCracked');
     });
   });
 
@@ -250,24 +250,23 @@ describe('NotificationsDataSource', () => {
 // agentError/logError) carry no objectId. The list-response schema must accept a null or absent
 // objectId, otherwise the serializer's validateBody() logs a large ZodError to the console.
 describe('zNotificationSettingListResponse objectId nullability', () => {
-  const bodyWith = (attrs: Record<string, unknown>) =>
-    mockResponse({
-      data: [
-        mockResource(
-          'notificationSetting',
-          1,
-          {
-            action: 'agentError',
-            notification: 'ChatBot',
-            userId: 1,
-            receiver: 'user@example.org',
-            isActive: true,
-            ...attrs
-          },
-          ['user']
-        )
-      ]
-    });
+  const bodyWith = (attrs: Record<string, unknown>) => ({
+    jsonapi: { version: '1.1' },
+    data: [
+      {
+        id: 1,
+        type: 'notificationSetting',
+        attributes: {
+          action: 'createNotification',
+          notification: 'agentError',
+          userId: 1,
+          receiver: 'user@example.org',
+          isActive: true,
+          ...attrs
+        }
+      }
+    ]
+  });
 
   it('accepts a numeric objectId', () => {
     expect(zNotificationSettingListResponse.safeParse(bodyWith({ objectId: 42 })).success).toBeTrue();
@@ -277,8 +276,8 @@ describe('zNotificationSettingListResponse objectId nullability', () => {
     expect(zNotificationSettingListResponse.safeParse(bodyWith({ objectId: null })).success).toBeTrue();
   });
 
-  it('rejects an absent objectId (the API always sends it, null when not tied to an object)', () => {
-    expect(zNotificationSettingListResponse.safeParse(bodyWith({})).success).toBeFalse();
+  it('accepts an absent objectId', () => {
+    expect(zNotificationSettingListResponse.safeParse(bodyWith({})).success).toBeTrue();
   });
 
   it('still rejects a non-integer objectId', () => {

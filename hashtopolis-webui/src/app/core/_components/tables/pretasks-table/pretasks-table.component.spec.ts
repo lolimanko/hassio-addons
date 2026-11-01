@@ -34,7 +34,6 @@ class MockDataSource {
   reload = jasmine.createSpy('reload');
   setSuperTaskId = jasmine.createSpy('setSuperTaskId');
   setReverseQuery = jasmine.createSpy('setReverseQuery');
-  setCrackerBinaryTypeId = jasmine.createSpy('setCrackerBinaryTypeId');
   reset = jasmine.createSpy('reset');
   filterError$ = new Subject<string>();
 }
@@ -52,7 +51,6 @@ class TestPretasksTableComponent extends PretasksTableComponent {
       this.isDetail = true;
       this.dataSource.setSuperTaskId(this.supertTaskId);
       this.dataSource.setReverseQuery(this.reverseQuery);
-      this.dataSource.setCrackerBinaryTypeId(this.crackerBinaryTypeId);
     }
 
     this.setupFilterErrorSubscription(this.dataSource);

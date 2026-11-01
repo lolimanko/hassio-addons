@@ -27,7 +27,7 @@ import { TableSettingsKey, UIConfig } from '@models/config-ui.model';
 import { JHashlist } from '@models/hashlist.model';
 import { JNotification } from '@models/notification.model';
 import { JSuperTask } from '@models/supertask.model';
-import { JTaskWith, JTaskWrapperDisplay, TaskType } from '@models/task.model';
+import { JTask, JTaskWith, JTaskWrapperDisplay, TaskType } from '@models/task.model';
 import { JUser } from '@models/user.model';
 
 import { ContextMenuService } from '@services/context-menu/base/context-menu.service';
@@ -166,18 +166,6 @@ export class BaseTableComponent {
   }
 
   /**
-   * Render link to the chunk detail page
-   * @param chunkId - ID of the chunk to link to, renders 'N/A' when there is none
-   * @return observable object containing a router link array
-   */
-  renderChunkDetailLink(chunkId: number | null | undefined): Observable<HTTableRouterLink[]> {
-    if (!chunkId) {
-      return of([{ routerLink: null, label: 'N/A', muted: true }]);
-    }
-    return of([{ routerLink: ['/tasks', 'chunks', chunkId, 'view'], label: chunkId.toString() }]);
-  }
-
-  /**
    * Render cracked link to be displayed in HTML code
    * @param chunk - chunk object to render router link for
    * @return observable object containing a router link array
@@ -306,28 +294,17 @@ export class BaseTableComponent {
   }
 
   /**
-   * Render agent edit link to be displayed in HTML code given a chunk instance.
-   * A chunk whose agent was deleted has a null agentId and shows a muted
-   * "(deleted)" placeholder instead of a link.
+   * Render agent edit link to be displayed in HTML code given a chunk instance
    * @param chunk - chunk model to render agent router link for
    * @return observable object containing a router link array
    */
   renderAgentLinkFromChunk(chunk: JChunk): Observable<HTTableRouterLink[]> {
     const links: HTTableRouterLink[] = [];
     if (chunk) {
-      if (chunk.agentId === null) {
-        links.push({
-          routerLink: null,
-          label: '(deleted)',
-          muted: true,
-          tooltip: 'The agent that worked this chunk has been deleted'
-        });
-      } else {
-        links.push({
-          routerLink: ['/agents', 'show-agents', chunk.agentId, 'edit'],
-          label: chunk.agentName?.trim() || String(chunk.agentId)
-        });
-      }
+      links.push({
+        routerLink: ['/agents', 'show-agents', chunk.agentId, 'edit'],
+        label: chunk.agentName?.trim() || String(chunk.agentId)
+      });
     }
     return of(links);
   }
@@ -376,6 +353,22 @@ export class BaseTableComponent {
       links.push({
         routerLink: ['/tasks', 'show-tasks', model.taskId, 'edit'],
         label: idLink ? model.taskId.toString() : model.task?.taskName?.toString()
+      });
+    }
+    return of(links);
+  }
+
+  /* Render edit link for subtask
+   * @param model - agent or chunk to render tasl link for
+   * @param idLink - if true, the task ID will be used as label, otherwise the task name
+   * @return observable object containing a router link array
+   */
+  renderTaskLinkSubtasks(model: JTask, idLink: boolean = false): Observable<HTTableRouterLink[]> {
+    const links: HTTableRouterLink[] = [];
+    if (model) {
+      links.push({
+        routerLink: ['/tasks', 'show-tasks', model.id, 'edit'],
+        label: idLink ? model.id.toString() : model.taskName?.toString()
       });
     }
     return of(links);

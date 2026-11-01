@@ -3,7 +3,6 @@
  */
 import { Injectable } from '@angular/core';
 
-import { BackgroundJobRoleService } from '@services/roles/config/background-job-role.service';
 import { HashTypesRoleService } from '@services/roles/config/hashtypes-role.service';
 import { HealthCheckRoleService } from '@services/roles/config/healthcheck-role.service';
 import { LogRoleService } from '@services/roles/config/log-role.service';
@@ -19,8 +18,7 @@ export class ConfigRoleWrapperService {
     private hashTypesRoleService: HashTypesRoleService,
     private healthCheckRoleService: HealthCheckRoleService,
     private logRoleService: LogRoleService,
-    private notificationRoleService: NotificationsRoleService,
-    private backgroundJobRoleService: BackgroundJobRoleService
+    private notificationRoleService: NotificationsRoleService
   ) {}
 
   hasSettingsRole(roleName: string): boolean {
@@ -41,9 +39,5 @@ export class ConfigRoleWrapperService {
 
   hasNotificationRole(roleName: string): boolean {
     return this.notificationRoleService.hasRole(roleName);
-  }
-
-  hasBackgroundJobRole(roleName: string): boolean {
-    return this.backgroundJobRoleService.hasRole(roleName);
   }
 }

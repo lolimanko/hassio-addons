@@ -5,7 +5,6 @@ export * from './agent-binary';
 export * from './agent-error';
 export * from './agent-stat';
 export * from './api-token';
-export * from './background-job';
 export * from './chunk';
 export * from './common';
 export * from './config';

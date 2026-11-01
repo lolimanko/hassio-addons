@@ -1,4 +1,4 @@
-import { zAccessGroupListResponse, zAccessGroupResponse, zUserListResponse } from '@generated/api/zod';
+import { zAccessGroupListResponse, zUserListResponse } from '@generated/api/zod';
 import { of } from 'rxjs';
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
@@ -18,17 +18,17 @@ import { AccessGroupsAgentsTableComponent } from '@components/tables/access-grou
 import { AccessGroupsUserTableComponent } from '@components/tables/access-groups-users-table/access-groups-users-table.component';
 
 import { JsonAPISerializer } from '@src/app/core/_services/api/serializer-service';
-import { mockResponse, mockValidResponse } from '@src/app/testing/mock-response';
+import { mockResponse } from '@src/app/testing/mock-response';
 import { EditGroupsComponent } from '@src/app/users/edit-groups/edit-groups.component';
 
-const mockAccessGroupResponse: ResponseWrapper = mockValidResponse(zAccessGroupResponse, {
+const mockAccessGroupResponse: ResponseWrapper = mockResponse({
   data: {
     id: 1,
     type: 'accessGroup',
     attributes: {
       groupName: 'Test Group'
     }
-  }
+  } as never
 });
 
 /**
@@ -42,7 +42,10 @@ const mockAccessGroupResponse: ResponseWrapper = mockValidResponse(zAccessGroupR
 describe('EditGroupsComponent deserialization', () => {
   let serializer: JsonAPISerializer;
 
-  const userListBody = mockValidResponse(zUserListResponse, {
+  const jsonapi = { version: '1.1' };
+
+  const userListBody = {
+    jsonapi,
     data: [
       {
         id: 10,
@@ -55,7 +58,12 @@ describe('EditGroupsComponent deserialization', () => {
           lastLoginDate: 1752647000,
           registeredSince: 1744086300,
           sessionLifetime: 3600,
-          globalPermissionGroupId: 2
+          globalPermissionGroupId: 2,
+          yubikey: '0',
+          otp1: '',
+          otp2: '',
+          otp3: '',
+          otp4: ''
         }
       },
       {
@@ -69,11 +77,16 @@ describe('EditGroupsComponent deserialization', () => {
           lastLoginDate: 1752647100,
           registeredSince: 1744086400,
           sessionLifetime: 7200,
-          globalPermissionGroupId: 1
+          globalPermissionGroupId: 1,
+          yubikey: '0',
+          otp1: '',
+          otp2: '',
+          otp3: '',
+          otp4: ''
         }
       }
     ]
-  });
+  };
 
   beforeEach(() => {
     serializer = new JsonAPISerializer();

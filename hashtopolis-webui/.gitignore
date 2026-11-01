@@ -52,6 +52,3 @@ git-version.json
 # Config file
 config.json
 .devcontainer/.env
-
-# Local files
-*.local

@@ -1,13 +1,11 @@
 export enum SupertasksTableCol {
   ID,
   NAME,
-  PRETASKS,
-  CRACKER_TYPE
+  PRETASKS
 }
 
 export const SupertasksTableColumnLabel = {
   [SupertasksTableCol.ID]: 'ID',
   [SupertasksTableCol.NAME]: 'Name',
-  [SupertasksTableCol.PRETASKS]: 'Pretasks',
-  [SupertasksTableCol.CRACKER_TYPE]: 'Cracker type'
+  [SupertasksTableCol.PRETASKS]: 'Pretasks'
 };

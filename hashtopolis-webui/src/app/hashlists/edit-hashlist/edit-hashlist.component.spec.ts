@@ -1,4 +1,3 @@
-import { zGetAccessGroupsHelperApiResponse, zHashlistResponse } from '@generated/api/zod';
 import { of } from 'rxjs';
 
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
@@ -28,10 +27,10 @@ import { ComponentsModule } from '@src/app/shared/components.module';
 import { InputModule } from '@src/app/shared/input/input.module';
 import { InputTextComponent } from '@src/app/shared/input/text/text.component';
 import { PageSubTitleComponent } from '@src/app/shared/page-headers/page-subtitle/page-subtitle.component';
-import { mockValidResponse } from '@src/app/testing/mock-response';
+import { mockResponse } from '@src/app/testing/mock-response';
 
 const mockHashlistResponse = (): ResponseWrapper =>
-  mockValidResponse(zHashlistResponse, {
+  mockResponse({
     data: {
       id: 1,
       type: 'hashlist',
@@ -71,7 +70,7 @@ const mockHashlistResponse = (): ResponseWrapper =>
   }) as ResponseWrapper;
 
 const mockSuperHashlistResponse = (): ResponseWrapper =>
-  mockValidResponse(zHashlistResponse, {
+  mockResponse({
     data: {
       id: 1,
       type: 'hashlist',
@@ -104,7 +103,7 @@ const mockSuperHashlistResponse = (): ResponseWrapper =>
     ]
   }) as ResponseWrapper;
 
-const mockAccessGroupsResponse: ResponseWrapper = mockValidResponse(zGetAccessGroupsHelperApiResponse, {
+const mockAccessGroupsResponse: ResponseWrapper = mockResponse({
   data: [
     { id: 1, type: 'accessGroup', attributes: { groupName: 'Admin' } },
     { id: 2, type: 'accessGroup', attributes: { groupName: 'User' } }

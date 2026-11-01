@@ -19,8 +19,7 @@ div.table-actions {
   margin-bottom: 10px;
   font-size: var(--text-md);
 
-  // Icon buttons are sized by Material, a min-height would stretch them into an oval
-  .mat-mdc-button-base:not(.mat-mdc-icon-button) {
+  .mat-mdc-button-base {
     --mat-button-text-container-height: 36px;
     --mat-button-outlined-container-height: 36px;
     --mat-button-filled-container-height: 36px;
@@ -159,17 +158,24 @@ table.hashtopolis-table {
       flex-direction: row;
       position: relative;
 
+      button[mat-icon-button],
       .mat-mdc-icon-button {
-        // Material derives the button padding from this, which keeps the smaller icon centred
-        --mat-icon-button-icon-size: 20px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        padding: 0;
         margin: 0 2px;
+        box-sizing: border-box;
+      }
 
-        .mat-icon {
-          margin: 0;
-          width: var(--mat-icon-button-icon-size);
-          height: var(--mat-icon-button-icon-size);
-          font-size: var(--mat-icon-button-icon-size);
-        }
+      button[mat-icon-button] .mat-icon,
+      .mat-mdc-icon-button .mat-icon {
+        margin: 0;
+        font-size: 20px;
+        line-height: 1;
+        display: block;
       }
 
       .mat-icon {
@@ -328,6 +334,12 @@ table.hashtopolis-table {
             align-items: center;
             justify-content: center;
           }
+
+          .mat-mdc-button-persistent-ripple,
+          .mat-mdc-button-ripple,
+          .mat-mdc-focus-indicator {
+            border-radius: 50%;
+          }
         }
       }
 
@@ -395,7 +407,7 @@ table.hashtopolis-table {
   }
 
   .mat-mdc-cell:has(.editable-container--idle):hover {
-    background-color: color-mix(in oklab, var(--cell-hover) 50%, var(--success-bg));
+    background-color: color-mix(in oklch, var(--cell-hover) 50%, var(--success-bg));
   }
 }
 
@@ -592,7 +604,7 @@ table.hashtopolis-table .mat-mdc-cell.mat-mdc-table-sticky {
   background: linear-gradient(var(--card), var(--card)), var(--background);
 }
 table.hashtopolis-table .mat-mdc-row:hover .mat-mdc-cell.mat-mdc-table-sticky {
-  background: linear-gradient(var(--card-hover), var(--card-hover)), var(--background);
+  background: var(--card-hover);
 }
 table.hashtopolis-table .mat-mdc-row:nth-of-type(even) .mat-mdc-cell.mat-mdc-table-sticky {
   background: linear-gradient(var(--card), var(--card)), color-mix(in oklab, var(--muted), var(--background));

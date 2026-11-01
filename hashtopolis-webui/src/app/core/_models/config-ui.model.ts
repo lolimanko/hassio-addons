@@ -1,15 +1,4 @@
-import {
-  BuiltInTheme,
-  DateFormat,
-  Layout,
-  Theme,
-  TimeFormat,
-  browserDateFormat,
-  browserTimeFormat
-} from '@constants/settings.config';
-
-export { BuiltInTheme, Layout };
-export type { Theme };
+import { DateFormat, TimeFormat, browserDateFormat, browserTimeFormat } from '@constants/settings.config';
 
 import { AccessGroupsAgentsTableCol } from '@components/tables/access-groups-agents-table/access-groups-agents-table.constants';
 import { AccessGroupsTableCol } from '@components/tables/access-groups-table/access-groups-table.constants';
@@ -21,9 +10,7 @@ import { AgentErrorTableCol } from '@components/tables/agent-error-table/agent-e
 import { AgentsStatusTableCol } from '@components/tables/agents-status-table/agents-status-table.constants';
 import { AgentsTableCol } from '@components/tables/agents-table/agents-table.constants';
 import { ApiTokensTableCol } from '@components/tables/api-tokens-table/api-tokens-table.constants';
-import { BackgroundJobsTableCol } from '@components/tables/background-jobs-table/background-jobs-table.constants';
 import { ChunksTableCol } from '@components/tables/chunks-table/chunks-table.constants';
-import { CrackerHashtypesTableCol } from '@components/tables/cracker-hashtypes-table/cracker-hashtypes-table.constants';
 import { CrackersTableCol } from '@components/tables/crackers-table/crackers-table.constants';
 import { CracksTableCol } from '@components/tables/cracks-table/cracks-table.constants';
 import { FilesAttackTableCol } from '@components/tables/files-attack-table/files-attack-table.constants';
@@ -51,8 +38,9 @@ import { VouchersTableCol } from '@components/tables/vouchers-table/vouchers-tab
 
 import { TimePrecision, dateTimeFormat } from '@src/app/shared/utils/datetime';
 
-/** Rows fetched per page before the user picks a different page size. */
-export const DEFAULT_PAGE_SIZE = 25;
+export type Layout = 'full' | 'fixed';
+export type BuiltInTheme = 'light' | 'dark';
+export type Theme = BuiltInTheme | (string & {});
 
 /**
  * Interface definition for TableSettings
@@ -102,41 +90,28 @@ export interface UIConfig {
 export type UIConfigKeys = keyof UIConfig;
 
 /**
- * Sort direction of a table column. `NONE` means unsorted. Shares its literal domain with
- * Angular Material's own `SortDirection` (`@angular/material/sort`) by coincidence rather than
- * dependency - kept as our own declaration since this type flows through zod validation and
- * localStorage persistence, which shouldn't be coupled to a UI library's type.
- */
-export const TableSortDirection = {
-  ASC: 'asc',
-  DESC: 'desc',
-  NONE: ''
-} as const;
-export type TableSortDirection = (typeof TableSortDirection)[keyof typeof TableSortDirection];
-
-/**
  * Interface definition for Sorting
  * @prop id         Column id
  * @prop dataKey    Data key to sort
  * @prop isSortable Enable sorting: true, disable sorting: false
- * @prop direction  Sorting direction
+ * @prop direction  Sorting direction ('asc', 'desc'
  */
 export interface Sorting {
   id: number;
   dataKey: string;
   isSortable: boolean;
-  direction: TableSortDirection;
+  direction: 'asc' | 'desc' | '';
   parent?: string | undefined;
 }
 
 const _uiConfigDefault = {
-  layout: Layout.FIXED,
-  theme: BuiltInTheme.LIGHT,
+  layout: 'fixed',
+  theme: 'light',
   dateFmt: browserDateFormat(),
   timeFmt: browserTimeFormat(),
   tableSettings: {
     notificationsTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         NotificationsTableCol.ID,
         NotificationsTableCol.STATUS,
@@ -149,12 +124,12 @@ const _uiConfigDefault = {
         id: NotificationsTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     apiTokensTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         ApiTokensTableCol.ID,
         ApiTokensTableCol.VALID_FROM,
@@ -166,34 +141,34 @@ const _uiConfigDefault = {
         id: ApiTokensTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.DESC
+        direction: 'desc'
       },
       search: ''
     },
     vouchersTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [VouchersTableCol.ID, VouchersTableCol.KEY, VouchersTableCol.CREATED],
       order: {
         id: VouchersTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     permissionsTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [PermissionsTableCol.ID, PermissionsTableCol.NAME, PermissionsTableCol.MEMBERS],
       order: {
         id: PermissionsTableCol.NAME,
         dataKey: 'name',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     cracksTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         CracksTableCol.FOUND,
         CracksTableCol.PLAINTEXT,
@@ -207,12 +182,12 @@ const _uiConfigDefault = {
         id: CracksTableCol.FOUND,
         dataKey: 'timeCracked',
         isSortable: true,
-        direction: TableSortDirection.DESC
+        direction: 'desc'
       },
       search: ''
     },
     agentsTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         AgentsTableCol.ID,
         AgentsTableCol.NAME,
@@ -226,12 +201,12 @@ const _uiConfigDefault = {
         id: AgentsTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     agentErrorTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         AgentErrorTableCol.ID,
         AgentErrorTableCol.TIME,
@@ -244,12 +219,12 @@ const _uiConfigDefault = {
         id: AgentErrorTableCol.TIME,
         dataKey: 'time',
         isSortable: true,
-        direction: TableSortDirection.DESC
+        direction: 'desc'
       },
       search: ''
     },
     agentStatusTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         AgentsStatusTableCol.ID,
         AgentsStatusTableCol.NAME,
@@ -266,12 +241,12 @@ const _uiConfigDefault = {
         id: AgentsStatusTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     assignedAgentsTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         TasksAgentsTableCol.ID,
         TasksAgentsTableCol.NAME,
@@ -287,12 +262,12 @@ const _uiConfigDefault = {
         id: TasksAgentsTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     chunksTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         ChunksTableCol.ID,
         ChunksTableCol.PROGRESS,
@@ -308,12 +283,12 @@ const _uiConfigDefault = {
         id: ChunksTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     hashlistsTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         HashlistsTableCol.ID,
         HashlistsTableCol.NAME,
@@ -326,12 +301,12 @@ const _uiConfigDefault = {
         id: HashlistsTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     hashlistsInShTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         HashlistsTableCol.ID,
         HashlistsTableCol.NAME,
@@ -343,12 +318,12 @@ const _uiConfigDefault = {
         id: HashlistsTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     superHashlistsTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         SuperHashlistsTableCol.ID,
         SuperHashlistsTableCol.NAME,
@@ -360,12 +335,12 @@ const _uiConfigDefault = {
         id: SuperHashlistsTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     hashtypesTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         HashtypesTableCol.HASHTYPE,
         HashtypesTableCol.DESCRIPTION,
@@ -376,12 +351,12 @@ const _uiConfigDefault = {
         id: HashtypesTableCol.HASHTYPE,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     filesTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         FilesTableCol.ID,
         FilesTableCol.NAME,
@@ -393,12 +368,12 @@ const _uiConfigDefault = {
         id: FilesTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     filesWordlistTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         FilesTableCol.ID,
         FilesTableCol.NAME,
@@ -410,12 +385,12 @@ const _uiConfigDefault = {
         id: FilesTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     filesRuleTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         FilesTableCol.ID,
         FilesTableCol.NAME,
@@ -427,12 +402,12 @@ const _uiConfigDefault = {
         id: FilesTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     filesOtherTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         FilesTableCol.ID,
         FilesTableCol.NAME,
@@ -444,73 +419,57 @@ const _uiConfigDefault = {
         id: FilesTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     filesTableInPreTasks: {
       start: 0,
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [FilesTableCol.ID, FilesTableCol.NAME, FilesTableCol.SIZE, FilesTableCol.LINE_COUNT],
       order: {
         id: FilesTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     filesAttackTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [FilesAttackTableCol.ID, FilesAttackTableCol.NAME, FilesAttackTableCol.SIZE],
       order: {
         id: FilesAttackTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     crackersTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [CrackersTableCol.ID, CrackersTableCol.TYPE, CrackersTableCol.VERSIONS],
       order: {
         id: CrackersTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
-      },
-      search: ''
-    },
-    crackerHashtypesTable: {
-      page: DEFAULT_PAGE_SIZE,
-      columns: [
-        CrackerHashtypesTableCol.HASHTYPE,
-        CrackerHashtypesTableCol.DESCRIPTION,
-        CrackerHashtypesTableCol.SALTED,
-        CrackerHashtypesTableCol.SLOW_HASH
-      ],
-      order: {
-        id: CrackerHashtypesTableCol.HASHTYPE,
-        dataKey: 'id',
-        isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     preprocessorsTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [PreprocessorsTableCol.ID, PreprocessorsTableCol.NAME],
       order: {
         id: PreprocessorsTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     agentBinariesTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         AgentBinariesTableCol.ID,
         AgentBinariesTableCol.FILENAME,
@@ -523,12 +482,12 @@ const _uiConfigDefault = {
         id: AgentBinariesTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     healthChecksTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         HealthChecksTableCol.ID,
         HealthChecksTableCol.CREATED,
@@ -539,12 +498,12 @@ const _uiConfigDefault = {
         id: HealthChecksTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     healthCheckAgentsTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         HealthCheckAgentsTableCol.AGENT_ID,
         HealthCheckAgentsTableCol.AGENT_NAME,
@@ -557,12 +516,12 @@ const _uiConfigDefault = {
         id: HealthCheckAgentsTableCol.AGENT_ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     pretasksTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         PretasksTableCol.ID,
         PretasksTableCol.NAME,
@@ -576,12 +535,12 @@ const _uiConfigDefault = {
         id: PretasksTableCol.PRIORITY,
         dataKey: 'priority',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     tasksTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         TaskTableCol.ID,
         TaskTableCol.TASK_TYPE,
@@ -600,12 +559,12 @@ const _uiConfigDefault = {
         id: TaskTableCol.PRIORITY,
         dataKey: 'taskWrapperPriority',
         isSortable: true,
-        direction: TableSortDirection.DESC
+        direction: 'desc'
       },
       search: ''
     },
     tasksChunksTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         TasksChunksTableCol.ID,
         TasksChunksTableCol.PROGRESS,
@@ -620,12 +579,12 @@ const _uiConfigDefault = {
         id: TasksChunksTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     tasksSupertasksTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         TasksSupertasksDataSourceTableCol.ID,
         TasksSupertasksDataSourceTableCol.NAME,
@@ -641,28 +600,23 @@ const _uiConfigDefault = {
         id: TasksSupertasksDataSourceTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     supertasksTable: {
-      page: DEFAULT_PAGE_SIZE,
-      columns: [
-        SupertasksTableCol.ID,
-        SupertasksTableCol.NAME,
-        SupertasksTableCol.PRETASKS,
-        SupertasksTableCol.CRACKER_TYPE
-      ],
+      page: 25,
+      columns: [SupertasksTableCol.ID, SupertasksTableCol.NAME, SupertasksTableCol.PRETASKS],
       order: {
         id: SupertasksTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     supertasksPretasksTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         SupertasksPretasksTableCol.ID,
         SupertasksPretasksTableCol.NAME,
@@ -673,12 +627,12 @@ const _uiConfigDefault = {
         id: SupertasksPretasksTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     superTasksPretasksEditTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         PretasksTableCol.ID,
         PretasksTableCol.NAME,
@@ -693,23 +647,23 @@ const _uiConfigDefault = {
         id: PretasksTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     hashlistTasksTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [TaskTableCol.ID, TaskTableCol.NAME, TaskTableCol.DISPATCHED_SEARCHED, TaskTableCol.CRACKED],
       order: {
         id: TaskTableCol.ID,
         dataKey: 'taskWrapperId',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     hashesTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         HashesTableCol.HASHES,
         HashesTableCol.PLAINTEXT,
@@ -722,12 +676,12 @@ const _uiConfigDefault = {
         id: HashesTableCol.TIMECRACKED,
         dataKey: 'timeCracked',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     searchHashTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         SearchHashTableCol.HASH,
         SearchHashTableCol.PLAINTEXT,
@@ -738,12 +692,12 @@ const _uiConfigDefault = {
         id: SearchHashTableCol.HASH,
         dataKey: 'hash',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     usersTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         UsersTableCol.ID,
         UsersTableCol.NAME,
@@ -758,44 +712,23 @@ const _uiConfigDefault = {
         id: UsersTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     logsTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [LogsTableCol.ID, LogsTableCol.ISSUER, LogsTableCol.LEVEL, LogsTableCol.MESSAGE, LogsTableCol.TIME],
       order: {
         id: LogsTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
-      },
-      search: ''
-    },
-    backgroundJobsTable: {
-      page: DEFAULT_PAGE_SIZE,
-      columns: [
-        BackgroundJobsTableCol.ID,
-        BackgroundJobsTableCol.TYPE,
-        BackgroundJobsTableCol.STATUS,
-        BackgroundJobsTableCol.USER,
-        BackgroundJobsTableCol.CREATED,
-        BackgroundJobsTableCol.FINISHED,
-        BackgroundJobsTableCol.EXIT_CODE,
-        BackgroundJobsTableCol.MESSAGE,
-        BackgroundJobsTableCol.PAYLOAD
-      ],
-      order: {
-        id: BackgroundJobsTableCol.ID,
-        dataKey: 'id',
-        isSortable: true,
-        direction: TableSortDirection.DESC
+        direction: 'asc'
       },
       search: ''
     },
     accessGroupsTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         AccessGroupsTableCol.ID,
         AccessGroupsTableCol.NAME,
@@ -806,18 +739,18 @@ const _uiConfigDefault = {
         id: AccessGroupsTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     accessGroupsUsersTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [AccessGroupsUsersTableCol.ID, AccessGroupsUsersTableCol.NAME, AccessGroupsUsersTableCol.STATUS],
       order: {
         id: AccessGroupsUsersTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
@@ -834,12 +767,12 @@ const _uiConfigDefault = {
         id: AccessPermissionGroupsUserTableCol.NAME,
         dataKey: 'name',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     accessPermissionGroupsUsersTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [
         AccessPermissionGroupsUsersTableCol.ID,
         AccessPermissionGroupsUsersTableCol.NAME,
@@ -850,18 +783,18 @@ const _uiConfigDefault = {
         id: AccessPermissionGroupsUsersTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     },
     accessGroupsAgentsTable: {
-      page: DEFAULT_PAGE_SIZE,
+      page: 25,
       columns: [AccessGroupsAgentsTableCol.ID, AccessGroupsAgentsTableCol.NAME],
       order: {
         id: AccessGroupsAgentsTableCol.ID,
         dataKey: 'id',
         isSortable: true,
-        direction: TableSortDirection.ASC
+        direction: 'asc'
       },
       search: ''
     }

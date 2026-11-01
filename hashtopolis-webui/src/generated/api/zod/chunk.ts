@@ -1,16 +1,19 @@
 import * as z from 'zod';
 
-import { zAgentResponse } from './agent';
-import { zTaskResponse } from './task';
-
 export const zChunkResponse = z.object({
   jsonapi: z.object({
     version: z.string().default('1.1'),
     ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
   }),
-  links: z.object({
-    self: z.string().default('/api/v2/ui/chunks/1')
-  }),
+  links: z
+    .object({
+      self: z.string().default('/api/v2/ui/chunks?page[size]=25'),
+      first: z.string().optional().default('/api/v2/ui/chunks?page[size]=25&page[after]=0'),
+      last: z.string().optional().default('/api/v2/ui/chunks?page[size]=25&page[before]=500'),
+      next: z.string().nullish().default('/api/v2/ui/chunks?page[size]=25&page[after]=25'),
+      previous: z.string().nullish().default('/api/v2/ui/chunks?page[size]=25&page[before]=25')
+    })
+    .optional(),
   data: z.object({
     id: z.int(),
     type: z.literal('chunk'),
@@ -18,7 +21,7 @@ export const zChunkResponse = z.object({
       taskId: z.int(),
       skip: z.int(),
       length: z.int(),
-      agentId: z.int().nullable(),
+      agentId: z.int(),
       dispatchTime: z.number(),
       solveTime: z.number(),
       checkpoint: z.number(),
@@ -38,11 +41,10 @@ export const zChunkResponse = z.object({
       ]),
       cracked: z.int(),
       speed: z.number()
-    }),
-    links: z.object({
-      self: z.string().default('/api/v2/ui/chunks/1')
-    }),
-    relationships: z.object({
+    })
+  }),
+  relationships: z
+    .object({
       agent: z.object({
         links: z.object({
           self: z.string().default('/api/v2/ui/chunks/relationships/agent'),
@@ -68,7 +70,7 @@ export const zChunkResponse = z.object({
           .nullish()
       })
     })
-  }),
+    .optional(),
   included: z
     .array(
       z.union([
@@ -132,33 +134,15 @@ export const zChunkListResponse = z.object({
     version: z.string().default('1.1'),
     ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
   }),
-  links: z.object({
-    self: z.string().default('/api/v2/ui/chunks?page[size]=25'),
-    first: z.string().default('/api/v2/ui/chunks?page[size]=25'),
-    last: z
-      .string()
-      .nullable()
-      .default(
-        '/api/v2/ui/chunks?page[size]=25&page[before]=eyJwcmltYXJ5Ijp7InNvbWVVbnFpdWVGaWVsZCI6MTIzfSwic2Vjb25kYXJ5Ijp7InNvbWVPdGhlck9wdGlvbmFsRmllbGQiOiJGb28ifX0='
-      ),
-    next: z
-      .string()
-      .nullable()
-      .default(
-        '/api/v2/ui/chunks?page[size]=25&page[after]=eyJwcmltYXJ5Ijp7InNvbWVVbnFpdWVGaWVsZCI6MTIzfSwic2Vjb25kYXJ5Ijp7InNvbWVPdGhlck9wdGlvbmFsRmllbGQiOiJGb28ifX0='
-      ),
-    prev: z
-      .string()
-      .nullable()
-      .default(
-        '/api/v2/ui/chunks?page[size]=25&page[before]=eyJwcmltYXJ5Ijp7InNvbWVVbnFpdWVGaWVsZCI6MTIzfSwic2Vjb25kYXJ5Ijp7InNvbWVPdGhlck9wdGlvbmFsRmllbGQiOiJGb28ifX0='
-      )
-  }),
-  meta: z.object({
-    page: z.object({
-      total_elements: z.int()
+  links: z
+    .object({
+      self: z.string().default('/api/v2/ui/chunks?page[size]=25'),
+      first: z.string().optional().default('/api/v2/ui/chunks?page[size]=25&page[after]=0'),
+      last: z.string().optional().default('/api/v2/ui/chunks?page[size]=25&page[before]=500'),
+      next: z.string().nullish().default('/api/v2/ui/chunks?page[size]=25&page[after]=25'),
+      previous: z.string().nullish().default('/api/v2/ui/chunks?page[size]=25&page[before]=25')
     })
-  }),
+    .optional(),
   data: z.array(
     z.object({
       id: z.int(),
@@ -167,7 +151,7 @@ export const zChunkListResponse = z.object({
         taskId: z.int(),
         skip: z.int(),
         length: z.int(),
-        agentId: z.int().nullable(),
+        agentId: z.int(),
         dispatchTime: z.number(),
         solveTime: z.number(),
         checkpoint: z.number(),
@@ -187,38 +171,37 @@ export const zChunkListResponse = z.object({
         ]),
         cracked: z.int(),
         speed: z.number()
-      }),
-      links: z.object({
-        self: z.string().default('/api/v2/ui/chunks/1')
-      }),
-      relationships: z.object({
-        agent: z.object({
-          links: z.object({
-            self: z.string().default('/api/v2/ui/chunks/relationships/agent'),
-            related: z.string().default('/api/v2/ui/chunks/agent')
-          }),
-          data: z
-            .object({
-              type: z.literal('agent'),
-              id: z.int()
-            })
-            .nullish()
-        }),
-        task: z.object({
-          links: z.object({
-            self: z.string().default('/api/v2/ui/chunks/relationships/task'),
-            related: z.string().default('/api/v2/ui/chunks/task')
-          }),
-          data: z
-            .object({
-              type: z.literal('task'),
-              id: z.int()
-            })
-            .nullish()
-        })
       })
     })
   ),
+  relationships: z
+    .object({
+      agent: z.object({
+        links: z.object({
+          self: z.string().default('/api/v2/ui/chunks/relationships/agent'),
+          related: z.string().default('/api/v2/ui/chunks/agent')
+        }),
+        data: z
+          .object({
+            type: z.literal('agent'),
+            id: z.int()
+          })
+          .nullish()
+      }),
+      task: z.object({
+        links: z.object({
+          self: z.string().default('/api/v2/ui/chunks/relationships/task'),
+          related: z.string().default('/api/v2/ui/chunks/task')
+        }),
+        data: z
+          .object({
+            type: z.literal('task'),
+            id: z.int()
+          })
+          .nullish()
+      })
+    })
+    .optional(),
   included: z
     .array(
       z.union([
@@ -277,60 +260,44 @@ export const zChunkListResponse = z.object({
     .optional()
 });
 
-export const zChunkCountResponse = z.object({
-  jsonapi: z.object({
-    version: z.string().default('1.1'),
-    ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
-  }),
-  meta: z.object({
-    count: z.int(),
-    total_count: z.int().optional()
-  }),
-  data: z.array(z.record(z.string(), z.unknown())).max(0)
-});
-
-export const zChunkRelationAgent = z.object({
-  data: z.object({
-    type: z.literal('agent'),
-    id: z.int()
-  })
-});
-
-export const zChunkRelationAgentGetResponse = z.object({
-  data: z
-    .object({
-      type: z.literal('agent'),
-      id: z.int()
-    })
-    .nullable()
-});
-
 export const zChunkRelationTask = z.object({
   data: z.object({
     type: z.literal('task'),
-    id: z.int()
+    id: z.int().default(1)
   })
 });
 
 export const zChunkRelationTaskGetResponse = z.object({
-  data: z
-    .object({
-      type: z.literal('task'),
-      id: z.int()
-    })
-    .nullable()
+  data: z.object({
+    type: z.literal('task'),
+    id: z.int().default(1)
+  })
 });
 
-export const zGetChunksQuery = z.object({
-  'page[after]': z.string().optional(),
-  'page[before]': z.string().optional(),
-  'page[size]': z
-    .int()
-    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-    .optional(),
-  filter: z.record(z.string(), z.string()).optional(),
-  include: z.array(z.enum(['agent', 'task'])).optional()
+export const zGetChunksData = z.object({
+  body: z.never().optional(),
+  path: z.never().optional(),
+  query: z
+    .object({
+      'page[after]': z
+        .int()
+        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+        .optional(),
+      'page[before]': z
+        .int()
+        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+        .optional(),
+      'page[size]': z
+        .int()
+        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+        .optional(),
+      filter: z.record(z.string(), z.unknown()).optional(),
+      include: z.string().optional()
+    })
+    .optional()
 });
 
 /**
@@ -338,95 +305,98 @@ export const zGetChunksQuery = z.object({
  */
 export const zGetChunksResponse = zChunkListResponse;
 
-export const zGetChunksCountQuery = z.object({
-  filter: z.record(z.string(), z.string()).optional(),
-  include_total: z.boolean().optional()
+export const zGetChunksCountData = z.object({
+  body: z.never().optional(),
+  path: z.never().optional(),
+  query: z
+    .object({
+      'page[after]': z
+        .int()
+        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+        .optional(),
+      'page[before]': z
+        .int()
+        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+        .optional(),
+      'page[size]': z
+        .int()
+        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+        .optional(),
+      filter: z.record(z.string(), z.unknown()).optional(),
+      include: z.string().optional()
+    })
+    .optional()
 });
 
 /**
  * successful operation
  */
-export const zGetChunksCountResponse = zChunkCountResponse;
+export const zGetChunksCountResponse = zChunkListResponse;
 
-export const zGetChunksByIdAgentPath = z.object({
-  id: z
-    .int()
-    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+export const zGetChunksByIdByRelationData = z.object({
+  body: z.never().optional(),
+  path: z.object({
+    id: z
+      .int()
+      .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+      .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    relation: z.string()
+  }),
+  query: z.never().optional()
 });
 
 /**
  * successful operation
  */
-export const zGetChunksByIdAgentResponse = zAgentResponse;
+export const zGetChunksByIdByRelationResponse = zChunkRelationTaskGetResponse;
 
-export const zGetChunksByIdRelationshipsAgentPath = z.object({
-  id: z
-    .int()
-    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+export const zGetChunksByIdRelationshipsByRelationData = z.object({
+  body: z.never().optional(),
+  path: z.object({
+    id: z
+      .int()
+      .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+      .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    relation: z.string()
+  }),
+  query: z.never().optional()
 });
 
 /**
  * successful operation
  */
-export const zGetChunksByIdRelationshipsAgentResponse = zChunkRelationAgentGetResponse;
+export const zGetChunksByIdRelationshipsByRelationResponse = zChunkResponse;
 
-export const zPatchChunksByIdRelationshipsAgentBody = zChunkRelationAgent;
-
-export const zPatchChunksByIdRelationshipsAgentPath = z.object({
-  id: z.int()
+export const zPatchChunksByIdRelationshipsByRelationData = z.object({
+  body: zChunkRelationTask,
+  path: z.object({
+    id: z.int(),
+    relation: z.string()
+  }),
+  query: z.never().optional()
 });
 
 /**
  * Successfull operation
  */
-export const zPatchChunksByIdRelationshipsAgentResponse = z.void();
+export const zPatchChunksByIdRelationshipsByRelationResponse = z.void();
 
-export const zGetChunksByIdTaskPath = z.object({
-  id: z
-    .int()
-    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-});
-
-/**
- * successful operation
- */
-export const zGetChunksByIdTaskResponse = zTaskResponse;
-
-export const zGetChunksByIdRelationshipsTaskPath = z.object({
-  id: z
-    .int()
-    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-});
-
-/**
- * successful operation
- */
-export const zGetChunksByIdRelationshipsTaskResponse = zChunkRelationTaskGetResponse;
-
-export const zPatchChunksByIdRelationshipsTaskBody = zChunkRelationTask;
-
-export const zPatchChunksByIdRelationshipsTaskPath = z.object({
-  id: z.int()
-});
-
-/**
- * Successfull operation
- */
-export const zPatchChunksByIdRelationshipsTaskResponse = z.void();
-
-export const zGetChunksByIdPath = z.object({
-  id: z
-    .int()
-    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-});
-
-export const zGetChunksByIdQuery = z.object({
-  include: z.array(z.enum(['agent', 'task'])).optional()
+export const zGetChunksByIdData = z.object({
+  body: z.never().optional(),
+  path: z.object({
+    id: z
+      .int()
+      .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+      .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+  }),
+  query: z
+    .object({
+      include: z.string().optional()
+    })
+    .optional()
 });
 
 /**

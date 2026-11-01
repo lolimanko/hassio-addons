@@ -1,7 +1,6 @@
 /**
  * This module contains the datasource definition for the preprocessors table component
  */
-import { HTTP_SKIP_ERROR_HEADER_CONFIG } from '@constants/http.config';
 import { zPreprocessorListResponse } from '@generated/api/zod';
 import { EMPTY, catchError, finalize } from 'rxjs';
 
@@ -31,7 +30,7 @@ export class PreprocessorsDataSource extends BaseDataSource<JPreprocessor> {
     params = this.applyFilterWithPaginationReset(params, activeFilter, query);
 
     // Create headers to skip error dialog for filter validation errors
-    const httpOptions = { headers: new HttpHeaders(HTTP_SKIP_ERROR_HEADER_CONFIG) };
+    const httpOptions = { headers: new HttpHeaders({ 'X-Skip-Error-Dialog': 'true' }) };
     const preprocessors$ = this.service.getAll(SERV.PREPROCESSORS, params.create(), httpOptions);
 
     this.subscriptions.push(

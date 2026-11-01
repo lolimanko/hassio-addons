@@ -1,10 +1,8 @@
 import { BaseModel } from '@models/base.model';
 import { UserId } from '@models/id.types';
 
-/**
- * The event that triggers a notification. This is the APIv2 `action` attribute of a
- * notification setting (e.g. an agent error or a completed task).
- */
+export type NotificationAction = 'createNotification' | 'setActive' | 'deleteNotification';
+
 export type NotificationEvent =
   | 'taskComplete'
   | 'agentError'
@@ -25,18 +23,13 @@ export type NotificationEvent =
   | 'deleteAgent';
 
 /**
- * Interface definition for user notification.
- *
- * Field semantics follow the APIv2 notification-setting resource:
- * - `action` is the triggering event ({@link NotificationEvent}).
- * - `notification` is the delivery method (e.g. ChatBot, Slack, Email). The set is open —
- *   an installation can register its own notification classes — so this is a free string.
+ * Interface definition for user notification
  * @extends BaseModel
  */
 export interface JNotification extends BaseModel {
-  action: NotificationEvent;
+  action: NotificationAction;
   isActive: boolean;
-  notification: string;
+  notification: NotificationEvent;
   receiver: string;
   userId: UserId;
   objectId?: number | null | undefined;

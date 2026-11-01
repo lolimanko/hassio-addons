@@ -12,5 +12,7 @@
   (rowActionClicked)="rowActionClicked($event)"
   (exportActionClicked)="exportActionClicked($event)"
   (selectedFilterColumnChanged)="selectedFilterColumn = $event"
+  (emitCopyRowData)="receiveCopyData($event)"
+  (emitFullHashModal)="showTruncatedData($event)"
   (backendSqlFilter)="handleBackendSqlFilter($event)"
 />

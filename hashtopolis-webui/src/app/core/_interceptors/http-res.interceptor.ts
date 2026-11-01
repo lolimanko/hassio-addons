@@ -1,4 +1,3 @@
-import { HttpHeaderName, HttpStatus } from '@constants/http.config';
 import { Observable, catchError, throwError } from 'rxjs';
 
 import { HttpErrorResponse, HttpEvent, HttpHandler, HttpInterceptor, HttpRequest } from '@angular/common/http';
@@ -18,33 +17,16 @@ export class HttpResInterceptor implements HttpInterceptor {
 
   intercept(req: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
     // If request contains this header, don't show modal/snackbar for errors
-    const skipDialog: boolean = req.headers.has(HttpHeaderName.SKIP_ERROR_DIALOG);
+    const skipDialog: boolean = req.headers.has('X-Skip-Error-Dialog');
 
     return next.handle(req).pipe(
       catchError((error: HttpErrorResponse) => {
-        if (skipDialog || this.isRecoverableAuthFailure(error)) {
+        if (skipDialog) {
           return throwError(() => error);
         }
         return this.handleError(req, error);
       })
     );
-  }
-
-  /**
-   * Whether the failure is one `AuthInterceptorService` will answer by renewing the session and
-   * resending the request.
-   *
-   * This interceptor sits closer to the network than the auth interceptor, so it sees such a failure
-   * first. Reporting it would put an error in front of the user for a recovery they never needed to
-   * know about, and the auth interceptor still logs out visibly when the renewal fails.
-   */
-  private isRecoverableAuthFailure(error: HttpErrorResponse): boolean {
-    if (error.status !== HttpStatus.UNAUTHORIZED && !this.authService.isAccessTokenExpired()) {
-      return false;
-    }
-    // Only a stored session can be renewed; without one there is nothing to recover and the
-    // failure is the user's to see
-    return this.authService.token !== null;
   }
 
   /**
@@ -60,21 +42,21 @@ export class HttpResInterceptor implements HttpInterceptor {
     const status = error?.status || 0;
     let showAlert: boolean = false;
 
-    if (error.status === HttpStatus.UNAUTHORIZED) {
+    if (error.status === 401) {
       errmsg = 'Invalid credentials. Please try again.';
-    } else if (error.status === HttpStatus.FORBIDDEN) {
+    } else if (error.status === 403) {
       if (error.error?.title) {
         errmsg = error.error.title;
       } else {
         errmsg = `You don't have permissions. Please contact your Administrator.`;
       }
       showAlert = true;
-    } else if (error.status === HttpStatus.NOT_FOUND && !req.url.includes('config.json')) {
+    } else if (error.status === 404 && !req.url.includes('config.json')) {
       errmsg = `The requested URL was not found.`;
-    } else if (error.status === HttpStatus.CONFLICT && req.url.includes('crackertypes')) {
+    } else if (error.status === 409 && req.url.includes('crackertypes')) {
       errmsg = error.error.title;
       showAlert = true;
-    } else if (error.status === HttpStatus.NETWORK_ERROR) {
+    } else if (error.status === 0) {
       errmsg = `Network error. Please verify the IP address (${this.extractIpAndPort(req.url)}) and try again.`;
     } else {
       errmsg = error.error?.title || 'An unknown error occurred.';

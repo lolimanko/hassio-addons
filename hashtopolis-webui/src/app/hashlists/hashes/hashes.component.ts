@@ -2,19 +2,33 @@ import { zChunkResponse, zHashlistResponse, zTaskResponse } from '@generated/api
 
 import { Component, DestroyRef, OnInit, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, Params } from '@angular/router';
+import { FormControl, FormGroup } from '@angular/forms';
+import { ActivatedRoute, Params, Router } from '@angular/router';
 
 import { JChunk } from '@models/chunk.model';
 import { JHashlist } from '@models/hashlist.model';
 import { ResponseWrapper } from '@models/response.model';
-import { HashesRouteKind, zHashesRouteData, zHashesRouteParams, zRouteId } from '@models/routes.schema';
+import {
+  HashesRouteKind,
+  zHashesQueryParams,
+  zHashesRouteData,
+  zHashesRouteParams,
+  zRouteId
+} from '@models/routes.schema';
 
 import { JsonAPISerializer } from '@services/api/serializer-service';
 import { SERV } from '@services/main.config';
 import { GlobalService } from '@services/main.service';
 import { AutoTitleService } from '@services/shared/autotitle.service';
 
-import { HashesViewType } from '@src/app/core/_constants/hashes.config';
+import { displays, filters } from '@src/app/core/_constants/hashes.config';
+
+export interface HashesViewForm {
+  display: FormControl<string | null>;
+  displaydes: FormControl<string | null>;
+  filter: FormControl<string | null>;
+  filterdes: FormControl<string | null>;
+}
 
 /**
  * The `HashesComponent` is for managing and displaying a list of hashes
@@ -29,16 +43,30 @@ export class HashesComponent implements OnInit {
   private titleService = inject(AutoTitleService);
   private route = inject(ActivatedRoute);
   private gs = inject(GlobalService);
+  private router = inject(Router);
+
+  /** Form group for the Hashes View. */
+  viewForm: FormGroup<HashesViewForm>;
+
+  /** Select Options */
+  selectFilters = filters;
+  selectDisplays = displays;
 
   // Component Properties
   editMode = false;
   editedIndex: number;
 
   // View type and filter options
-  whichView: HashesViewType;
-  protected readonly HashesViewType = HashesViewType;
+  whichView: string;
   titleName: string;
   filterParam: string;
+
+  // Filtering and Display Properties
+  crackPos: boolean | string = true;
+  filtering = '';
+  filteringDescr = '';
+  displaying = '';
+  displayingDescr = '';
 
   constructor() {
     const titleService = this.titleService;
@@ -53,13 +81,43 @@ export class HashesComponent implements OnInit {
     this.loadHashes();
   }
 
+  buildForm(): void {
+    const qp = zHashesQueryParams.parse(this.route.snapshot.queryParams);
+    if (qp.crackpos) {
+      this.crackPos = qp.crackpos;
+    }
+    if (qp.filter) {
+      this.filtering = qp.filter;
+      this.filteringDescr = this.getDescrip(this.filtering, 2) ?? '';
+    }
+    if (qp.display) {
+      this.displaying = qp.display;
+      this.displayingDescr = this.getDescrip(this.displaying, 3) ?? '';
+    }
+    this.viewForm = new FormGroup<HashesViewForm>({
+      display: new FormControl<string | null>(this.displaying),
+      displaydes: new FormControl<string | null>(this.displayingDescr),
+      filter: new FormControl<string | null>(this.filtering),
+      filterdes: new FormControl<string | null>(this.filteringDescr)
+    });
+
+    //subscribe to changes to handle select trigger actions
+    this.viewForm.controls.display.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((newvalue) => {
+      this.onQueryp(newvalue ?? '', 0);
+    });
+
+    this.viewForm.controls.filter.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((newvalue) => {
+      this.onQueryp(newvalue ?? '', 1);
+    });
+  }
+
   getRouterLink(): (string | number)[] {
     switch (this.whichView) {
-      case HashesViewType.CHUNKS:
+      case 'chunks':
         return ['/tasks/show-tasks/', this.editedIndex, 'edit'];
-      case HashesViewType.TASKS:
+      case 'tasks':
         return ['/tasks/show-tasks/', this.editedIndex, 'edit'];
-      case HashesViewType.HASHLISTS:
+      case 'hashlists':
         return ['/hashlists/hashlist/', this.editedIndex, 'edit'];
       default:
         return [];
@@ -83,7 +141,7 @@ export class HashesComponent implements OnInit {
       const routeDataKind = zHashesRouteData.parse(data).kind;
       switch (routeDataKind) {
         case HashesRouteKind.ChunkHashes:
-          this.whichView = HashesViewType.CHUNKS;
+          this.whichView = 'chunks';
           this.gs
             .get(SERV.CHUNKS, this.editedIndex)
             .pipe(takeUntilDestroyed(this.destroyRef))
@@ -94,7 +152,7 @@ export class HashesComponent implements OnInit {
           break;
 
         case HashesRouteKind.TaskHashes:
-          this.whichView = HashesViewType.TASKS;
+          this.whichView = 'tasks';
           this.gs
             .get(SERV.TASKS, this.editedIndex)
             .pipe(takeUntilDestroyed(this.destroyRef))
@@ -105,7 +163,7 @@ export class HashesComponent implements OnInit {
           break;
 
         case HashesRouteKind.HashlistHashes:
-          this.whichView = HashesViewType.HASHLISTS;
+          this.whichView = 'hashlists';
           this.gs
             .get(SERV.HASHLISTS, this.editedIndex)
             .pipe(takeUntilDestroyed(this.destroyRef))
@@ -115,6 +173,59 @@ export class HashesComponent implements OnInit {
             });
           break;
       }
+      this.buildForm();
     });
+  }
+
+  // Update query parameters and trigger updates
+  onQueryp(name: string, type: number) {
+    let query = {};
+    if (type == 0) {
+      query = { display: name };
+    }
+    if (type == 1) {
+      query = { filter: name };
+    }
+    this.router.navigate(['/hashlists/hashes/', this.whichView, this.editedIndex], {
+      queryParams: query,
+      queryParamsHandling: 'merge'
+    });
+    this.onDisplaying(name, type);
+  }
+
+  // Update display or filter options
+  onDisplaying(name: string, type: number) {
+    if (type == 0) {
+      this.displaying = name;
+      this.viewForm.patchValue({
+        display: this.displaying,
+        displaydes: this.getDescrip(name, type) ?? null
+      });
+    }
+    if (type == 1) {
+      this.filtering = name;
+      this.viewForm.patchValue({
+        filter: this.filtering,
+        filterdes: this.getDescrip(name, type) ?? null
+      });
+    }
+  }
+
+  // Get the description for filter and display options
+  getDescrip(item: string, type: number): string | undefined {
+    const selectedArray = type === 0 ? this.selectDisplays : this.selectFilters;
+    const selectedItem = selectedArray?.find((obj) => obj?._id === item);
+
+    if (selectedItem) {
+      if (type === 0) {
+        this.displayingDescr = selectedItem.name;
+      } else if (type === 1) {
+        this.filteringDescr = selectedItem.name;
+      }
+
+      return selectedItem.name;
+    }
+
+    return undefined;
   }
 }

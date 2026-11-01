@@ -69,6 +69,7 @@
   color: var(--muted-foreground);
 
   &:hover {
+    background-color: var(--surface-soft);
     color: var(--heading-foreground);
   }
 }

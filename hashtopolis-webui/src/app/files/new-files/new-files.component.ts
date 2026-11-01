@@ -1,5 +1,4 @@
-import { HttpMethod } from '@constants/http.config';
-import { zGetAccessGroupsHelperApiResponse } from '@generated/api/zod';
+import { zAccessGroupListResponse } from '@generated/api/zod';
 import { firstValueFrom, lastValueFrom } from 'rxjs';
 
 import { ChangeDetectorRef, Component, DestroyRef, OnInit, inject } from '@angular/core';
@@ -10,7 +9,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, Router } from '@angular/router';
 
 import { JAccessGroup } from '@models/access-group.model';
-import { FileSource, ServerImportFile } from '@models/file.model';
+import { ServerImportFile } from '@models/file.model';
 import { AccessGroupId } from '@models/id.types';
 import { ResponseWrapper } from '@models/response.model';
 import { NewFilesRouteKind, zNewFilesRouteData } from '@models/routes.schema';
@@ -27,14 +26,6 @@ import { NewFilesForm, PreparedFormData, getNewFilesForm } from '@src/app/files/
 import { SelectOption, transformSelectOptions } from '@src/app/shared/utils/forms';
 import { formatFileSize } from '@src/app/shared/utils/util';
 import { WordlistGeneratorComponent } from '@src/app/shared/wordlist-generator/wordlist-generator.component';
-
-/** Upload tab shown on the page; the values double as the DOM ids of the tab panels. */
-const NewFileTab = {
-  UPLOAD: 'tab1',
-  LINK: 'tab2',
-  SERVER_IMPORT: 'tab3'
-} as const;
-type NewFileTab = (typeof NewFileTab)[keyof typeof NewFileTab];
 
 /**
  * Represents the NewFilesComponent responsible for creating and uploading files
@@ -60,9 +51,7 @@ export class NewFilesComponent implements OnInit {
 
   /** Filtering and views. */
   filterType: number;
-  viewMode: NewFileTab = NewFileTab.UPLOAD;
-  protected readonly NewFileTab = NewFileTab;
-  protected readonly FileSource = FileSource;
+  viewMode = 'tab1';
   title: string;
   redirect: string;
 
@@ -154,11 +143,11 @@ export class NewFilesComponent implements OnInit {
     this.updateValidatorsBySourceType(this.form.controls.sourceType.value);
   }
 
-  private updateValidatorsBySourceType(sourceType: FileSource): void {
+  private updateValidatorsBySourceType(sourceType: string): void {
     const filenameCtrl = this.form.controls.filename;
     const urlCtrl = this.form.controls.url;
 
-    if (sourceType === FileSource.URL) {
+    if (sourceType === 'url') {
       filenameCtrl.setValidators([Validators.required]);
       urlCtrl.setValidators([Validators.required]);
     } else {
@@ -179,10 +168,7 @@ export class NewFilesComponent implements OnInit {
     try {
       const response: ResponseWrapper = await lastValueFrom(this.gs.ghelper(SERV.HELPER, 'getAccessGroups'));
 
-      const accessGroups: JAccessGroup[] = new JsonAPISerializer().deserialize(
-        response,
-        zGetAccessGroupsHelperApiResponse
-      );
+      const accessGroups: JAccessGroup[] = new JsonAPISerializer().deserialize(response, zAccessGroupListResponse);
 
       this.selectAccessgroup = transformSelectOptions(accessGroups, ACCESS_GROUP_FIELD_MAPPING);
     } catch (error) {
@@ -199,7 +185,7 @@ export class NewFilesComponent implements OnInit {
   async loadServerFiles(): Promise<void> {
     try {
       const response = await lastValueFrom(
-        this.gs.chelper<ResponseWrapper<ServerImportFile[]>>(SERV.HELPER, 'importFile', undefined, HttpMethod.GET)
+        this.gs.chelper<ResponseWrapper<ServerImportFile[]>>(SERV.HELPER, 'importFile', undefined, 'GET')
       );
       this.serverFiles = response.meta || [];
       this.changeDetectorRef.detectChanges();
@@ -259,8 +245,8 @@ export class NewFilesComponent implements OnInit {
    * @returns Prepared form data.
    */
   onBeforeSubmit(form: FormGroup<NewFilesForm>['value'], status: boolean): PreparedFormData {
-    const sourceType = form.sourceType || FileSource.IMPORT;
-    const isUrl = sourceType === FileSource.URL;
+    const sourceType = form.sourceType || 'import';
+    const isUrl = sourceType === 'url';
     const fileName = isUrl ? form.filename : this.fileName;
     const sourceData = isUrl ? form.url : this.fileName;
 
@@ -285,7 +271,7 @@ export class NewFilesComponent implements OnInit {
    * @param {string} type - The selected file upload type.
    * @param {string} view - The selected view mode.
    */
-  onChangeType(type: FileSource, view: NewFileTab): void {
+  onChangeType(type: string, view: string): void {
     this.viewMode = view;
     this.form.patchValue({
       filename: '',
@@ -295,7 +281,7 @@ export class NewFilesComponent implements OnInit {
     });
     this.updateValidatorsBySourceType(type);
 
-    if (view === NewFileTab.SERVER_IMPORT) {
+    if (view === 'tab3') {
       void this.loadServerFiles();
     }
   }
@@ -395,7 +381,7 @@ export class NewFilesComponent implements OnInit {
           isSecret: this.form.value.isSecret || false,
           fileType: this.filterType,
           accessGroupId: this.form.value.accessGroupId,
-          sourceType: FileSource.IMPORT, // IMPORTANT: tells backend to pick it from server import dir
+          sourceType: 'import', // IMPORTANT: tells backend to pick it from server import dir
           sourceData: file // some backends require this too
         };
 
