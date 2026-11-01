@@ -49,3 +49,4 @@ schema:
   hashtopolis_backend_url: str
   hashtopolis_frontend_urls: str
   SSL: bool
+ingress: true
