@@ -50,3 +50,4 @@ schema:
   hashtopolis_frontend_urls: str
   SSL: bool
 ingress: true
+ingress_port: 80
