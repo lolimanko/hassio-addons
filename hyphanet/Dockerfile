@@ -115,7 +115,7 @@ USER ${HYPHANET_USER}
 WORKDIR ${HYPHANET_HOME}
 
 EXPOSE 8123
-#VOLUME [ "${HYPHANET_DATA}" ]
+VOLUME [ "${HYPHANET_DATA}" ]
 
 ENTRYPOINT [ "/usr/local/bin/entrypoint.sh" ]
 CMD [ "start" ]
