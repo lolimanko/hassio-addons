@@ -1,5 +1,5 @@
 name: "hyphanet"
-version: 1.0.14
+version: 1.0.15
 slug: "hyphanet"
 description: "hyphanet"
 arch:
@@ -12,13 +12,3 @@ map:
   - type: addon_config
     read_only: false
     #path: /app/configs
-  - type: media
-    read_only: False
-  - type: share
-    read_only: false
-  - type: ssl
-    read_only: false
-#image: "ghcr.io/lolimanko/{arch}-anigamerplus" 
-ingress: true 
-ingress_port: 8888
-panel_icon: mdi:television
