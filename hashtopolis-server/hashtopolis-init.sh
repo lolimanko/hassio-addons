@@ -119,4 +119,3 @@ echo ""
 echo ""
 
 
-docker-php-entrypoint apache2-foreground
