@@ -122,7 +122,8 @@ ENV DEBIAN_FRONTEND=dialog
 COPY docker-entrypoint.sh /usr/local/bin
 COPY hashtopolis-init.sh /usr/local/bin
 #COPY docker-entrypoint.sh /usr/bin/bashio
-#RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/hashtopolis-init.sh
 #RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 # Setting the hashtopolis document root is done at build time. Because the www-data user cannot write to the apache config folder.
 COPY 000-default.conf /tmp/
