@@ -1,7 +1,7 @@
 #!/usr/bin/env bashio
 
-chown -R www-data:www-data /usr/local/share/hashtopolis
-chmod -R u+rwX /usr/local/share/hashtopolis
+#chown -R www-data:www-data /usr/local/share/hashtopolis
+#chmod -R u+rwX /usr/local/share/hashtopolis
 #source /usr/lib/bashio/bashio.sh
 ssl=$(bashio::config 'SSL')
 if [ "$ssl" = "true" ]; then
