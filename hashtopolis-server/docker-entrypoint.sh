@@ -5,11 +5,9 @@ chmod 777 -R /usr/local/share/hashtopolis
 #source /usr/lib/bashio/bashio.sh
 ssl=$(bashio::config 'SSL')
 if [ "$ssl" = "true" ]; then
-    
     a2enmod ssl && a2ensite default-ssl
-
 fi
-exec runuser -u www-data -- "$0" "$@"
+#exec runuser -u www-data -- "$0" "$@"
 
 echo "Current User: $(whoami)"
 export HASHTOPOLIS_DB_TYPE=$(bashio::config 'hashtopolis_db_type')
