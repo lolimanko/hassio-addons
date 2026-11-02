@@ -3,6 +3,7 @@
 #chown -R www-data:www-data /usr/local/share/hashtopolis
 #chmod -R u+rwX /usr/local/share/hashtopolis
 #source /usr/lib/bashio/bashio.sh
+chmod 777 -R /usr/local/share/hashtopolis
 ssl=$(bashio::config 'SSL')
 if [ "$ssl" = "true" ]; then
     a2enmod ssl && a2ensite default-ssl
