@@ -44,7 +44,7 @@ RUN if [ -n "${CONTAINER_USER_CMD_PRE}" ]; then echo "${CONTAINER_USER_CMD_PRE}"
 
 
 RUN apt-get update \
-    && apt-get -y install --no-install-recommends apt-utils zip unzip nano ncdu gettext-base 2>&1 \
+    && apt-get -y install --no-install-recommends util-linux apt-utils zip unzip nano ncdu gettext-base 2>&1 \
     \
     # Install git, procps, lsb-release (useful for CLI installs) \
     && apt-get -y install git iproute2 procps lsb-release \
