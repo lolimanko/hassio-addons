@@ -9,7 +9,12 @@ if [ "$ssl" = "true" ]; then
     a2enmod ssl && a2ensite default-ssl
 
 fi
-su -s /bin/bash www-data
+if [ "$(id -u)" -eq 0 ]; then
+
+    exec runuser -u www-data -- "$0" "$@"
+
+fi
+
 echo "Current User: $(whoami)"
 export HASHTOPOLIS_DB_TYPE=$(bashio::config 'hashtopolis_db_type')
 export HASHTOPOLIS_DB_USER=$(bashio::config 'hashtopolis_db_user')
