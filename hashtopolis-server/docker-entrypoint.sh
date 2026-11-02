@@ -9,7 +9,7 @@ if [ "$ssl" = "true" ]; then
     a2enmod ssl && a2ensite default-ssl
 
 fi
-exec runuser -u hyphanet -- "$0" "$@"
+exec runuser -u www-data -- "$0" "$@"
 
 echo "Current User: $(whoami)"
 export HASHTOPOLIS_DB_TYPE=$(bashio::config 'hashtopolis_db_type')
