@@ -1,6 +1,27 @@
 #!/bin/bash
 set -e
 
+# =========================================================
+# FIX /config PERMISSIONS
+# =========================================================
+
+if [ "$(id -u)" -eq 0 ]; then
+
+    echo "Fixing /config permissions..."
+
+    mkdir -p "${HYPHANET_DATA}"
+
+    chown -R hyphanet:hyphanet "${HYPHANET_DATA}"
+    chmod -R u+rwX "${HYPHANET_DATA}"
+
+    echo "Switching to hyphanet..."
+
+    exec runuser -u hyphanet -- "$0" "$@"
+
+fi
+echo "Current User: $(whoami)"
+
+
 HYPHANET_HOME=${HYPHANET_HOME:-/opt/hyphanet}
 HYPHANET_DATA=${HYPHANET_DATA:-/config}
 
