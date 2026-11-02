@@ -217,7 +217,7 @@ RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" \
 
 
 #WORKDIR /
-#USER www-data
+USER www-data
 # ----END----
 
 
