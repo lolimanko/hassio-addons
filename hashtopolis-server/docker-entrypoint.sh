@@ -21,3 +21,17 @@ export HASHTOPOLIS_BACKEND_URL=$(bashio::config 'hashtopolis_backend_url')
 export HASHTOPOLIS_FRONTEND_URLS=$(bashio::config 'hashtopolis_frontend_urls')
 
 runuser -u www-data --preserve-environment -- /bin/bash /usr/local/bin/hashtopolis-init.sh
+
+rc=$?
+
+if [ "$rc" -ne 0 ]; then
+    echo "Hashtopolis initialization failed!"
+    exit "$rc"
+fi
+
+echo "Initialization complete!"
+
+# Root 啟動 Apache
+echo "Starting Apache as root..."
+
+exec docker-php-entrypoint apache2-foreground
