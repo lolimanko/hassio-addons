@@ -7,7 +7,7 @@ ssl=$(bashio::config 'SSL')
 if [ "$ssl" = "true" ]; then
     a2enmod ssl && a2ensite default-ssl
 fi
-su -s /bin/bash www-data
+exec su -s /bin/bash www-data -c 'exec "$0" "$@"' "$0" "$@"
 #exec runuser -u www-data -- "$0" "$@"
 #su www-data
 echo "Current User: $(whoami)"
