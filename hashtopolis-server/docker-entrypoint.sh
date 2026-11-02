@@ -7,7 +7,7 @@ if [ "$ssl" = "true" ]; then
     a2enmod ssl && a2ensite default-ssl
 
 fi
-su -s /bin/bash www-data
+
 export HASHTOPOLIS_DB_TYPE=$(bashio::config 'hashtopolis_db_type')
 export HASHTOPOLIS_DB_USER=$(bashio::config 'hashtopolis_db_user')
 export HASHTOPOLIS_DB_PASS=$(bashio::config 'hashtopolis_db_pass')
