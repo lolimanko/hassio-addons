@@ -1,7 +1,7 @@
-name: "hashtopolis-backend"
-description: "hashtopolis-backend"
-version: "1.0.1"
-slug: "hashtopolis-backend"
+name: "hashtopolis-server"
+description: "hashtopolis-server"
+version: "1.0.2"
+slug: "hashtopolis-server"
 #init: false
 #host_network: true
 ports:
