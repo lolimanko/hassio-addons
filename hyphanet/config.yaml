@@ -1,5 +1,5 @@
 name: "hyphanet"
-version: 1.0.16
+version: 1.0.17
 slug: "hyphanet"
 description: "hyphanet"
 arch:
@@ -8,8 +8,6 @@ arch:
 init: false
 ports:
   8123/tcp: 8125
-  8888/tcp: 8888
-  9481/tcp: 9481
 map:
   - type: addon_config
     read_only: false
