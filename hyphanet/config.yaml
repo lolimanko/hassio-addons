@@ -8,6 +8,8 @@ arch:
 init: false
 ports:
   8123/tcp: 8125
+  8888/tcp: 8888
+  9481/tcp: 9481
 map:
   - type: addon_config
     read_only: false
