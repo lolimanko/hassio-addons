@@ -1,7 +1,7 @@
-name: "hashtopolis-frontend"
+name: "hashtopolis-webui"
 description: "frontend"
 version: "1.0.1"
-slug: "hashtopolis-frontend"
+slug: "hashtopolis-webui"
 #init: false
 #host_network: true
 ports:
@@ -16,10 +16,6 @@ arch:
 map:
   - type: ssl
     read_only: False
-  - type: media
-    read_only: False
-  - type: share
-    read_only: false
 ingress: true 
 #ingress_port: 80
 #image: "redroid/redroid" 
