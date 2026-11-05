@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     dnsutils \
     && rm -rf /var/lib/apt/lists/*
 
-ARG HYPHANET_VERSION=1503
+ARG HYPHANET_VERSION=1507
 ENV HYPHANET_INSTALLER_URL=https://www.draketo.de/dateien/freenet/build0${HYPHANET_VERSION}/new_installer_offline_${HYPHANET_VERSION}.jar
 ENV INSTALLER_JAR=new_installer_offline.jar
 ENV HYPHANET_HOME=/opt/hyphanet
