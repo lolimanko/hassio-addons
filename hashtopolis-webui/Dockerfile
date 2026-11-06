@@ -21,6 +21,7 @@ WORKDIR /app
 
 # Docker entry location
 COPY docker-entrypoint.sh /usr/local/bin
+COPY preload_opt.sh /usr/local/bin
 
 # BUILD Image
 #----BEGIN----
@@ -54,6 +55,7 @@ ENTRYPOINT [ "/bin/bash", "/usr/local/bin/docker-entrypoint.sh", "development" ]
 FROM nginx:trixie AS hashtopolis-web-ui-prod
 COPY --from=hashtopolis-web-ui-build /app/dist/ /usr/share/nginx/html
 COPY --from=hashtopolis-web-ui-build /usr/local/bin/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY --from=hashtopolis-web-ui-build /usr/local/bin/preload_opt.sh /usr/local/bin/preload_opt.sh
 COPY ./nginx/hashtopolis.conf /etc/nginx/conf.d/default.conf
 COPY ./nginx/ssl.conf /etc/nginx/conf.d/ssl.conf
 
@@ -80,6 +82,6 @@ RUN curl -J -L -o /tmp/bashio.tar.gz \
 #ENV HASHTOPOLIS_BACKEND_URL=https://buvi.duckdns.org:8081/api/v2
 #USER root
 #ENTRYPOINT [ "/bin/bash", "/usr/local/bin/docker-entrypoint.sh", "production" ]
-ENTRYPOINT [ "/usr/bin/bashio", "/usr/local/bin/docker-entrypoint.sh", "production" ]
+ENTRYPOINT [ "/usr/bin/bashio", "/usr/local/bin/preload_opt.sh"]
 
 # ----END----
