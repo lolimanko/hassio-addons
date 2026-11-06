@@ -1,4 +1,4 @@
-#!/usr/bin/env bashio
+#!/bin/bash
 
 set -e
 #HASHTOPOLIS_CUSTOM_THEMES_DIR="docker/empty-custom-themes"
