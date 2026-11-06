@@ -1,8 +1,8 @@
 #!/usr/bin/env bashio
 
 set -e
-HASHTOPOLIS_CUSTOM_THEMES_DIR="docker/empty-custom-themes"
-export HASHTOPOLIS_BACKEND_URL=$(bashio::config 'hashtopolis_backend_url')
+#HASHTOPOLIS_CUSTOM_THEMES_DIR="docker/empty-custom-themes"
+#export HASHTOPOLIS_BACKEND_URL=$(bashio::config 'hashtopolis_backend_url')
 
 
 
