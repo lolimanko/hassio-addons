@@ -1,0 +1,38 @@
+#!/bin/bash
+
+chown ${HYPHANET_UID}:${HYPHANET_GID} ${HYPHANET_DATA}
+
+echo "ha Current User: $(whoami)"
+http_auth=$(jq -r '.http_auth' /data/options.json)
+auth_user=$(jq -r '.auth_user' /data/options.json)
+auth_pass=$(jq -r '.auth_pass' /data/options.json)
+#echo "$auth_user"
+if [ "$http_auth" = "true" ]; then
+  #echo "true"
+  htpasswd -c -b /.htpasswd $auth_user $auth_pass
+  chmod 777 /.htpasswd 
+  sed -i 's/##auth_basic##/auth_basic "Restricted Access";/' /etc/nginx/nginx.conf
+  sed -i 's|##auth_basic_user_file##|auth_basic_user_file /.htpasswd;|' /etc/nginx/nginx.conf
+
+fi
+
+ssl=$(jq -r '.ssl' /data/options.json)
+certfile=$(jq -r '.certfile' /data/options.json)
+keyfile=$(jq -r '.keyfile' /data/options.json)
+
+if [ "$ssl" = "true" ]; then
+    
+    echo "ssl enable."
+    sed -i "s/listen 80;/listen 80 ssl;/g" /etc/nginx/nginx.conf
+    sed -i "s|##certfile##;|ssl_certificate /ssl/${certfile};|" /etc/nginx/nginx.conf
+
+    sed -i "s|##keyfile##;|ssl_certificate_key /ssl/${keyfile};|" /etc/nginx/nginx.conf
+else
+    echo "ssl disable."
+    
+fi
+nginx -v
+nginx -t
+nginx
+#runuser -u root -- id
+gosu  hyphanet  /usr/local/bin/hyphanet.sh start
