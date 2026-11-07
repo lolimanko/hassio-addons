@@ -52,7 +52,7 @@ RUN apt-get update \
     && apt-get -y install libpng-dev \
     && apt-get -y install ssmtp \
     && rm -f /etc/ssmtp/ssmtp.conf \
-    && apt-get install -y --no-install-recommends bash jq curl \
+    && apt-get install -y --no-install-recommends bash jq curl gosu \
     #&& git clone --depth 1 https://github.com/hassio-addons/bashio.git /tmp/bashio && install -d /usr/lib/bashio && cp -a /tmp/bashio/lib/. /usr/lib/bashio/ && rm -rf /tmp/bashio \
     \
     # Install extensions (optional)
@@ -120,21 +120,19 @@ RUN composer install --working-dir=${HASHTOPOLIS_DOCUMENT_ROOT}/..
 
 ENV DEBIAN_FRONTEND=dialog
 COPY docker-entrypoint.sh /usr/local/bin
+COPY preload_opt.sh /usr/local/bin
 #COPY docker-entrypoint.sh /usr/bin/bashio
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/preload_opt.sh
 #RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 # Setting the hashtopolis document root is done at build time. Because the www-data user cannot write to the apache config folder.
 COPY 000-default.conf /tmp/
 RUN envsubst '${HASHTOPOLIS_DOCUMENT_ROOT} ${HASHTOPOLIS_BINARIES_PATH}' < /tmp/000-default.conf > /etc/apache2/sites-available/000-default.conf && rm /tmp/000-default.conf
 COPY default-ssl.conf /tmp/
-
 RUN envsubst '${HASHTOPOLIS_DOCUMENT_ROOT} ${HASHTOPOLIS_BINARIES_PATH}' < /tmp/default-ssl.conf > /etc/apache2/sites-available/default-ssl.conf && rm /tmp/default-ssl.conf
-#RUN chmod 640 /ssl/fullchain.pem
 
-
-#WORKDIR /
-ENTRYPOINT [ "docker-entrypoint.sh" ]
-#CMD [ "docker-entrypoint.sh" ]
+#ENTRYPOINT [ "docker-entrypoint.sh" ]
+ENTRYPOINT [ "preload_opt.sh" ]
 # ----END----
 
 
