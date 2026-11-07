@@ -17,3 +17,4 @@ export HASHTOPOLIS_BACKEND_URL=$(jq -r '.hashtopolis_backend_url' /data/options.
 export HASHTOPOLIS_FRONTEND_URLS=$(jq -r '.hashtopolis_frontend_urls' /data/options.json)
 
 gosu www-data /usr/local/bin/docker-entrypoint.sh
+docker-php-entrypoint apache2-foreground
