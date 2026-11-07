@@ -58,7 +58,7 @@ COPY --from=hashtopolis-web-ui-build /usr/local/bin/docker-entrypoint.sh /usr/lo
 COPY --from=hashtopolis-web-ui-build /usr/local/bin/preload_opt.sh /usr/local/bin/preload_opt.sh
 COPY ./nginx/hashtopolis.conf /etc/nginx/conf.d/default.conf
 COPY ./nginx/ssl.conf /etc/nginx/conf.d/ssl.conf
-
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 # Custom themes are opt-in at runtime via HASHTOPOLIS_CUSTOM_THEMES_DIR.
 # By default this bakes an empty folder (no themes ship in the image). To bake
 # themes, build with --build-arg CUSTOM_THEMES_DIR=custom-themes (or your own
