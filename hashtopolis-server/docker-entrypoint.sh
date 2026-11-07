@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-
+echo "$HASHTOPOLIS_DB_PASS"
 paths=(inc/utils/locks)
 
 for path in ${paths[@]}; do
