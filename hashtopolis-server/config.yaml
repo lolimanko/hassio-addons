@@ -1,7 +1,7 @@
 name: "hashtopolis-server"
 description: "hashtopolis-server"
-version: "1.0.28"
-slug: "hashtopolis-server2"
+version: "1.0.29"
+slug: "hashtopolis-server"
 #init: false
 #host_network: true
 ports:
