@@ -131,7 +131,7 @@ if [ "$environment" = "development" ]; then
 else
   # Prepare configuration
 
-  ssl=$(bashio::config 'SSL')
+ 
   if [  "$ssl" = "false"   ]; then
     echo "ssl false"
     rm /etc/nginx/conf.d/ssl.conf
