@@ -120,11 +120,6 @@ if [ "$environment" = "development" ]; then
 else
   # Prepare configuration
 
- 
-  if [  "$ssl" = "false"   ]; then
-    echo "ssl false"
-    rm /etc/nginx/conf.d/ssl.conf
-  fi
   update_app_config "/usr/share/nginx/html"
   sync_custom_themes "/usr/share/nginx/html"
 
