@@ -18,8 +18,9 @@ import {
 
 import { TasksChunksDataSource } from '@datasources/tasks-chunks.datasource';
 
-import { chunkStates } from '@src/app/core/_constants/chunks.config';
+import { ChunkStateLabels, ChunkStatePillClass } from '@src/app/core/_constants/chunks.config';
 import { FilterType } from '@src/app/core/_models/request-params.model';
+import { chunkCheckpointPercent, chunkProgressPercent, chunkTimeSpent } from '@src/app/shared/utils/chunk';
 import { formatSeconds, formatUnixTimestamp } from '@src/app/shared/utils/datetime';
 import { convertToLocale } from '@src/app/shared/utils/util';
 
@@ -76,6 +77,7 @@ export class TasksChunksTableComponent extends BaseTableComponent implements OnI
       {
         id: TasksChunksTableCol.ID,
         dataKey: 'id',
+        routerLink: (chunk: JChunk) => this.renderChunkDetailLink(chunk.id),
         isSortable: true,
         isSearchable: true
       },
@@ -165,16 +167,16 @@ export class TasksChunksTableComponent extends BaseTableComponent implements OnI
 
   // --- Render functions ---
   renderState(chunk: JChunk): SafeHtml {
-    let html = `${chunk.state}`;
-    if (chunk.state && chunk.state in chunkStates) {
-      html = `<span class="pill pill-${chunkStates[chunk.state].toLowerCase()}">${chunkStates[chunk.state]}</span>`;
+    const label = ChunkStateLabels[chunk.state];
+    if (!label) {
+      return this.sanitize(`<span class="pill">${chunk.state}</span>`);
     }
 
-    return this.sanitize(html);
+    return this.sanitize(`<span class="pill ${ChunkStatePillClass[chunk.state]}">${label}</span>`);
   }
 
   renderTimeSpent(chunk: JChunk): SafeHtml {
-    const seconds = chunk.solveTime - chunk.dispatchTime;
+    const seconds = chunkTimeSpent(chunk);
     if (seconds) {
       return this.sanitize(formatSeconds(seconds));
     }
@@ -183,20 +185,21 @@ export class TasksChunksTableComponent extends BaseTableComponent implements OnI
   }
 
   renderCheckpoint(chunk: JChunk): SafeHtml {
-    const percent = chunk.progress ? (((chunk.checkpoint - chunk.skip) / chunk.length) * 100).toFixed(2) : 0;
-    const data = chunk.checkpoint ? `${chunk.checkpoint} (${convertToLocale(Number(percent))}%)` : '0';
+    if (!chunk.checkpoint) {
+      return this.sanitize('0');
+    }
+    const percent = Number(chunkCheckpointPercent(chunk).toFixed(2));
 
-    return this.sanitize(data);
+    return this.sanitize(`${chunk.checkpoint} (${convertToLocale(percent)}%)`);
   }
 
   renderProgress(chunk: JChunk): SafeHtml {
-    if (chunk.progress === undefined) {
+    const percent = chunkProgressPercent(chunk);
+    if (percent === null) {
       return this.sanitize('N/A');
-    } else if (chunk.progress > 0) {
-      return this.sanitize(`${convertToLocale(chunk.progress / 100)}%`);
     }
 
-    return `${chunk.progress ? chunk.progress : 0}`;
+    return this.sanitize(`${convertToLocale(percent)}%`);
   }
 
   renderDispatchTime(chunk: JChunk): SafeHtml {

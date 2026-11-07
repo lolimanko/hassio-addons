@@ -1,13 +1,9 @@
+import { ChunkState } from '@constants/chunks.config';
+
 import { JAgent } from '@models/agent.model';
 import { BaseModel } from '@models/base.model';
 import { AgentId, TaskId } from '@models/id.types';
 import { JTask } from '@models/task.model';
-
-/** Chunk state values (0–10) matching the generated Zod schema. */
-export type ChunkState = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
-
-/** State reported while an agent is actively cracking a chunk (matches DHashcatStatus::RUNNING on the server). */
-export const CHUNK_STATE_RUNNING: ChunkState = 2;
 
 /**
  * Interface for a task chunk
@@ -20,7 +16,8 @@ export interface JChunk extends BaseModel {
   format?: string;
   skip: number;
   length: number;
-  agentId: AgentId;
+  /** Null once the agent that worked the chunk has been deleted (the server nulls it, see AgentUtils::deleteDependencies). */
+  agentId: AgentId | null;
   agent?: JAgent;
   agentName?: string | undefined;
   dispatchTime: number;

@@ -1,16 +1,20 @@
-import type { ErrorResponse, NotFoundResponse } from './common';
+import type { ErrorResponse } from './common';
+import type { TaskResponse } from './task';
+
+export type AgentErrorDeleteMultiple = {
+  data: Array<{
+    id: number;
+    type: 'agentError';
+  }>;
+};
 
 export type AgentErrorResponse = {
   jsonapi: {
     version: string;
     ext?: Array<string>;
   };
-  links?: {
+  links: {
     self: string;
-    first?: string;
-    last?: string;
-    next?: string | null;
-    previous?: string | null;
   };
   data: {
     id: number;
@@ -22,17 +26,20 @@ export type AgentErrorResponse = {
       time: number;
       error: string;
     };
-  };
-  relationships?: {
-    task: {
-      links: {
-        self: string;
-        related: string;
+    links: {
+      self: string;
+    };
+    relationships: {
+      task: {
+        links: {
+          self: string;
+          related: string;
+        };
+        data?: {
+          type: 'task';
+          id: number;
+        } | null;
       };
-      data?: {
-        type: 'task';
-        id: number;
-      } | null;
     };
   };
   included?: Array<{
@@ -71,12 +78,17 @@ export type AgentErrorListResponse = {
     version: string;
     ext?: Array<string>;
   };
-  links?: {
+  links: {
     self: string;
-    first?: string;
-    last?: string;
-    next?: string | null;
-    previous?: string | null;
+    first: string;
+    last: string | null;
+    next: string | null;
+    prev: string | null;
+  };
+  meta: {
+    page: {
+      total_elements: number;
+    };
   };
   data: Array<{
     id: number;
@@ -88,19 +100,22 @@ export type AgentErrorListResponse = {
       time: number;
       error: string;
     };
-  }>;
-  relationships?: {
-    task: {
-      links: {
-        self: string;
-        related: string;
-      };
-      data?: {
-        type: 'task';
-        id: number;
-      } | null;
+    links: {
+      self: string;
     };
-  };
+    relationships: {
+      task: {
+        links: {
+          self: string;
+          related: string;
+        };
+        data?: {
+          type: 'task';
+          id: number;
+        } | null;
+      };
+    };
+  }>;
   included?: Array<{
     id: number;
     type: 'task';
@@ -132,6 +147,29 @@ export type AgentErrorListResponse = {
   }>;
 };
 
+export type AgentErrorCountResponse = {
+  jsonapi: {
+    version: string;
+    ext?: Array<string>;
+  };
+  meta: {
+    /**
+     * Number of objects accessible to the current user matching the given filters
+     */
+    count: number;
+    /**
+     * Number of objects accessible to the current user without any filter applied, only present when `include_total=true` was requested
+     */
+    total_count?: number;
+  };
+  /**
+   * Always empty: the count is reported under meta.
+   */
+  data: Array<{
+    [key: string]: unknown;
+  }>;
+};
+
 export type AgentErrorRelationTask = {
   data: {
     type: 'task';
@@ -143,11 +181,11 @@ export type AgentErrorRelationTaskGetResponse = {
   data: {
     type: 'task';
     id: number;
-  };
+  } | null;
 };
 
 export type DeleteAgenterrorsData = {
-  body?: never;
+  body: AgentErrorDeleteMultiple;
   path?: never;
   query?: never;
   url: '/api/v2/ui/agenterrors';
@@ -162,43 +200,65 @@ export type DeleteAgenterrorsErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
+  /**
+   * Permission denied
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
 };
 
 export type DeleteAgenterrorsError = DeleteAgenterrorsErrors[keyof DeleteAgenterrorsErrors];
 
 export type DeleteAgenterrorsResponses = {
   /**
-   * successful operation
+   * successfully deleted
    */
-  200: unknown;
+  204: void;
 };
+
+export type DeleteAgenterrorsResponse = DeleteAgenterrorsResponses[keyof DeleteAgenterrorsResponses];
 
 export type GetAgenterrorsData = {
   body?: never;
   path?: never;
   query?: {
     /**
-     * Pointer to paginate to retrieve the data after the value provided
+     * Pointer to paginate to retrieve the data after the object provided. Specify the `base64` encoded JSON string in a **uniquely identifiable** manner (e.g. object IDs), i.e. by using one (primary) or two (primary and secondary) fields that allow for **stable** sorting.
+     *
+     *
+     * Format: `{"primary":{"someField": 123},"secondary":{"someOtherOptionalField": "Foo"}}`
+     *
+     *
+     * Example: `{"primary":{"agentErrorId": 123}}` -> `eyJwcmltYXJ5Ijp7ImFnZW50RXJyb3JJZCI6IDEyM319`
      */
-    'page[after]'?: number;
+    'page[after]'?: string;
     /**
-     * Pointer to paginate to retrieve the data before the value provided
+     * Pointer to paginate to retrieve the data before the object provided. Specify the `base64` encoded JSON string in a **uniquely identifiable** manner (e.g. object IDs), i.e. by using one (primary) or two (primary and secondary) fields that allow for **stable** sorting.
+     *
+     *
+     * Format: `{"primary":{"someField": 123},"secondary":{"someOtherOptionalField": "Foo"}}`
+     *
+     *
+     * Example: `{"primary":{"agentErrorId": 123}}` -> `eyJwcmltYXJ5Ijp7ImFnZW50RXJyb3JJZCI6IDEyM319`
      */
-    'page[before]'?: number;
+    'page[before]'?: string;
     /**
-     * Amout of data to retrieve inside a single page
+     * Amount of data to retrieve inside a single page
      */
     'page[size]'?: number;
     /**
-     * Filters results using a query
+     * Filters results using a query. Every key is an attribute name optionally suffixed with a comparison operator, e.g. `filter[agentErrorId__gt]=200`.
      */
     filter?: {
-      [key: string]: unknown;
+      [key: string]: string;
     };
     /**
-     * Items to include, comma seperated. Possible options: Array
+     * Relationships to include in the response, comma seperated. Possible options: task
      */
-    include?: string;
+    include?: Array<'task'>;
   };
   url: '/api/v2/ui/agenterrors';
 };
@@ -212,6 +272,10 @@ export type GetAgenterrorsErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
+  /**
+   * Permission denied
+   */
+  403: ErrorResponse;
 };
 
 export type GetAgenterrorsError = GetAgenterrorsErrors[keyof GetAgenterrorsErrors];
@@ -230,27 +294,15 @@ export type GetAgenterrorsCountData = {
   path?: never;
   query?: {
     /**
-     * Pointer to paginate to retrieve the data after the value provided
-     */
-    'page[after]'?: number;
-    /**
-     * Pointer to paginate to retrieve the data before the value provided
-     */
-    'page[before]'?: number;
-    /**
-     * Amout of data to retrieve inside a single page
-     */
-    'page[size]'?: number;
-    /**
-     * Filters results using a query
+     * Filters results using a query. Every key is an attribute name optionally suffixed with a comparison operator, e.g. `filter[agentErrorId__gt]=200`.
      */
     filter?: {
-      [key: string]: unknown;
+      [key: string]: string;
     };
     /**
-     * Items to include, comma seperated. Possible options: Array
+     * Also report the number of accessible objects without any filter applied, as `meta.total_count`
      */
-    include?: string;
+    include_total?: boolean;
   };
   url: '/api/v2/ui/agenterrors/count';
 };
@@ -264,6 +316,10 @@ export type GetAgenterrorsCountErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
+  /**
+   * Permission denied
+   */
+  403: ErrorResponse;
 };
 
 export type GetAgenterrorsCountError = GetAgenterrorsCountErrors[keyof GetAgenterrorsCountErrors];
@@ -272,22 +328,21 @@ export type GetAgenterrorsCountResponses = {
   /**
    * successful operation
    */
-  200: AgentErrorListResponse;
+  200: AgentErrorCountResponse;
 };
 
 export type GetAgenterrorsCountResponse = GetAgenterrorsCountResponses[keyof GetAgenterrorsCountResponses];
 
-export type GetAgenterrorsByIdByRelationData = {
+export type GetAgenterrorsByIdTaskData = {
   body?: never;
   path: {
     id: number;
-    relation: string;
   };
   query?: never;
-  url: '/api/v2/ui/agenterrors/{id}/{relation}';
+  url: '/api/v2/ui/agenterrors/{id}/task';
 };
 
-export type GetAgenterrorsByIdByRelationErrors = {
+export type GetAgenterrorsByIdTaskErrors = {
   /**
    * Invalid request
    */
@@ -297,73 +352,77 @@ export type GetAgenterrorsByIdByRelationErrors = {
    */
   401: ErrorResponse;
   /**
+   * Permission denied
+   */
+  403: ErrorResponse;
+  /**
    * Not Found
    */
-  404: NotFoundResponse;
+  404: ErrorResponse;
 };
 
-export type GetAgenterrorsByIdByRelationError =
-  GetAgenterrorsByIdByRelationErrors[keyof GetAgenterrorsByIdByRelationErrors];
+export type GetAgenterrorsByIdTaskError = GetAgenterrorsByIdTaskErrors[keyof GetAgenterrorsByIdTaskErrors];
 
-export type GetAgenterrorsByIdByRelationResponses = {
+export type GetAgenterrorsByIdTaskResponses = {
+  /**
+   * successful operation
+   */
+  200: TaskResponse;
+};
+
+export type GetAgenterrorsByIdTaskResponse = GetAgenterrorsByIdTaskResponses[keyof GetAgenterrorsByIdTaskResponses];
+
+export type GetAgenterrorsByIdRelationshipsTaskData = {
+  body?: never;
+  path: {
+    id: number;
+  };
+  query?: never;
+  url: '/api/v2/ui/agenterrors/{id}/relationships/task';
+};
+
+export type GetAgenterrorsByIdRelationshipsTaskErrors = {
+  /**
+   * Invalid request
+   */
+  400: ErrorResponse;
+  /**
+   * Authentication failed
+   */
+  401: ErrorResponse;
+  /**
+   * Permission denied
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+};
+
+export type GetAgenterrorsByIdRelationshipsTaskError =
+  GetAgenterrorsByIdRelationshipsTaskErrors[keyof GetAgenterrorsByIdRelationshipsTaskErrors];
+
+export type GetAgenterrorsByIdRelationshipsTaskResponses = {
   /**
    * successful operation
    */
   200: AgentErrorRelationTaskGetResponse;
 };
 
-export type GetAgenterrorsByIdByRelationResponse =
-  GetAgenterrorsByIdByRelationResponses[keyof GetAgenterrorsByIdByRelationResponses];
+export type GetAgenterrorsByIdRelationshipsTaskResponse =
+  GetAgenterrorsByIdRelationshipsTaskResponses[keyof GetAgenterrorsByIdRelationshipsTaskResponses];
 
-export type GetAgenterrorsByIdRelationshipsByRelationData = {
-  body?: never;
-  path: {
-    id: number;
-    relation: string;
-  };
-  query?: never;
-  url: '/api/v2/ui/agenterrors/{id}/relationships/{relation}';
-};
-
-export type GetAgenterrorsByIdRelationshipsByRelationErrors = {
-  /**
-   * Invalid request
-   */
-  400: ErrorResponse;
-  /**
-   * Authentication failed
-   */
-  401: ErrorResponse;
-  /**
-   * Not Found
-   */
-  404: NotFoundResponse;
-};
-
-export type GetAgenterrorsByIdRelationshipsByRelationError =
-  GetAgenterrorsByIdRelationshipsByRelationErrors[keyof GetAgenterrorsByIdRelationshipsByRelationErrors];
-
-export type GetAgenterrorsByIdRelationshipsByRelationResponses = {
-  /**
-   * successful operation
-   */
-  200: AgentErrorResponse;
-};
-
-export type GetAgenterrorsByIdRelationshipsByRelationResponse =
-  GetAgenterrorsByIdRelationshipsByRelationResponses[keyof GetAgenterrorsByIdRelationshipsByRelationResponses];
-
-export type PatchAgenterrorsByIdRelationshipsByRelationData = {
+export type PatchAgenterrorsByIdRelationshipsTaskData = {
   body: AgentErrorRelationTask;
   path: {
     id: number;
-    relation: string;
   };
   query?: never;
-  url: '/api/v2/ui/agenterrors/{id}/relationships/{relation}';
+  url: '/api/v2/ui/agenterrors/{id}/relationships/task';
 };
 
-export type PatchAgenterrorsByIdRelationshipsByRelationErrors = {
+export type PatchAgenterrorsByIdRelationshipsTaskErrors = {
   /**
    * Invalid request
    */
@@ -373,28 +432,34 @@ export type PatchAgenterrorsByIdRelationshipsByRelationErrors = {
    */
   401: ErrorResponse;
   /**
+   * Permission denied
+   */
+  403: ErrorResponse;
+  /**
    * Not Found
    */
-  404: NotFoundResponse;
+  404: ErrorResponse;
+  /**
+   * Resource already exists
+   */
+  409: ErrorResponse;
 };
 
-export type PatchAgenterrorsByIdRelationshipsByRelationError =
-  PatchAgenterrorsByIdRelationshipsByRelationErrors[keyof PatchAgenterrorsByIdRelationshipsByRelationErrors];
+export type PatchAgenterrorsByIdRelationshipsTaskError =
+  PatchAgenterrorsByIdRelationshipsTaskErrors[keyof PatchAgenterrorsByIdRelationshipsTaskErrors];
 
-export type PatchAgenterrorsByIdRelationshipsByRelationResponses = {
+export type PatchAgenterrorsByIdRelationshipsTaskResponses = {
   /**
    * Successfull operation
    */
   204: void;
 };
 
-export type PatchAgenterrorsByIdRelationshipsByRelationResponse =
-  PatchAgenterrorsByIdRelationshipsByRelationResponses[keyof PatchAgenterrorsByIdRelationshipsByRelationResponses];
+export type PatchAgenterrorsByIdRelationshipsTaskResponse =
+  PatchAgenterrorsByIdRelationshipsTaskResponses[keyof PatchAgenterrorsByIdRelationshipsTaskResponses];
 
 export type DeleteAgenterrorsByIdData = {
-  body: {
-    [key: string]: unknown;
-  };
+  body?: never;
   path: {
     id: number;
   };
@@ -412,9 +477,13 @@ export type DeleteAgenterrorsByIdErrors = {
    */
   401: ErrorResponse;
   /**
+   * Permission denied
+   */
+  403: ErrorResponse;
+  /**
    * Not Found
    */
-  404: NotFoundResponse;
+  404: ErrorResponse;
 };
 
 export type DeleteAgenterrorsByIdError = DeleteAgenterrorsByIdErrors[keyof DeleteAgenterrorsByIdErrors];
@@ -435,9 +504,9 @@ export type GetAgenterrorsByIdData = {
   };
   query?: {
     /**
-     * Items to include. Comma seperated
+     * Relationships to include in the response, comma seperated. Possible options: task
      */
-    include?: string;
+    include?: Array<'task'>;
   };
   url: '/api/v2/ui/agenterrors/{id}';
 };
@@ -452,9 +521,13 @@ export type GetAgenterrorsByIdErrors = {
    */
   401: ErrorResponse;
   /**
+   * Permission denied
+   */
+  403: ErrorResponse;
+  /**
    * Not Found
    */
-  404: NotFoundResponse;
+  404: ErrorResponse;
 };
 
 export type GetAgenterrorsByIdError = GetAgenterrorsByIdErrors[keyof GetAgenterrorsByIdErrors];

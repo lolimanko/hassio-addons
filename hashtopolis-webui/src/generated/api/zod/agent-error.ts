@@ -1,19 +1,24 @@
 import * as z from 'zod';
 
+import { zTaskResponse } from './task';
+
+export const zAgentErrorDeleteMultiple = z.object({
+  data: z.array(
+    z.object({
+      id: z.int(),
+      type: z.literal('agentError')
+    })
+  )
+});
+
 export const zAgentErrorResponse = z.object({
   jsonapi: z.object({
     version: z.string().default('1.1'),
     ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
   }),
-  links: z
-    .object({
-      self: z.string().default('/api/v2/ui/agenterrors?page[size]=25'),
-      first: z.string().optional().default('/api/v2/ui/agenterrors?page[size]=25&page[after]=0'),
-      last: z.string().optional().default('/api/v2/ui/agenterrors?page[size]=25&page[before]=500'),
-      next: z.string().nullish().default('/api/v2/ui/agenterrors?page[size]=25&page[after]=25'),
-      previous: z.string().nullish().default('/api/v2/ui/agenterrors?page[size]=25&page[before]=25')
-    })
-    .optional(),
+  links: z.object({
+    self: z.string().default('/api/v2/ui/agenterrors/1')
+  }),
   data: z.object({
     id: z.int(),
     type: z.literal('agentError'),
@@ -23,10 +28,11 @@ export const zAgentErrorResponse = z.object({
       chunkId: z.int().nullable(),
       time: z.number(),
       error: z.string()
-    })
-  }),
-  relationships: z
-    .object({
+    }),
+    links: z.object({
+      self: z.string().default('/api/v2/ui/agenterrors/1')
+    }),
+    relationships: z.object({
       task: z.object({
         links: z.object({
           self: z.string().default('/api/v2/ui/agenterrors/relationships/task'),
@@ -40,7 +46,7 @@ export const zAgentErrorResponse = z.object({
           .nullish()
       })
     })
-    .optional(),
+  }),
   included: z
     .array(
       z.object({
@@ -81,15 +87,33 @@ export const zAgentErrorListResponse = z.object({
     version: z.string().default('1.1'),
     ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
   }),
-  links: z
-    .object({
-      self: z.string().default('/api/v2/ui/agenterrors?page[size]=25'),
-      first: z.string().optional().default('/api/v2/ui/agenterrors?page[size]=25&page[after]=0'),
-      last: z.string().optional().default('/api/v2/ui/agenterrors?page[size]=25&page[before]=500'),
-      next: z.string().nullish().default('/api/v2/ui/agenterrors?page[size]=25&page[after]=25'),
-      previous: z.string().nullish().default('/api/v2/ui/agenterrors?page[size]=25&page[before]=25')
+  links: z.object({
+    self: z.string().default('/api/v2/ui/agenterrors?page[size]=25'),
+    first: z.string().default('/api/v2/ui/agenterrors?page[size]=25'),
+    last: z
+      .string()
+      .nullable()
+      .default(
+        '/api/v2/ui/agenterrors?page[size]=25&page[before]=eyJwcmltYXJ5Ijp7InNvbWVVbnFpdWVGaWVsZCI6MTIzfSwic2Vjb25kYXJ5Ijp7InNvbWVPdGhlck9wdGlvbmFsRmllbGQiOiJGb28ifX0='
+      ),
+    next: z
+      .string()
+      .nullable()
+      .default(
+        '/api/v2/ui/agenterrors?page[size]=25&page[after]=eyJwcmltYXJ5Ijp7InNvbWVVbnFpdWVGaWVsZCI6MTIzfSwic2Vjb25kYXJ5Ijp7InNvbWVPdGhlck9wdGlvbmFsRmllbGQiOiJGb28ifX0='
+      ),
+    prev: z
+      .string()
+      .nullable()
+      .default(
+        '/api/v2/ui/agenterrors?page[size]=25&page[before]=eyJwcmltYXJ5Ijp7InNvbWVVbnFpdWVGaWVsZCI6MTIzfSwic2Vjb25kYXJ5Ijp7InNvbWVPdGhlck9wdGlvbmFsRmllbGQiOiJGb28ifX0='
+      )
+  }),
+  meta: z.object({
+    page: z.object({
+      total_elements: z.int()
     })
-    .optional(),
+  }),
   data: z.array(
     z.object({
       id: z.int(),
@@ -100,25 +124,26 @@ export const zAgentErrorListResponse = z.object({
         chunkId: z.int().nullable(),
         time: z.number(),
         error: z.string()
+      }),
+      links: z.object({
+        self: z.string().default('/api/v2/ui/agenterrors/1')
+      }),
+      relationships: z.object({
+        task: z.object({
+          links: z.object({
+            self: z.string().default('/api/v2/ui/agenterrors/relationships/task'),
+            related: z.string().default('/api/v2/ui/agenterrors/task')
+          }),
+          data: z
+            .object({
+              type: z.literal('task'),
+              id: z.int()
+            })
+            .nullish()
+        })
       })
     })
   ),
-  relationships: z
-    .object({
-      task: z.object({
-        links: z.object({
-          self: z.string().default('/api/v2/ui/agenterrors/relationships/task'),
-          related: z.string().default('/api/v2/ui/agenterrors/task')
-        }),
-        data: z
-          .object({
-            type: z.literal('task'),
-            id: z.int()
-          })
-          .nullish()
-      })
-    })
-    .optional(),
   included: z
     .array(
       z.object({
@@ -154,50 +179,57 @@ export const zAgentErrorListResponse = z.object({
     .optional()
 });
 
+export const zAgentErrorCountResponse = z.object({
+  jsonapi: z.object({
+    version: z.string().default('1.1'),
+    ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
+  }),
+  meta: z.object({
+    count: z.int(),
+    total_count: z.int().optional()
+  }),
+  data: z.array(z.record(z.string(), z.unknown())).max(0)
+});
+
 export const zAgentErrorRelationTask = z.object({
   data: z.object({
     type: z.literal('task'),
-    id: z.int().default(1)
+    id: z.int()
   })
 });
 
 export const zAgentErrorRelationTaskGetResponse = z.object({
-  data: z.object({
-    type: z.literal('task'),
-    id: z.int().default(1)
-  })
-});
-
-export const zDeleteAgenterrorsData = z.object({
-  body: z.never().optional(),
-  path: z.never().optional(),
-  query: z.never().optional()
-});
-
-export const zGetAgenterrorsData = z.object({
-  body: z.never().optional(),
-  path: z.never().optional(),
-  query: z
+  data: z
     .object({
-      'page[after]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      'page[before]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      'page[size]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      filter: z.record(z.string(), z.unknown()).optional(),
-      include: z.string().optional()
+      type: z.literal('task'),
+      id: z.int()
     })
-    .optional()
+    .nullable()
+});
+
+export const zDeleteAgenterrorsBody = zAgentErrorDeleteMultiple;
+
+/**
+ * successfully deleted
+ */
+export const zDeleteAgenterrorsResponse = z.void();
+
+export const zGetAgenterrorsQuery = z.object({
+  'page[after]': z
+    .string()
+    .regex(/^[A-Za-z0-9+\/]*={0,2}$/)
+    .optional(),
+  'page[before]': z
+    .string()
+    .regex(/^[A-Za-z0-9+\/]*={0,2}$/)
+    .optional(),
+  'page[size]': z
+    .int()
+    .gte(1)
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+    .optional(),
+  filter: z.record(z.string(), z.string()).optional(),
+  include: z.array(z.enum(['task'])).optional()
 });
 
 /**
@@ -205,91 +237,53 @@ export const zGetAgenterrorsData = z.object({
  */
 export const zGetAgenterrorsResponse = zAgentErrorListResponse;
 
-export const zGetAgenterrorsCountData = z.object({
-  body: z.never().optional(),
-  path: z.never().optional(),
-  query: z
-    .object({
-      'page[after]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      'page[before]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      'page[size]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      filter: z.record(z.string(), z.unknown()).optional(),
-      include: z.string().optional()
-    })
-    .optional()
+export const zGetAgenterrorsCountQuery = z.object({
+  filter: z.record(z.string(), z.string()).optional(),
+  include_total: z.boolean().optional()
 });
 
 /**
  * successful operation
  */
-export const zGetAgenterrorsCountResponse = zAgentErrorListResponse;
+export const zGetAgenterrorsCountResponse = zAgentErrorCountResponse;
 
-export const zGetAgenterrorsByIdByRelationData = z.object({
-  body: z.never().optional(),
-  path: z.object({
-    id: z
-      .int()
-      .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-      .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-    relation: z.string()
-  }),
-  query: z.never().optional()
+export const zGetAgenterrorsByIdTaskPath = z.object({
+  id: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
 });
 
 /**
  * successful operation
  */
-export const zGetAgenterrorsByIdByRelationResponse = zAgentErrorRelationTaskGetResponse;
+export const zGetAgenterrorsByIdTaskResponse = zTaskResponse;
 
-export const zGetAgenterrorsByIdRelationshipsByRelationData = z.object({
-  body: z.never().optional(),
-  path: z.object({
-    id: z
-      .int()
-      .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-      .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-    relation: z.string()
-  }),
-  query: z.never().optional()
+export const zGetAgenterrorsByIdRelationshipsTaskPath = z.object({
+  id: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
 });
 
 /**
  * successful operation
  */
-export const zGetAgenterrorsByIdRelationshipsByRelationResponse = zAgentErrorResponse;
+export const zGetAgenterrorsByIdRelationshipsTaskResponse = zAgentErrorRelationTaskGetResponse;
 
-export const zPatchAgenterrorsByIdRelationshipsByRelationData = z.object({
-  body: zAgentErrorRelationTask,
-  path: z.object({
-    id: z.int(),
-    relation: z.string()
-  }),
-  query: z.never().optional()
+export const zPatchAgenterrorsByIdRelationshipsTaskBody = zAgentErrorRelationTask;
+
+export const zPatchAgenterrorsByIdRelationshipsTaskPath = z.object({
+  id: z.int()
 });
 
 /**
  * Successfull operation
  */
-export const zPatchAgenterrorsByIdRelationshipsByRelationResponse = z.void();
+export const zPatchAgenterrorsByIdRelationshipsTaskResponse = z.void();
 
-export const zDeleteAgenterrorsByIdData = z.object({
-  body: z.record(z.string(), z.unknown()),
-  path: z.object({
-    id: z.int()
-  }),
-  query: z.never().optional()
+export const zDeleteAgenterrorsByIdPath = z.object({
+  id: z.int()
 });
 
 /**
@@ -297,19 +291,15 @@ export const zDeleteAgenterrorsByIdData = z.object({
  */
 export const zDeleteAgenterrorsByIdResponse = z.void();
 
-export const zGetAgenterrorsByIdData = z.object({
-  body: z.never().optional(),
-  path: z.object({
-    id: z
-      .int()
-      .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-      .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-  }),
-  query: z
-    .object({
-      include: z.string().optional()
-    })
-    .optional()
+export const zGetAgenterrorsByIdPath = z.object({
+  id: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+});
+
+export const zGetAgenterrorsByIdQuery = z.object({
+  include: z.array(z.enum(['task'])).optional()
 });
 
 /**

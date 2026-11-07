@@ -22,7 +22,7 @@ import { DialogData } from '@components/tables/table-dialog/table-dialog.model';
 
 import { HashlistsDataSource } from '@datasources/hashlists.datasource';
 
-import { HashListFormatLabel } from '@src/app/core/_constants/hashlist.config';
+import { HashListFormatLabels } from '@src/app/core/_constants/hashlist.config';
 import { FilterType } from '@src/app/core/_models/request-params.model';
 import { formatPercentage } from '@src/app/shared/utils/util';
 
@@ -36,7 +36,6 @@ export class HashlistsTableComponent extends BaseTableComponent implements OnIni
   dataSource: HashlistsDataSource;
   isArchived = false;
   selectedFilterColumn: HTTableColumn;
-  private viewReady = false;
 
   ngOnInit(): void {
     this.setColumnLabels(HashlistsTableColumnLabel);
@@ -56,7 +55,6 @@ export class HashlistsTableComponent extends BaseTableComponent implements OnIni
 
   ngAfterViewInit(): void {
     // Wait until paginator is defined
-    this.viewReady = true;
     this.dataSource.loadAll();
   }
 
@@ -128,8 +126,8 @@ export class HashlistsTableComponent extends BaseTableComponent implements OnIni
         id: HashlistsTableCol.FORMAT,
         dataKey: 'format',
         isSortable: true,
-        render: (hashlist: JHashlist) => this.sanitize(HashListFormatLabel[hashlist.format!]),
-        export: async (hashlist: JHashlist) => HashListFormatLabel[hashlist.format!]
+        render: (hashlist: JHashlist) => this.sanitize(HashListFormatLabels[hashlist.format!]),
+        export: async (hashlist: JHashlist) => HashListFormatLabels[hashlist.format!]
       }
     ];
 

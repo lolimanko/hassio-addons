@@ -1,3 +1,4 @@
+import { HttpStatus } from '@constants/http.config';
 import { BehaviorSubject, Observable, Subject, Subscription } from 'rxjs';
 
 import { CollectionViewer, DataSource, SelectionModel } from '@angular/cdk/collections';
@@ -7,7 +8,7 @@ import { MatPaginator } from '@angular/material/paginator';
 import { MatSort } from '@angular/material/sort';
 
 import { BaseModel, DynamicModel } from '@models/base.model';
-import { UIConfig } from '@models/config-ui.model';
+import { DEFAULT_PAGE_SIZE, TableSortDirection } from '@models/config-ui.model';
 import { Filter } from '@models/request-params.model';
 
 import { JsonAPISerializer } from '@services/api/serializer-service';
@@ -17,11 +18,9 @@ import { PermissionService } from '@services/permission/permission.service';
 import { HttpCacheService } from '@services/shared/http-cache.service';
 import { AutoRefreshService } from '@services/shared/refresh/auto-refresh.service';
 import { UIConfigService } from '@services/shared/storage.service';
-import { LocalStorageService } from '@services/storage/local-storage.service';
 
 import { HTTableColumn, SortingColumn } from '@components/tables/ht-table/ht-table.models';
 
-import { UISettingsUtilityClass } from '@src/app/shared/utils/config';
 import { environment } from '@src/environments/environment';
 
 /**
@@ -37,7 +36,7 @@ export abstract class BaseDataSource<
   T extends BaseModel,
   P extends MatPaginator = MatPaginator
 > implements DataSource<T> {
-  public pageSize = 25;
+  public pageSize = DEFAULT_PAGE_SIZE;
   public currentPage = 0;
   public totalItems = 0;
   public sortingColumn: SortingColumn;
@@ -90,8 +89,6 @@ export abstract class BaseDataSource<
    */
   protected originalData: T[] = [];
 
-  private readonly chunkTime: number = 600;
-
   public autoRefreshEnabled = false;
   lastUpdated: Date;
 
@@ -99,7 +96,6 @@ export abstract class BaseDataSource<
   protected service: GlobalService;
   protected uiService: UIConfigService;
   protected permissionService: PermissionService;
-  public util: UISettingsUtilityClass;
   autoRefreshService: AutoRefreshService;
   private cacheService: HttpCacheService;
   private autoRefreshSubscription: Subscription;
@@ -113,18 +109,9 @@ export abstract class BaseDataSource<
     this.service = injector.get(GlobalService);
     this.uiService = injector.get(UIConfigService);
     this.permissionService = injector.get(PermissionService);
-    this.serializer = new JsonAPISerializer();
+    this.serializer = injector.get(JsonAPISerializer);
     this.autoRefreshService = injector.get(AutoRefreshService);
     this.cacheService = injector.get(HttpCacheService);
-
-    const chunktime = this.uiService.getUISettings()?.chunktime;
-    if (chunktime !== undefined) {
-      this.chunkTime = chunktime;
-    }
-
-    // Create util manually instead of injector.get
-    const localStorageService = injector.get(LocalStorageService<UIConfig>);
-    this.util = new UISettingsUtilityClass(localStorageService);
   }
 
   /**
@@ -172,9 +159,9 @@ export abstract class BaseDataSource<
     // Handle filter validation errors gracefully
     if (error?.error?.title) {
       this.filterError$.next(error.error.title);
-    } else if (error?.status === 403) {
+    } else if (error?.status === HttpStatus.FORBIDDEN) {
       this.filterError$.next('Access forbidden. Please check your permissions.');
-    } else if (error?.status === 400) {
+    } else if (error?.status === HttpStatus.BAD_REQUEST) {
       const message = error?.error?.title || 'Invalid filter parameter';
       this.filterError$.next(message);
     } else if (error?.status) {
@@ -247,7 +234,7 @@ export abstract class BaseDataSource<
    */
   protected applySorting(data: T[]): T[] {
     if (!this.sortingColumn) return data;
-    const isAscending = this.sortingColumn.direction === 'asc';
+    const isAscending = this.sortingColumn.direction === TableSortDirection.ASC;
     const sortKey = this.sortingColumn.dataKey;
     return [...data].sort((a, b) => {
       const aValue = (a as DynamicModel)[sortKey];

@@ -1,5 +1,7 @@
 import * as z from 'zod';
 
+import { zFileListResponse } from './file';
+
 export const zPreTaskCreate = z.object({
   data: z.object({
     type: z.literal('preTask'),
@@ -35,9 +37,42 @@ export const zPreTaskPatch = z.object({
       maxAgents: z.int().optional(),
       priority: z.int().optional(),
       statusTimer: z.int().optional(),
-      taskName: z.string().optional()
+      taskName: z.string().optional(),
+      useNewBench: z.boolean().optional()
     })
   })
+});
+
+export const zPreTaskPatchMultiple = z.object({
+  data: z.array(
+    z.object({
+      id: z.int(),
+      type: z.literal('preTask'),
+      attributes: z.object({
+        attackCmd: z.string().optional(),
+        chunkTime: z.int().optional(),
+        color: z.string().optional(),
+        crackerBinaryTypeId: z.int().optional(),
+        isCpuTask: z.boolean().optional(),
+        isMaskImport: z.boolean().optional(),
+        isSmall: z.boolean().optional(),
+        maxAgents: z.int().optional(),
+        priority: z.int().optional(),
+        statusTimer: z.int().optional(),
+        taskName: z.string().optional(),
+        useNewBench: z.boolean().optional()
+      })
+    })
+  )
+});
+
+export const zPreTaskDeleteMultiple = z.object({
+  data: z.array(
+    z.object({
+      id: z.int(),
+      type: z.literal('preTask')
+    })
+  )
 });
 
 export const zPreTaskResponse = z.object({
@@ -45,15 +80,9 @@ export const zPreTaskResponse = z.object({
     version: z.string().default('1.1'),
     ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
   }),
-  links: z
-    .object({
-      self: z.string().default('/api/v2/ui/pretasks?page[size]=25'),
-      first: z.string().optional().default('/api/v2/ui/pretasks?page[size]=25&page[after]=0'),
-      last: z.string().optional().default('/api/v2/ui/pretasks?page[size]=25&page[before]=500'),
-      next: z.string().nullish().default('/api/v2/ui/pretasks?page[size]=25&page[after]=25'),
-      previous: z.string().nullish().default('/api/v2/ui/pretasks?page[size]=25&page[before]=25')
-    })
-    .optional(),
+  links: z.object({
+    self: z.string().default('/api/v2/ui/pretasks/1')
+  }),
   data: z.object({
     id: z.int(),
     type: z.literal('preTask'),
@@ -70,11 +99,12 @@ export const zPreTaskResponse = z.object({
       maxAgents: z.int(),
       isMaskImport: z.boolean(),
       crackerBinaryTypeId: z.int(),
-      auxiliaryKeyspace: z.number().optional()
-    })
-  }),
-  relationships: z
-    .object({
+      auxiliaryKeyspace: z.int().optional()
+    }),
+    links: z.object({
+      self: z.string().default('/api/v2/ui/pretasks/1')
+    }),
+    relationships: z.object({
       pretaskFiles: z.object({
         links: z.object({
           self: z.string().default('/api/v2/ui/pretasks/relationships/pretaskFiles'),
@@ -90,7 +120,7 @@ export const zPreTaskResponse = z.object({
           .optional()
       })
     })
-    .optional(),
+  }),
   included: z
     .array(
       z.object({
@@ -114,6 +144,9 @@ export const zPreTaskPostPatchResponse = z.object({
     version: z.string().default('1.1'),
     ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
   }),
+  links: z.object({
+    self: z.string().default('/api/v2/ui/pretasks/1')
+  }),
   data: z.object({
     id: z.int(),
     type: z.literal('preTask'),
@@ -130,48 +163,12 @@ export const zPreTaskPostPatchResponse = z.object({
       maxAgents: z.int(),
       isMaskImport: z.boolean(),
       crackerBinaryTypeId: z.int(),
-      auxiliaryKeyspace: z.number().optional()
-    })
-  })
-});
-
-export const zPreTaskListResponse = z.object({
-  jsonapi: z.object({
-    version: z.string().default('1.1'),
-    ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
-  }),
-  links: z
-    .object({
-      self: z.string().default('/api/v2/ui/pretasks?page[size]=25'),
-      first: z.string().optional().default('/api/v2/ui/pretasks?page[size]=25&page[after]=0'),
-      last: z.string().optional().default('/api/v2/ui/pretasks?page[size]=25&page[before]=500'),
-      next: z.string().nullish().default('/api/v2/ui/pretasks?page[size]=25&page[after]=25'),
-      previous: z.string().nullish().default('/api/v2/ui/pretasks?page[size]=25&page[before]=25')
-    })
-    .optional(),
-  data: z.array(
-    z.object({
-      id: z.int(),
-      type: z.literal('preTask'),
-      attributes: z.object({
-        taskName: z.string(),
-        attackCmd: z.string(),
-        chunkTime: z.int(),
-        statusTimer: z.int(),
-        color: z.string(),
-        isSmall: z.boolean(),
-        isCpuTask: z.boolean(),
-        useNewBench: z.boolean(),
-        priority: z.int(),
-        maxAgents: z.int(),
-        isMaskImport: z.boolean(),
-        crackerBinaryTypeId: z.int(),
-        auxiliaryKeyspace: z.number().optional()
-      })
-    })
-  ),
-  relationships: z
-    .object({
+      auxiliaryKeyspace: z.int().optional()
+    }),
+    links: z.object({
+      self: z.string().default('/api/v2/ui/pretasks/1')
+    }),
+    relationships: z.object({
       pretaskFiles: z.object({
         links: z.object({
           self: z.string().default('/api/v2/ui/pretasks/relationships/pretaskFiles'),
@@ -187,7 +184,7 @@ export const zPreTaskListResponse = z.object({
           .optional()
       })
     })
-    .optional(),
+  }),
   included: z
     .array(
       z.object({
@@ -206,11 +203,113 @@ export const zPreTaskListResponse = z.object({
     .optional()
 });
 
+export const zPreTaskListResponse = z.object({
+  jsonapi: z.object({
+    version: z.string().default('1.1'),
+    ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
+  }),
+  links: z.object({
+    self: z.string().default('/api/v2/ui/pretasks?page[size]=25'),
+    first: z.string().default('/api/v2/ui/pretasks?page[size]=25'),
+    last: z
+      .string()
+      .nullable()
+      .default(
+        '/api/v2/ui/pretasks?page[size]=25&page[before]=eyJwcmltYXJ5Ijp7InNvbWVVbnFpdWVGaWVsZCI6MTIzfSwic2Vjb25kYXJ5Ijp7InNvbWVPdGhlck9wdGlvbmFsRmllbGQiOiJGb28ifX0='
+      ),
+    next: z
+      .string()
+      .nullable()
+      .default(
+        '/api/v2/ui/pretasks?page[size]=25&page[after]=eyJwcmltYXJ5Ijp7InNvbWVVbnFpdWVGaWVsZCI6MTIzfSwic2Vjb25kYXJ5Ijp7InNvbWVPdGhlck9wdGlvbmFsRmllbGQiOiJGb28ifX0='
+      ),
+    prev: z
+      .string()
+      .nullable()
+      .default(
+        '/api/v2/ui/pretasks?page[size]=25&page[before]=eyJwcmltYXJ5Ijp7InNvbWVVbnFpdWVGaWVsZCI6MTIzfSwic2Vjb25kYXJ5Ijp7InNvbWVPdGhlck9wdGlvbmFsRmllbGQiOiJGb28ifX0='
+      )
+  }),
+  meta: z.object({
+    page: z.object({
+      total_elements: z.int()
+    })
+  }),
+  data: z.array(
+    z.object({
+      id: z.int(),
+      type: z.literal('preTask'),
+      attributes: z.object({
+        taskName: z.string(),
+        attackCmd: z.string(),
+        chunkTime: z.int(),
+        statusTimer: z.int(),
+        color: z.string(),
+        isSmall: z.boolean(),
+        isCpuTask: z.boolean(),
+        useNewBench: z.boolean(),
+        priority: z.int(),
+        maxAgents: z.int(),
+        isMaskImport: z.boolean(),
+        crackerBinaryTypeId: z.int(),
+        auxiliaryKeyspace: z.int().optional()
+      }),
+      links: z.object({
+        self: z.string().default('/api/v2/ui/pretasks/1')
+      }),
+      relationships: z.object({
+        pretaskFiles: z.object({
+          links: z.object({
+            self: z.string().default('/api/v2/ui/pretasks/relationships/pretaskFiles'),
+            related: z.string().default('/api/v2/ui/pretasks/pretaskFiles')
+          }),
+          data: z
+            .array(
+              z.object({
+                type: z.literal('file'),
+                id: z.int()
+              })
+            )
+            .optional()
+        })
+      })
+    })
+  ),
+  included: z
+    .array(
+      z.object({
+        id: z.int(),
+        type: z.literal('file'),
+        attributes: z.object({
+          filename: z.string(),
+          size: z.number(),
+          isSecret: z.boolean(),
+          fileType: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(100)]),
+          accessGroupId: z.int(),
+          lineCount: z.number()
+        })
+      })
+    )
+    .optional()
+});
+
+export const zPreTaskCountResponse = z.object({
+  jsonapi: z.object({
+    version: z.string().default('1.1'),
+    ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
+  }),
+  meta: z.object({
+    count: z.int(),
+    total_count: z.int().optional()
+  }),
+  data: z.array(z.record(z.string(), z.unknown())).max(0)
+});
+
 export const zPreTaskRelationPretaskFiles = z.object({
   data: z.array(
     z.object({
-      type: z.literal('pretaskFiles'),
-      id: z.int().default(1)
+      type: z.literal('file'),
+      id: z.int()
     })
   )
 });
@@ -218,42 +317,36 @@ export const zPreTaskRelationPretaskFiles = z.object({
 export const zPreTaskRelationPretaskFilesGetResponse = z.object({
   data: z.array(
     z.object({
-      type: z.literal('pretaskFiles'),
-      id: z.int().default(1)
+      type: z.literal('file'),
+      id: z.int()
     })
   )
 });
 
-export const zDeletePretasksData = z.object({
-  body: z.never().optional(),
-  path: z.never().optional(),
-  query: z.never().optional()
-});
+export const zDeletePretasksBody = zPreTaskDeleteMultiple;
 
-export const zGetPretasksData = z.object({
-  body: z.never().optional(),
-  path: z.never().optional(),
-  query: z
-    .object({
-      'page[after]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      'page[before]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      'page[size]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      filter: z.record(z.string(), z.unknown()).optional(),
-      include: z.string().optional()
-    })
-    .optional()
+/**
+ * successfully deleted
+ */
+export const zDeletePretasksResponse = z.void();
+
+export const zGetPretasksQuery = z.object({
+  'page[after]': z
+    .string()
+    .regex(/^[A-Za-z0-9+\/]*={0,2}$/)
+    .optional(),
+  'page[before]': z
+    .string()
+    .regex(/^[A-Za-z0-9+\/]*={0,2}$/)
+    .optional(),
+  'page[size]': z
+    .int()
+    .gte(1)
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+    .optional(),
+  filter: z.record(z.string(), z.string()).optional(),
+  include: z.array(z.enum(['pretaskFiles'])).optional(),
+  aggregate: z.record(z.string(), z.string()).optional()
 });
 
 /**
@@ -261,136 +354,89 @@ export const zGetPretasksData = z.object({
  */
 export const zGetPretasksResponse = zPreTaskListResponse;
 
-export const zPatchPretasksData = z.object({
-  body: z.never().optional(),
-  path: z.never().optional(),
-  query: z.never().optional()
-});
+export const zPatchPretasksBody = zPreTaskPatchMultiple;
 
-export const zPostPretasksData = z.object({
-  body: zPreTaskCreate,
-  path: z.never().optional(),
-  query: z.never().optional()
-});
+/**
+ * successfully updated
+ */
+export const zPatchPretasksResponse = z.void();
+
+export const zPostPretasksBody = zPreTaskCreate;
 
 /**
  * successful operation
  */
 export const zPostPretasksResponse = zPreTaskPostPatchResponse;
 
-export const zGetPretasksCountData = z.object({
-  body: z.never().optional(),
-  path: z.never().optional(),
-  query: z
-    .object({
-      'page[after]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      'page[before]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      'page[size]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      filter: z.record(z.string(), z.unknown()).optional(),
-      include: z.string().optional()
-    })
-    .optional()
+export const zGetPretasksCountQuery = z.object({
+  filter: z.record(z.string(), z.string()).optional(),
+  include_total: z.boolean().optional()
 });
 
 /**
  * successful operation
  */
-export const zGetPretasksCountResponse = zPreTaskListResponse;
+export const zGetPretasksCountResponse = zPreTaskCountResponse;
 
-export const zGetPretasksByIdByRelationData = z.object({
-  body: z.never().optional(),
-  path: z.object({
-    id: z
-      .int()
-      .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-      .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-    relation: z.string()
-  }),
-  query: z.never().optional()
+export const zGetPretasksByIdPretaskFilesPath = z.object({
+  id: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
 });
 
 /**
  * successful operation
  */
-export const zGetPretasksByIdByRelationResponse = zPreTaskRelationPretaskFilesGetResponse;
+export const zGetPretasksByIdPretaskFilesResponse = zFileListResponse;
 
-export const zDeletePretasksByIdRelationshipsByRelationData = z.object({
-  body: zPreTaskRelationPretaskFiles,
-  path: z.object({
-    id: z.int(),
-    relation: z.string()
-  }),
-  query: z.never().optional()
+export const zDeletePretasksByIdRelationshipsPretaskFilesBody = zPreTaskRelationPretaskFiles;
+
+export const zDeletePretasksByIdRelationshipsPretaskFilesPath = z.object({
+  id: z.int()
 });
 
 /**
  * successfully deleted
  */
-export const zDeletePretasksByIdRelationshipsByRelationResponse = z.void();
+export const zDeletePretasksByIdRelationshipsPretaskFilesResponse = z.void();
 
-export const zGetPretasksByIdRelationshipsByRelationData = z.object({
-  body: z.never().optional(),
-  path: z.object({
-    id: z
-      .int()
-      .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-      .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-    relation: z.string()
-  }),
-  query: z.never().optional()
+export const zGetPretasksByIdRelationshipsPretaskFilesPath = z.object({
+  id: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
 });
 
 /**
  * successful operation
  */
-export const zGetPretasksByIdRelationshipsByRelationResponse = zPreTaskResponse;
+export const zGetPretasksByIdRelationshipsPretaskFilesResponse = zPreTaskRelationPretaskFilesGetResponse;
 
-export const zPatchPretasksByIdRelationshipsByRelationData = z.object({
-  body: zPreTaskRelationPretaskFiles,
-  path: z.object({
-    id: z.int(),
-    relation: z.string()
-  }),
-  query: z.never().optional()
+export const zPatchPretasksByIdRelationshipsPretaskFilesBody = zPreTaskRelationPretaskFiles;
+
+export const zPatchPretasksByIdRelationshipsPretaskFilesPath = z.object({
+  id: z.int()
 });
 
 /**
  * Successfull operation
  */
-export const zPatchPretasksByIdRelationshipsByRelationResponse = z.void();
+export const zPatchPretasksByIdRelationshipsPretaskFilesResponse = z.void();
 
-export const zPostPretasksByIdRelationshipsByRelationData = z.object({
-  body: z.record(z.string(), z.unknown()),
-  path: z.object({
-    id: z.int(),
-    relation: z.string()
-  }),
-  query: z.never().optional()
+export const zPostPretasksByIdRelationshipsPretaskFilesBody = zPreTaskRelationPretaskFiles;
+
+export const zPostPretasksByIdRelationshipsPretaskFilesPath = z.object({
+  id: z.int()
 });
 
 /**
  * successfully created
  */
-export const zPostPretasksByIdRelationshipsByRelationResponse = z.void();
+export const zPostPretasksByIdRelationshipsPretaskFilesResponse = z.void();
 
-export const zDeletePretasksByIdData = z.object({
-  body: z.record(z.string(), z.unknown()),
-  path: z.object({
-    id: z.int()
-  }),
-  query: z.never().optional()
+export const zDeletePretasksByIdPath = z.object({
+  id: z.int()
 });
 
 /**
@@ -398,19 +444,15 @@ export const zDeletePretasksByIdData = z.object({
  */
 export const zDeletePretasksByIdResponse = z.void();
 
-export const zGetPretasksByIdData = z.object({
-  body: z.never().optional(),
-  path: z.object({
-    id: z
-      .int()
-      .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-      .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-  }),
-  query: z
-    .object({
-      include: z.string().optional()
-    })
-    .optional()
+export const zGetPretasksByIdPath = z.object({
+  id: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+});
+
+export const zGetPretasksByIdQuery = z.object({
+  include: z.array(z.enum(['pretaskFiles'])).optional()
 });
 
 /**
@@ -418,12 +460,10 @@ export const zGetPretasksByIdData = z.object({
  */
 export const zGetPretasksByIdResponse = zPreTaskResponse;
 
-export const zPatchPretasksByIdData = z.object({
-  body: zPreTaskPatch,
-  path: z.object({
-    id: z.int()
-  }),
-  query: z.never().optional()
+export const zPatchPretasksByIdBody = zPreTaskPatch;
+
+export const zPatchPretasksByIdPath = z.object({
+  id: z.int()
 });
 
 /**

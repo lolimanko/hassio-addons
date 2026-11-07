@@ -1,4 +1,5 @@
 // typescript
+import { HTTP_SKIP_ERROR_HEADER_CONFIG } from '@constants/http.config';
 import { zPreTaskListResponse, zSupertaskResponse } from '@generated/api/zod';
 import { catchError, lastValueFrom } from 'rxjs';
 
@@ -18,6 +19,8 @@ import { BaseDataSource } from '@datasources/base.datasource';
 export class PreTasksDataSource extends BaseDataSource<JPretask> {
   private _superTaskId = 0;
   private _reverseQuery = false;
+  /** Cracker binary type the pretasks NOT part of the supertask are limited to, null for no limit */
+  private _crackerBinaryTypeId: number | null = null;
   private _currentFilter: Filter | null = null;
 
   /**
@@ -34,6 +37,15 @@ export class PreTasksDataSource extends BaseDataSource<JPretask> {
    */
   setReverseQuery(value: boolean): void {
     this._reverseQuery = value;
+  }
+
+  /**
+   * Limit the reverse query (pretasks not part of the supertask) to pretasks of the given cracker binary type.
+   * A supertask only accepts pretasks of its own type.
+   * @param crackerBinaryTypeId the type, null for no limit
+   */
+  setCrackerBinaryTypeId(crackerBinaryTypeId: number | null): void {
+    this._crackerBinaryTypeId = crackerBinaryTypeId;
   }
 
   /**
@@ -72,6 +84,7 @@ export class PreTasksDataSource extends BaseDataSource<JPretask> {
           if (this._reverseQuery) {
             let paramsAll: IParamBuilder = new RequestParamBuilder().addInitial(this).addInclude('pretaskFiles');
             paramsAll = this.applyMaskImportFilter(paramsAll);
+            paramsAll = this.applyCrackerTypeFilter(paramsAll);
             paramsAll = this.applyFilterWithPaginationReset(paramsAll, activeFilter, query);
             const pretasks = await this.loadPretasks(paramsAll.create());
             this.setData(pretasks);
@@ -101,12 +114,24 @@ export class PreTasksDataSource extends BaseDataSource<JPretask> {
   }
 
   /**
+   * Limit to the cracker binary type of the supertask, only for the pretasks which are not part of it yet.
+   * @param params
+   * @private
+   */
+  private applyCrackerTypeFilter<B extends IParamBuilder>(params: B): B {
+    if (this._reverseQuery && this._crackerBinaryTypeId !== null) {
+      params.addFilter({ field: 'crackerBinaryTypeId', operator: FilterType.EQUAL, value: this._crackerBinaryTypeId });
+    }
+    return params;
+  }
+
+  /**
    * Load pretasks with given parameters
    * @param params Request parameters
    * @private
    */
   private async loadPretasks(params: RequestParams): Promise<JPretask[]> {
-    const httpOptions = { headers: new HttpHeaders({ 'X-Skip-Error-Dialog': 'true' }) };
+    const httpOptions = { headers: new HttpHeaders(HTTP_SKIP_ERROR_HEADER_CONFIG) };
     try {
       const response = await lastValueFrom<ResponseWrapper>(
         this.service.getAll(SERV.PRETASKS, params, httpOptions).pipe(
@@ -131,7 +156,7 @@ export class PreTasksDataSource extends BaseDataSource<JPretask> {
   }
 
   private async loadSupertask(superTaskId: number, params: RequestParams): Promise<JSuperTask | null> {
-    const httpOptions = { headers: new HttpHeaders({ 'X-Skip-Error-Dialog': 'true' }) };
+    const httpOptions = { headers: new HttpHeaders(HTTP_SKIP_ERROR_HEADER_CONFIG) };
     try {
       const response = await lastValueFrom<ResponseWrapper>(
         this.service.get(SERV.SUPER_TASKS, superTaskId, params, httpOptions).pipe(
@@ -168,10 +193,11 @@ export class PreTasksDataSource extends BaseDataSource<JPretask> {
         .addFilter({ field: 'pretaskId', operator: filterOperator, value: pretaskIds });
       if (this._reverseQuery) {
         paramsBuilder = this.applyMaskImportFilter(paramsBuilder);
+        paramsBuilder = this.applyCrackerTypeFilter(paramsBuilder);
       }
       paramsBuilder = this.applyFilterWithPaginationReset(paramsBuilder, activeFilter, query);
       const paramsPretaskFiles = paramsBuilder.create();
-      const httpOptions = { headers: new HttpHeaders({ 'X-Skip-Error-Dialog': 'true' }) };
+      const httpOptions = { headers: new HttpHeaders(HTTP_SKIP_ERROR_HEADER_CONFIG) };
       try {
         const response = await lastValueFrom<ResponseWrapper>(
           this.service.getAll(SERV.PRETASKS, paramsPretaskFiles, httpOptions).pipe(

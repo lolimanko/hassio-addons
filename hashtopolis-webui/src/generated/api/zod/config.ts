@@ -1,5 +1,77 @@
 import * as z from 'zod';
 
+import { zConfigSectionResponse } from './config-section';
+
+export const zConfigResourceObject = z.object({
+  id: z.int(),
+  type: z.literal('config'),
+  attributes: z.union([
+    z.object({
+      configSectionId: z.int(),
+      item: z.literal('serverLogLevel'),
+      value: z.union([
+        z.literal('0'),
+        z.literal('10'),
+        z.literal('20'),
+        z.literal('30'),
+        z.literal('40'),
+        z.literal('50')
+      ]),
+      valueBoundaries: z
+        .object({
+          min: z.int().optional(),
+          max: z.int().optional(),
+          maxLength: z.int().optional(),
+          binaryValues: z.array(z.string()).optional()
+        })
+        .optional()
+    }),
+    z.object({
+      configSectionId: z.int(),
+      item: z.literal('notificationsProxyType'),
+      value: z.union([z.literal('HTTP'), z.literal('HTTPS'), z.literal('SOCKS4'), z.literal('SOCKS5')]),
+      valueBoundaries: z
+        .object({
+          min: z.int().optional(),
+          max: z.int().optional(),
+          maxLength: z.int().optional(),
+          binaryValues: z.array(z.string()).optional()
+        })
+        .optional()
+    }),
+    z.object({
+      configSectionId: z.int(),
+      item: z.string(),
+      value: z.string(),
+      valueBoundaries: z
+        .object({
+          min: z.int().optional(),
+          max: z.int().optional(),
+          maxLength: z.int().optional(),
+          binaryValues: z.array(z.string()).optional()
+        })
+        .optional()
+    })
+  ]),
+  links: z.object({
+    self: z.string().default('/api/v2/ui/configs/1')
+  }),
+  relationships: z.object({
+    configSection: z.object({
+      links: z.object({
+        self: z.string().default('/api/v2/ui/configs/relationships/configSection'),
+        related: z.string().default('/api/v2/ui/configs/configSection')
+      }),
+      data: z
+        .object({
+          type: z.literal('configSection'),
+          id: z.int()
+        })
+        .nullish()
+    })
+  })
+});
+
 export const zConfigPatch = z.object({
   data: z.object({
     type: z.literal('config'),
@@ -10,20 +82,27 @@ export const zConfigPatch = z.object({
   })
 });
 
+export const zConfigPatchMultiple = z.object({
+  data: z.array(
+    z.object({
+      id: z.int(),
+      type: z.literal('config'),
+      attributes: z.object({
+        item: z.string().optional(),
+        value: z.string().optional()
+      })
+    })
+  )
+});
+
 export const zConfigResponse = z.object({
   jsonapi: z.object({
     version: z.string().default('1.1'),
     ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
   }),
-  links: z
-    .object({
-      self: z.string().default('/api/v2/ui/configs?page[size]=25'),
-      first: z.string().optional().default('/api/v2/ui/configs?page[size]=25&page[after]=0'),
-      last: z.string().optional().default('/api/v2/ui/configs?page[size]=25&page[before]=500'),
-      next: z.string().nullish().default('/api/v2/ui/configs?page[size]=25&page[after]=25'),
-      previous: z.string().nullish().default('/api/v2/ui/configs?page[size]=25&page[before]=25')
-    })
-    .optional(),
+  links: z.object({
+    self: z.string().default('/api/v2/ui/configs/1')
+  }),
   data: z.object({
     id: z.int(),
     type: z.literal('config'),
@@ -38,22 +117,47 @@ export const zConfigResponse = z.object({
           z.literal('30'),
           z.literal('40'),
           z.literal('50')
-        ])
+        ]),
+        valueBoundaries: z
+          .object({
+            min: z.int().optional(),
+            max: z.int().optional(),
+            maxLength: z.int().optional(),
+            binaryValues: z.array(z.string()).optional()
+          })
+          .optional()
       }),
       z.object({
         configSectionId: z.int(),
         item: z.literal('notificationsProxyType'),
-        value: z.union([z.literal('HTTP'), z.literal('HTTPS'), z.literal('SOCKS4'), z.literal('SOCKS5')])
+        value: z.union([z.literal('HTTP'), z.literal('HTTPS'), z.literal('SOCKS4'), z.literal('SOCKS5')]),
+        valueBoundaries: z
+          .object({
+            min: z.int().optional(),
+            max: z.int().optional(),
+            maxLength: z.int().optional(),
+            binaryValues: z.array(z.string()).optional()
+          })
+          .optional()
       }),
       z.object({
         configSectionId: z.int(),
         item: z.string(),
-        value: z.string()
+        value: z.string(),
+        valueBoundaries: z
+          .object({
+            min: z.int().optional(),
+            max: z.int().optional(),
+            maxLength: z.int().optional(),
+            binaryValues: z.array(z.string()).optional()
+          })
+          .optional()
       })
-    ])
-  }),
-  relationships: z
-    .object({
+    ]),
+    links: z.object({
+      self: z.string().default('/api/v2/ui/configs/1')
+    }),
+    relationships: z.object({
       configSection: z.object({
         links: z.object({
           self: z.string().default('/api/v2/ui/configs/relationships/configSection'),
@@ -67,7 +171,7 @@ export const zConfigResponse = z.object({
           .nullish()
       })
     })
-    .optional(),
+  }),
   included: z
     .array(
       z.object({
@@ -86,6 +190,9 @@ export const zConfigPostPatchResponse = z.object({
     version: z.string().default('1.1'),
     ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
   }),
+  links: z.object({
+    self: z.string().default('/api/v2/ui/configs/1')
+  }),
   data: z.object({
     id: z.int(),
     type: z.literal('config'),
@@ -100,20 +207,72 @@ export const zConfigPostPatchResponse = z.object({
           z.literal('30'),
           z.literal('40'),
           z.literal('50')
-        ])
+        ]),
+        valueBoundaries: z
+          .object({
+            min: z.int().optional(),
+            max: z.int().optional(),
+            maxLength: z.int().optional(),
+            binaryValues: z.array(z.string()).optional()
+          })
+          .optional()
       }),
       z.object({
         configSectionId: z.int(),
         item: z.literal('notificationsProxyType'),
-        value: z.union([z.literal('HTTP'), z.literal('HTTPS'), z.literal('SOCKS4'), z.literal('SOCKS5')])
+        value: z.union([z.literal('HTTP'), z.literal('HTTPS'), z.literal('SOCKS4'), z.literal('SOCKS5')]),
+        valueBoundaries: z
+          .object({
+            min: z.int().optional(),
+            max: z.int().optional(),
+            maxLength: z.int().optional(),
+            binaryValues: z.array(z.string()).optional()
+          })
+          .optional()
       }),
       z.object({
         configSectionId: z.int(),
         item: z.string(),
-        value: z.string()
+        value: z.string(),
+        valueBoundaries: z
+          .object({
+            min: z.int().optional(),
+            max: z.int().optional(),
+            maxLength: z.int().optional(),
+            binaryValues: z.array(z.string()).optional()
+          })
+          .optional()
       })
-    ])
-  })
+    ]),
+    links: z.object({
+      self: z.string().default('/api/v2/ui/configs/1')
+    }),
+    relationships: z.object({
+      configSection: z.object({
+        links: z.object({
+          self: z.string().default('/api/v2/ui/configs/relationships/configSection'),
+          related: z.string().default('/api/v2/ui/configs/configSection')
+        }),
+        data: z
+          .object({
+            type: z.literal('configSection'),
+            id: z.int()
+          })
+          .nullish()
+      })
+    })
+  }),
+  included: z
+    .array(
+      z.object({
+        id: z.int(),
+        type: z.literal('configSection'),
+        attributes: z.object({
+          sectionName: z.string()
+        })
+      })
+    )
+    .optional()
 });
 
 export const zConfigListResponse = z.object({
@@ -121,15 +280,33 @@ export const zConfigListResponse = z.object({
     version: z.string().default('1.1'),
     ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
   }),
-  links: z
-    .object({
-      self: z.string().default('/api/v2/ui/configs?page[size]=25'),
-      first: z.string().optional().default('/api/v2/ui/configs?page[size]=25&page[after]=0'),
-      last: z.string().optional().default('/api/v2/ui/configs?page[size]=25&page[before]=500'),
-      next: z.string().nullish().default('/api/v2/ui/configs?page[size]=25&page[after]=25'),
-      previous: z.string().nullish().default('/api/v2/ui/configs?page[size]=25&page[before]=25')
+  links: z.object({
+    self: z.string().default('/api/v2/ui/configs?page[size]=25'),
+    first: z.string().default('/api/v2/ui/configs?page[size]=25'),
+    last: z
+      .string()
+      .nullable()
+      .default(
+        '/api/v2/ui/configs?page[size]=25&page[before]=eyJwcmltYXJ5Ijp7InNvbWVVbnFpdWVGaWVsZCI6MTIzfSwic2Vjb25kYXJ5Ijp7InNvbWVPdGhlck9wdGlvbmFsRmllbGQiOiJGb28ifX0='
+      ),
+    next: z
+      .string()
+      .nullable()
+      .default(
+        '/api/v2/ui/configs?page[size]=25&page[after]=eyJwcmltYXJ5Ijp7InNvbWVVbnFpdWVGaWVsZCI6MTIzfSwic2Vjb25kYXJ5Ijp7InNvbWVPdGhlck9wdGlvbmFsRmllbGQiOiJGb28ifX0='
+      ),
+    prev: z
+      .string()
+      .nullable()
+      .default(
+        '/api/v2/ui/configs?page[size]=25&page[before]=eyJwcmltYXJ5Ijp7InNvbWVVbnFpdWVGaWVsZCI6MTIzfSwic2Vjb25kYXJ5Ijp7InNvbWVPdGhlck9wdGlvbmFsRmllbGQiOiJGb28ifX0='
+      )
+  }),
+  meta: z.object({
+    page: z.object({
+      total_elements: z.int()
     })
-    .optional(),
+  }),
   data: z.array(
     z.object({
       id: z.int(),
@@ -145,37 +322,62 @@ export const zConfigListResponse = z.object({
             z.literal('30'),
             z.literal('40'),
             z.literal('50')
-          ])
+          ]),
+          valueBoundaries: z
+            .object({
+              min: z.int().optional(),
+              max: z.int().optional(),
+              maxLength: z.int().optional(),
+              binaryValues: z.array(z.string()).optional()
+            })
+            .optional()
         }),
         z.object({
           configSectionId: z.int(),
           item: z.literal('notificationsProxyType'),
-          value: z.union([z.literal('HTTP'), z.literal('HTTPS'), z.literal('SOCKS4'), z.literal('SOCKS5')])
+          value: z.union([z.literal('HTTP'), z.literal('HTTPS'), z.literal('SOCKS4'), z.literal('SOCKS5')]),
+          valueBoundaries: z
+            .object({
+              min: z.int().optional(),
+              max: z.int().optional(),
+              maxLength: z.int().optional(),
+              binaryValues: z.array(z.string()).optional()
+            })
+            .optional()
         }),
         z.object({
           configSectionId: z.int(),
           item: z.string(),
-          value: z.string()
+          value: z.string(),
+          valueBoundaries: z
+            .object({
+              min: z.int().optional(),
+              max: z.int().optional(),
+              maxLength: z.int().optional(),
+              binaryValues: z.array(z.string()).optional()
+            })
+            .optional()
         })
-      ])
-    })
-  ),
-  relationships: z
-    .object({
-      configSection: z.object({
-        links: z.object({
-          self: z.string().default('/api/v2/ui/configs/relationships/configSection'),
-          related: z.string().default('/api/v2/ui/configs/configSection')
-        }),
-        data: z
-          .object({
-            type: z.literal('configSection'),
-            id: z.int()
-          })
-          .nullish()
+      ]),
+      links: z.object({
+        self: z.string().default('/api/v2/ui/configs/1')
+      }),
+      relationships: z.object({
+        configSection: z.object({
+          links: z.object({
+            self: z.string().default('/api/v2/ui/configs/relationships/configSection'),
+            related: z.string().default('/api/v2/ui/configs/configSection')
+          }),
+          data: z
+            .object({
+              type: z.literal('configSection'),
+              id: z.int()
+            })
+            .nullish()
+        })
       })
     })
-    .optional(),
+  ),
   included: z
     .array(
       z.object({
@@ -189,44 +391,51 @@ export const zConfigListResponse = z.object({
     .optional()
 });
 
+export const zConfigCountResponse = z.object({
+  jsonapi: z.object({
+    version: z.string().default('1.1'),
+    ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
+  }),
+  meta: z.object({
+    count: z.int(),
+    total_count: z.int().optional()
+  }),
+  data: z.array(z.record(z.string(), z.unknown())).max(0)
+});
+
 export const zConfigRelationConfigSection = z.object({
   data: z.object({
     type: z.literal('configSection'),
-    id: z.int().default(1)
+    id: z.int()
   })
 });
 
 export const zConfigRelationConfigSectionGetResponse = z.object({
-  data: z.object({
-    type: z.literal('configSection'),
-    id: z.int().default(1)
-  })
+  data: z
+    .object({
+      type: z.literal('configSection'),
+      id: z.int()
+    })
+    .nullable()
 });
 
-export const zGetConfigsData = z.object({
-  body: z.never().optional(),
-  path: z.never().optional(),
-  query: z
-    .object({
-      'page[after]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      'page[before]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      'page[size]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      filter: z.record(z.string(), z.unknown()).optional(),
-      include: z.string().optional()
-    })
-    .optional()
+export const zGetConfigsQuery = z.object({
+  'page[after]': z
+    .string()
+    .regex(/^[A-Za-z0-9+\/]*={0,2}$/)
+    .optional(),
+  'page[before]': z
+    .string()
+    .regex(/^[A-Za-z0-9+\/]*={0,2}$/)
+    .optional(),
+  'page[size]': z
+    .int()
+    .gte(1)
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+    .optional(),
+  filter: z.record(z.string(), z.string()).optional(),
+  include: z.array(z.enum(['configSection'])).optional(),
+  aggregate: z.record(z.string(), z.string()).optional()
 });
 
 /**
@@ -234,104 +443,67 @@ export const zGetConfigsData = z.object({
  */
 export const zGetConfigsResponse = zConfigListResponse;
 
-export const zPatchConfigsData = z.object({
-  body: z.never().optional(),
-  path: z.never().optional(),
-  query: z.never().optional()
-});
+export const zPatchConfigsBody = zConfigPatchMultiple;
 
-export const zGetConfigsCountData = z.object({
-  body: z.never().optional(),
-  path: z.never().optional(),
-  query: z
-    .object({
-      'page[after]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      'page[before]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      'page[size]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      filter: z.record(z.string(), z.unknown()).optional(),
-      include: z.string().optional()
-    })
-    .optional()
+/**
+ * successfully updated
+ */
+export const zPatchConfigsResponse = z.void();
+
+export const zGetConfigsCountQuery = z.object({
+  filter: z.record(z.string(), z.string()).optional(),
+  include_total: z.boolean().optional()
 });
 
 /**
  * successful operation
  */
-export const zGetConfigsCountResponse = zConfigListResponse;
+export const zGetConfigsCountResponse = zConfigCountResponse;
 
-export const zGetConfigsByIdByRelationData = z.object({
-  body: z.never().optional(),
-  path: z.object({
-    id: z
-      .int()
-      .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-      .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-    relation: z.string()
-  }),
-  query: z.never().optional()
+export const zGetConfigsByIdConfigSectionPath = z.object({
+  id: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
 });
 
 /**
  * successful operation
  */
-export const zGetConfigsByIdByRelationResponse = zConfigRelationConfigSectionGetResponse;
+export const zGetConfigsByIdConfigSectionResponse = zConfigSectionResponse;
 
-export const zGetConfigsByIdRelationshipsByRelationData = z.object({
-  body: z.never().optional(),
-  path: z.object({
-    id: z
-      .int()
-      .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-      .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-    relation: z.string()
-  }),
-  query: z.never().optional()
+export const zGetConfigsByIdRelationshipsConfigSectionPath = z.object({
+  id: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
 });
 
 /**
  * successful operation
  */
-export const zGetConfigsByIdRelationshipsByRelationResponse = zConfigResponse;
+export const zGetConfigsByIdRelationshipsConfigSectionResponse = zConfigRelationConfigSectionGetResponse;
 
-export const zPatchConfigsByIdRelationshipsByRelationData = z.object({
-  body: zConfigRelationConfigSection,
-  path: z.object({
-    id: z.int(),
-    relation: z.string()
-  }),
-  query: z.never().optional()
+export const zPatchConfigsByIdRelationshipsConfigSectionBody = zConfigRelationConfigSection;
+
+export const zPatchConfigsByIdRelationshipsConfigSectionPath = z.object({
+  id: z.int()
 });
 
 /**
  * Successfull operation
  */
-export const zPatchConfigsByIdRelationshipsByRelationResponse = z.void();
+export const zPatchConfigsByIdRelationshipsConfigSectionResponse = z.void();
 
-export const zGetConfigsByIdData = z.object({
-  body: z.never().optional(),
-  path: z.object({
-    id: z
-      .int()
-      .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-      .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-  }),
-  query: z
-    .object({
-      include: z.string().optional()
-    })
-    .optional()
+export const zGetConfigsByIdPath = z.object({
+  id: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+});
+
+export const zGetConfigsByIdQuery = z.object({
+  include: z.array(z.enum(['configSection'])).optional()
 });
 
 /**
@@ -339,12 +511,10 @@ export const zGetConfigsByIdData = z.object({
  */
 export const zGetConfigsByIdResponse = zConfigResponse;
 
-export const zPatchConfigsByIdData = z.object({
-  body: zConfigPatch,
-  path: z.object({
-    id: z.int()
-  }),
-  query: z.never().optional()
+export const zPatchConfigsByIdBody = zConfigPatch;
+
+export const zPatchConfigsByIdPath = z.object({
+  id: z.int()
 });
 
 /**

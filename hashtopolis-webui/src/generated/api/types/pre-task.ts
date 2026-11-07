@@ -1,4 +1,5 @@
-import type { ErrorResponse, NotFoundResponse } from './common';
+import type { ErrorResponse } from './common';
+import type { FileListResponse } from './file';
 
 export type PreTaskCreate = {
   data: {
@@ -36,8 +37,37 @@ export type PreTaskPatch = {
       priority?: number;
       statusTimer?: number;
       taskName?: string;
+      useNewBench?: boolean;
     };
   };
+};
+
+export type PreTaskPatchMultiple = {
+  data: Array<{
+    id: number;
+    type: 'preTask';
+    attributes: {
+      attackCmd?: string;
+      chunkTime?: number;
+      color?: string;
+      crackerBinaryTypeId?: number;
+      isCpuTask?: boolean;
+      isMaskImport?: boolean;
+      isSmall?: boolean;
+      maxAgents?: number;
+      priority?: number;
+      statusTimer?: number;
+      taskName?: string;
+      useNewBench?: boolean;
+    };
+  }>;
+};
+
+export type PreTaskDeleteMultiple = {
+  data: Array<{
+    id: number;
+    type: 'preTask';
+  }>;
 };
 
 export type PreTaskResponse = {
@@ -45,12 +75,8 @@ export type PreTaskResponse = {
     version: string;
     ext?: Array<string>;
   };
-  links?: {
+  links: {
     self: string;
-    first?: string;
-    last?: string;
-    next?: string | null;
-    previous?: string | null;
   };
   data: {
     id: number;
@@ -70,17 +96,20 @@ export type PreTaskResponse = {
       crackerBinaryTypeId: number;
       auxiliaryKeyspace?: number;
     };
-  };
-  relationships?: {
-    pretaskFiles: {
-      links: {
-        self: string;
-        related: string;
+    links: {
+      self: string;
+    };
+    relationships: {
+      pretaskFiles: {
+        links: {
+          self: string;
+          related: string;
+        };
+        data?: Array<{
+          type: 'file';
+          id: number;
+        }>;
       };
-      data?: Array<{
-        type: 'file';
-        id: number;
-      }>;
     };
   };
   included?: Array<{
@@ -102,6 +131,9 @@ export type PreTaskPostPatchResponse = {
     version: string;
     ext?: Array<string>;
   };
+  links: {
+    self: string;
+  };
   data: {
     id: number;
     type: 'preTask';
@@ -120,7 +152,34 @@ export type PreTaskPostPatchResponse = {
       crackerBinaryTypeId: number;
       auxiliaryKeyspace?: number;
     };
+    links: {
+      self: string;
+    };
+    relationships: {
+      pretaskFiles: {
+        links: {
+          self: string;
+          related: string;
+        };
+        data?: Array<{
+          type: 'file';
+          id: number;
+        }>;
+      };
+    };
   };
+  included?: Array<{
+    id: number;
+    type: 'file';
+    attributes: {
+      filename: string;
+      size: number;
+      isSecret: boolean;
+      fileType: 0 | 1 | 2 | 100;
+      accessGroupId: number;
+      lineCount: number;
+    };
+  }>;
 };
 
 export type PreTaskListResponse = {
@@ -128,12 +187,17 @@ export type PreTaskListResponse = {
     version: string;
     ext?: Array<string>;
   };
-  links?: {
+  links: {
     self: string;
-    first?: string;
-    last?: string;
-    next?: string | null;
-    previous?: string | null;
+    first: string;
+    last: string | null;
+    next: string | null;
+    prev: string | null;
+  };
+  meta: {
+    page: {
+      total_elements: number;
+    };
   };
   data: Array<{
     id: number;
@@ -153,19 +217,22 @@ export type PreTaskListResponse = {
       crackerBinaryTypeId: number;
       auxiliaryKeyspace?: number;
     };
-  }>;
-  relationships?: {
-    pretaskFiles: {
-      links: {
-        self: string;
-        related: string;
-      };
-      data?: Array<{
-        type: 'file';
-        id: number;
-      }>;
+    links: {
+      self: string;
     };
-  };
+    relationships: {
+      pretaskFiles: {
+        links: {
+          self: string;
+          related: string;
+        };
+        data?: Array<{
+          type: 'file';
+          id: number;
+        }>;
+      };
+    };
+  }>;
   included?: Array<{
     id: number;
     type: 'file';
@@ -180,22 +247,45 @@ export type PreTaskListResponse = {
   }>;
 };
 
+export type PreTaskCountResponse = {
+  jsonapi: {
+    version: string;
+    ext?: Array<string>;
+  };
+  meta: {
+    /**
+     * Number of objects accessible to the current user matching the given filters
+     */
+    count: number;
+    /**
+     * Number of objects accessible to the current user without any filter applied, only present when `include_total=true` was requested
+     */
+    total_count?: number;
+  };
+  /**
+   * Always empty: the count is reported under meta.
+   */
+  data: Array<{
+    [key: string]: unknown;
+  }>;
+};
+
 export type PreTaskRelationPretaskFiles = {
   data: Array<{
-    type: 'pretaskFiles';
+    type: 'file';
     id: number;
   }>;
 };
 
 export type PreTaskRelationPretaskFilesGetResponse = {
   data: Array<{
-    type: 'pretaskFiles';
+    type: 'file';
     id: number;
   }>;
 };
 
 export type DeletePretasksData = {
-  body?: never;
+  body: PreTaskDeleteMultiple;
   path?: never;
   query?: never;
   url: '/api/v2/ui/pretasks';
@@ -210,43 +300,71 @@ export type DeletePretasksErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
+  /**
+   * Permission denied
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
 };
 
 export type DeletePretasksError = DeletePretasksErrors[keyof DeletePretasksErrors];
 
 export type DeletePretasksResponses = {
   /**
-   * successful operation
+   * successfully deleted
    */
-  200: unknown;
+  204: void;
 };
+
+export type DeletePretasksResponse = DeletePretasksResponses[keyof DeletePretasksResponses];
 
 export type GetPretasksData = {
   body?: never;
   path?: never;
   query?: {
     /**
-     * Pointer to paginate to retrieve the data after the value provided
+     * Pointer to paginate to retrieve the data after the object provided. Specify the `base64` encoded JSON string in a **uniquely identifiable** manner (e.g. object IDs), i.e. by using one (primary) or two (primary and secondary) fields that allow for **stable** sorting.
+     *
+     *
+     * Format: `{"primary":{"someField": 123},"secondary":{"someOtherOptionalField": "Foo"}}`
+     *
+     *
+     * Example: `{"primary":{"pretaskId": 123}}` -> `eyJwcmltYXJ5Ijp7InByZXRhc2tJZCI6IDEyM319`
      */
-    'page[after]'?: number;
+    'page[after]'?: string;
     /**
-     * Pointer to paginate to retrieve the data before the value provided
+     * Pointer to paginate to retrieve the data before the object provided. Specify the `base64` encoded JSON string in a **uniquely identifiable** manner (e.g. object IDs), i.e. by using one (primary) or two (primary and secondary) fields that allow for **stable** sorting.
+     *
+     *
+     * Format: `{"primary":{"someField": 123},"secondary":{"someOtherOptionalField": "Foo"}}`
+     *
+     *
+     * Example: `{"primary":{"pretaskId": 123}}` -> `eyJwcmltYXJ5Ijp7InByZXRhc2tJZCI6IDEyM319`
      */
-    'page[before]'?: number;
+    'page[before]'?: string;
     /**
-     * Amout of data to retrieve inside a single page
+     * Amount of data to retrieve inside a single page
      */
     'page[size]'?: number;
     /**
-     * Filters results using a query
+     * Filters results using a query. Every key is an attribute name optionally suffixed with a comparison operator, e.g. `filter[pretaskId__gt]=200`.
      */
     filter?: {
-      [key: string]: unknown;
+      [key: string]: string;
     };
     /**
-     * Items to include, comma seperated. Possible options: Array
+     * Relationships to include in the response, comma seperated. Possible options: pretaskFiles
      */
-    include?: string;
+    include?: Array<'pretaskFiles'>;
+    /**
+     * Aggregated fields to include by type (comma separated values). Possible options: pretask: auxiliaryKeyspace
+     */
+    aggregate?: {
+      [key: string]: string;
+    };
   };
   url: '/api/v2/ui/pretasks';
 };
@@ -260,6 +378,10 @@ export type GetPretasksErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
+  /**
+   * Permission denied
+   */
+  403: ErrorResponse;
 };
 
 export type GetPretasksError = GetPretasksErrors[keyof GetPretasksErrors];
@@ -274,7 +396,7 @@ export type GetPretasksResponses = {
 export type GetPretasksResponse = GetPretasksResponses[keyof GetPretasksResponses];
 
 export type PatchPretasksData = {
-  body?: never;
+  body: PreTaskPatchMultiple;
   path?: never;
   query?: never;
   url: '/api/v2/ui/pretasks';
@@ -289,16 +411,30 @@ export type PatchPretasksErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
+  /**
+   * Permission denied
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Resource already exists
+   */
+  409: ErrorResponse;
 };
 
 export type PatchPretasksError = PatchPretasksErrors[keyof PatchPretasksErrors];
 
 export type PatchPretasksResponses = {
   /**
-   * successful operation
+   * successfully updated
    */
-  200: unknown;
+  204: void;
 };
+
+export type PatchPretasksResponse = PatchPretasksResponses[keyof PatchPretasksResponses];
 
 export type PostPretasksData = {
   body: PreTaskCreate;
@@ -316,6 +452,14 @@ export type PostPretasksErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
+  /**
+   * Permission denied
+   */
+  403: ErrorResponse;
+  /**
+   * Resource already exists
+   */
+  409: ErrorResponse;
 };
 
 export type PostPretasksError = PostPretasksErrors[keyof PostPretasksErrors];
@@ -334,27 +478,15 @@ export type GetPretasksCountData = {
   path?: never;
   query?: {
     /**
-     * Pointer to paginate to retrieve the data after the value provided
-     */
-    'page[after]'?: number;
-    /**
-     * Pointer to paginate to retrieve the data before the value provided
-     */
-    'page[before]'?: number;
-    /**
-     * Amout of data to retrieve inside a single page
-     */
-    'page[size]'?: number;
-    /**
-     * Filters results using a query
+     * Filters results using a query. Every key is an attribute name optionally suffixed with a comparison operator, e.g. `filter[pretaskId__gt]=200`.
      */
     filter?: {
-      [key: string]: unknown;
+      [key: string]: string;
     };
     /**
-     * Items to include, comma seperated. Possible options: Array
+     * Also report the number of accessible objects without any filter applied, as `meta.total_count`
      */
-    include?: string;
+    include_total?: boolean;
   };
   url: '/api/v2/ui/pretasks/count';
 };
@@ -368,6 +500,10 @@ export type GetPretasksCountErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
+  /**
+   * Permission denied
+   */
+  403: ErrorResponse;
 };
 
 export type GetPretasksCountError = GetPretasksCountErrors[keyof GetPretasksCountErrors];
@@ -376,22 +512,21 @@ export type GetPretasksCountResponses = {
   /**
    * successful operation
    */
-  200: PreTaskListResponse;
+  200: PreTaskCountResponse;
 };
 
 export type GetPretasksCountResponse = GetPretasksCountResponses[keyof GetPretasksCountResponses];
 
-export type GetPretasksByIdByRelationData = {
+export type GetPretasksByIdPretaskFilesData = {
   body?: never;
   path: {
     id: number;
-    relation: string;
   };
   query?: never;
-  url: '/api/v2/ui/pretasks/{id}/{relation}';
+  url: '/api/v2/ui/pretasks/{id}/pretaskFiles';
 };
 
-export type GetPretasksByIdByRelationErrors = {
+export type GetPretasksByIdPretaskFilesErrors = {
   /**
    * Invalid request
    */
@@ -401,34 +536,38 @@ export type GetPretasksByIdByRelationErrors = {
    */
   401: ErrorResponse;
   /**
+   * Permission denied
+   */
+  403: ErrorResponse;
+  /**
    * Not Found
    */
-  404: NotFoundResponse;
+  404: ErrorResponse;
 };
 
-export type GetPretasksByIdByRelationError = GetPretasksByIdByRelationErrors[keyof GetPretasksByIdByRelationErrors];
+export type GetPretasksByIdPretaskFilesError =
+  GetPretasksByIdPretaskFilesErrors[keyof GetPretasksByIdPretaskFilesErrors];
 
-export type GetPretasksByIdByRelationResponses = {
+export type GetPretasksByIdPretaskFilesResponses = {
   /**
    * successful operation
    */
-  200: PreTaskRelationPretaskFilesGetResponse;
+  200: FileListResponse;
 };
 
-export type GetPretasksByIdByRelationResponse =
-  GetPretasksByIdByRelationResponses[keyof GetPretasksByIdByRelationResponses];
+export type GetPretasksByIdPretaskFilesResponse =
+  GetPretasksByIdPretaskFilesResponses[keyof GetPretasksByIdPretaskFilesResponses];
 
-export type DeletePretasksByIdRelationshipsByRelationData = {
+export type DeletePretasksByIdRelationshipsPretaskFilesData = {
   body: PreTaskRelationPretaskFiles;
   path: {
     id: number;
-    relation: string;
   };
   query?: never;
-  url: '/api/v2/ui/pretasks/{id}/relationships/{relation}';
+  url: '/api/v2/ui/pretasks/{id}/relationships/pretaskFiles';
 };
 
-export type DeletePretasksByIdRelationshipsByRelationErrors = {
+export type DeletePretasksByIdRelationshipsPretaskFilesErrors = {
   /**
    * Invalid request
    */
@@ -438,35 +577,38 @@ export type DeletePretasksByIdRelationshipsByRelationErrors = {
    */
   401: ErrorResponse;
   /**
+   * Permission denied
+   */
+  403: ErrorResponse;
+  /**
    * Not Found
    */
-  404: NotFoundResponse;
+  404: ErrorResponse;
 };
 
-export type DeletePretasksByIdRelationshipsByRelationError =
-  DeletePretasksByIdRelationshipsByRelationErrors[keyof DeletePretasksByIdRelationshipsByRelationErrors];
+export type DeletePretasksByIdRelationshipsPretaskFilesError =
+  DeletePretasksByIdRelationshipsPretaskFilesErrors[keyof DeletePretasksByIdRelationshipsPretaskFilesErrors];
 
-export type DeletePretasksByIdRelationshipsByRelationResponses = {
+export type DeletePretasksByIdRelationshipsPretaskFilesResponses = {
   /**
    * successfully deleted
    */
   204: void;
 };
 
-export type DeletePretasksByIdRelationshipsByRelationResponse =
-  DeletePretasksByIdRelationshipsByRelationResponses[keyof DeletePretasksByIdRelationshipsByRelationResponses];
+export type DeletePretasksByIdRelationshipsPretaskFilesResponse =
+  DeletePretasksByIdRelationshipsPretaskFilesResponses[keyof DeletePretasksByIdRelationshipsPretaskFilesResponses];
 
-export type GetPretasksByIdRelationshipsByRelationData = {
+export type GetPretasksByIdRelationshipsPretaskFilesData = {
   body?: never;
   path: {
     id: number;
-    relation: string;
   };
   query?: never;
-  url: '/api/v2/ui/pretasks/{id}/relationships/{relation}';
+  url: '/api/v2/ui/pretasks/{id}/relationships/pretaskFiles';
 };
 
-export type GetPretasksByIdRelationshipsByRelationErrors = {
+export type GetPretasksByIdRelationshipsPretaskFilesErrors = {
   /**
    * Invalid request
    */
@@ -476,35 +618,38 @@ export type GetPretasksByIdRelationshipsByRelationErrors = {
    */
   401: ErrorResponse;
   /**
+   * Permission denied
+   */
+  403: ErrorResponse;
+  /**
    * Not Found
    */
-  404: NotFoundResponse;
+  404: ErrorResponse;
 };
 
-export type GetPretasksByIdRelationshipsByRelationError =
-  GetPretasksByIdRelationshipsByRelationErrors[keyof GetPretasksByIdRelationshipsByRelationErrors];
+export type GetPretasksByIdRelationshipsPretaskFilesError =
+  GetPretasksByIdRelationshipsPretaskFilesErrors[keyof GetPretasksByIdRelationshipsPretaskFilesErrors];
 
-export type GetPretasksByIdRelationshipsByRelationResponses = {
+export type GetPretasksByIdRelationshipsPretaskFilesResponses = {
   /**
    * successful operation
    */
-  200: PreTaskResponse;
+  200: PreTaskRelationPretaskFilesGetResponse;
 };
 
-export type GetPretasksByIdRelationshipsByRelationResponse =
-  GetPretasksByIdRelationshipsByRelationResponses[keyof GetPretasksByIdRelationshipsByRelationResponses];
+export type GetPretasksByIdRelationshipsPretaskFilesResponse =
+  GetPretasksByIdRelationshipsPretaskFilesResponses[keyof GetPretasksByIdRelationshipsPretaskFilesResponses];
 
-export type PatchPretasksByIdRelationshipsByRelationData = {
+export type PatchPretasksByIdRelationshipsPretaskFilesData = {
   body: PreTaskRelationPretaskFiles;
   path: {
     id: number;
-    relation: string;
   };
   query?: never;
-  url: '/api/v2/ui/pretasks/{id}/relationships/{relation}';
+  url: '/api/v2/ui/pretasks/{id}/relationships/pretaskFiles';
 };
 
-export type PatchPretasksByIdRelationshipsByRelationErrors = {
+export type PatchPretasksByIdRelationshipsPretaskFilesErrors = {
   /**
    * Invalid request
    */
@@ -514,37 +659,42 @@ export type PatchPretasksByIdRelationshipsByRelationErrors = {
    */
   401: ErrorResponse;
   /**
+   * Permission denied
+   */
+  403: ErrorResponse;
+  /**
    * Not Found
    */
-  404: NotFoundResponse;
+  404: ErrorResponse;
+  /**
+   * Resource already exists
+   */
+  409: ErrorResponse;
 };
 
-export type PatchPretasksByIdRelationshipsByRelationError =
-  PatchPretasksByIdRelationshipsByRelationErrors[keyof PatchPretasksByIdRelationshipsByRelationErrors];
+export type PatchPretasksByIdRelationshipsPretaskFilesError =
+  PatchPretasksByIdRelationshipsPretaskFilesErrors[keyof PatchPretasksByIdRelationshipsPretaskFilesErrors];
 
-export type PatchPretasksByIdRelationshipsByRelationResponses = {
+export type PatchPretasksByIdRelationshipsPretaskFilesResponses = {
   /**
    * Successfull operation
    */
   204: void;
 };
 
-export type PatchPretasksByIdRelationshipsByRelationResponse =
-  PatchPretasksByIdRelationshipsByRelationResponses[keyof PatchPretasksByIdRelationshipsByRelationResponses];
+export type PatchPretasksByIdRelationshipsPretaskFilesResponse =
+  PatchPretasksByIdRelationshipsPretaskFilesResponses[keyof PatchPretasksByIdRelationshipsPretaskFilesResponses];
 
-export type PostPretasksByIdRelationshipsByRelationData = {
-  body: {
-    [key: string]: unknown;
-  };
+export type PostPretasksByIdRelationshipsPretaskFilesData = {
+  body: PreTaskRelationPretaskFiles;
   path: {
     id: number;
-    relation: string;
   };
   query?: never;
-  url: '/api/v2/ui/pretasks/{id}/relationships/{relation}';
+  url: '/api/v2/ui/pretasks/{id}/relationships/pretaskFiles';
 };
 
-export type PostPretasksByIdRelationshipsByRelationErrors = {
+export type PostPretasksByIdRelationshipsPretaskFilesErrors = {
   /**
    * Invalid request
    */
@@ -554,28 +704,34 @@ export type PostPretasksByIdRelationshipsByRelationErrors = {
    */
   401: ErrorResponse;
   /**
+   * Permission denied
+   */
+  403: ErrorResponse;
+  /**
    * Not Found
    */
-  404: NotFoundResponse;
+  404: ErrorResponse;
+  /**
+   * Resource already exists
+   */
+  409: ErrorResponse;
 };
 
-export type PostPretasksByIdRelationshipsByRelationError =
-  PostPretasksByIdRelationshipsByRelationErrors[keyof PostPretasksByIdRelationshipsByRelationErrors];
+export type PostPretasksByIdRelationshipsPretaskFilesError =
+  PostPretasksByIdRelationshipsPretaskFilesErrors[keyof PostPretasksByIdRelationshipsPretaskFilesErrors];
 
-export type PostPretasksByIdRelationshipsByRelationResponses = {
+export type PostPretasksByIdRelationshipsPretaskFilesResponses = {
   /**
    * successfully created
    */
   204: void;
 };
 
-export type PostPretasksByIdRelationshipsByRelationResponse =
-  PostPretasksByIdRelationshipsByRelationResponses[keyof PostPretasksByIdRelationshipsByRelationResponses];
+export type PostPretasksByIdRelationshipsPretaskFilesResponse =
+  PostPretasksByIdRelationshipsPretaskFilesResponses[keyof PostPretasksByIdRelationshipsPretaskFilesResponses];
 
 export type DeletePretasksByIdData = {
-  body: {
-    [key: string]: unknown;
-  };
+  body?: never;
   path: {
     id: number;
   };
@@ -593,9 +749,13 @@ export type DeletePretasksByIdErrors = {
    */
   401: ErrorResponse;
   /**
+   * Permission denied
+   */
+  403: ErrorResponse;
+  /**
    * Not Found
    */
-  404: NotFoundResponse;
+  404: ErrorResponse;
 };
 
 export type DeletePretasksByIdError = DeletePretasksByIdErrors[keyof DeletePretasksByIdErrors];
@@ -616,9 +776,9 @@ export type GetPretasksByIdData = {
   };
   query?: {
     /**
-     * Items to include. Comma seperated
+     * Relationships to include in the response, comma seperated. Possible options: pretaskFiles
      */
-    include?: string;
+    include?: Array<'pretaskFiles'>;
   };
   url: '/api/v2/ui/pretasks/{id}';
 };
@@ -633,9 +793,13 @@ export type GetPretasksByIdErrors = {
    */
   401: ErrorResponse;
   /**
+   * Permission denied
+   */
+  403: ErrorResponse;
+  /**
    * Not Found
    */
-  404: NotFoundResponse;
+  404: ErrorResponse;
 };
 
 export type GetPretasksByIdError = GetPretasksByIdErrors[keyof GetPretasksByIdErrors];
@@ -668,9 +832,17 @@ export type PatchPretasksByIdErrors = {
    */
   401: ErrorResponse;
   /**
+   * Permission denied
+   */
+  403: ErrorResponse;
+  /**
    * Not Found
    */
-  404: NotFoundResponse;
+  404: ErrorResponse;
+  /**
+   * Resource already exists
+   */
+  409: ErrorResponse;
 };
 
 export type PatchPretasksByIdError = PatchPretasksByIdErrors[keyof PatchPretasksByIdErrors];

@@ -1,18 +1,6 @@
-FROM rust:1.94-slim-trixie AS prebuild
-
-RUN apt-get update && apt-get install -y pkg-config libssl-dev
-
-RUN cargo install --locked sqlx-cli --no-default-features --features native-tls,mysql,postgres
-
-FROM alpine/git AS preprocess
-
-COPY .gi[t] /.git
-
-RUN cd / && git rev-parse --short HEAD > /HEAD; exit 0
-
-# BASE image
-# ----BEGIN----
-FROM php:8.5-apache AS hashtopolis-server-base
+FROM node:24.18-trixie AS hashtopolis-web-ui-base
+ENV PUPPETEER_SKIP_DOWNLOAD='true'
+EXPOSE 4200
 
 # Enable possible build args for injecting user commands
 ARG CONTAINER_USER_CMD_PRE
@@ -22,54 +10,64 @@ ARG CONTAINER_USER_CMD_POST
 ENV DEBIAN_FRONTEND=noninteractive
 ENV NODE_OPTIONS='--use-openssl-ca'
 
-# Set default hashtopolis env
-ENV HASHTOPOLIS_DOCUMENT_ROOT=/var/www/html/src
-ENV HASHTOPOLIS_PATH=/usr/local/share/hashtopolis
-ENV HASHTOPOLIS_FILES_PATH=${HASHTOPOLIS_PATH}/files
-ENV HASHTOPOLIS_IMPORT_PATH=${HASHTOPOLIS_PATH}/import
-ENV HASHTOPOLIS_LOG_PATH=${HASHTOPOLIS_PATH}/log
-ENV HASHTOPOLIS_CONFIG_PATH=${HASHTOPOLIS_PATH}/config
-ENV HASHTOPOLIS_BINARIES_PATH=${HASHTOPOLIS_PATH}/binaries
-ENV HASHTOPOLIS_TUS_PATH=/var/tmp/tus
-ENV HASHTOPOLIS_TEMP_UPLOADS_PATH=${HASHTOPOLIS_TUS_PATH}/uploads
-ENV HASHTOPOLIS_TEMP_META_PATH=${HASHTOPOLIS_TUS_PATH}/meta
-
 # Add support for TLS inspection corporate setups, see .env.sample for details
-ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt 
+ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
 
 # Check for and run optional user-supplied command to enable (advanced) customizations of the container
-RUN if [ -n "${CONTAINER_USER_CMD_PRE}" ]; then echo "${CONTAINER_USER_CMD_PRE}" | sh ; fi
+RUN if [ -n "${CONTAINER_USER_CMD_PRE}" ]; then echo "Applying CONTAINER_USER_CMD_PRE customizations..."; echo "${CONTAINER_USER_CMD_PRE}" | sh ; fi
 
-# Configure apt and install packages
+RUN mkdir /app
+WORKDIR /app
+
+# Docker entry location
+COPY docker-entrypoint.sh /usr/local/bin
+COPY preload_opt.sh /usr/local/bin
+
+# BUILD Image
+#----BEGIN----
+FROM hashtopolis-web-ui-base AS hashtopolis-web-ui-build
+COPY . ./
+
+# npm package - clean install
+COPY package-lock.json package.json ./
+
+RUN npm ci
+RUN npm run build
+# ----END----
 
 
-RUN apt-get update \
-    && apt-get -y install --no-install-recommends util-linux apt-utils zip unzip nano ncdu gettext-base 2>&1 \
-    \
-    # Install git, procps, lsb-release (useful for CLI installs) \
-    && apt-get -y install git iproute2 procps lsb-release \
-    && apt-get -y install mariadb-client postgresql-client libpq-dev \
-    && apt-get -y install libpng-dev \
-    && apt-get -y install ssmtp \
-    && rm -f /etc/ssmtp/ssmtp.conf \
-    && apt-get install -y --no-install-recommends bash jq curl gosu \
-    #&& git clone --depth 1 https://github.com/hassio-addons/bashio.git /tmp/bashio && install -d /usr/lib/bashio && cp -a /tmp/bashio/lib/. /usr/lib/bashio/ && rm -rf /tmp/bashio \
-    \
-    # Install extensions (optional)
-    && docker-php-ext-install pdo_mysql pgsql pdo_pgsql gd bcmath \
-    \
-    # Install Composer
-    && curl -sS https://getcomposer.org/installer | php \
-    && mv composer.phar /usr/local/bin/composer \
-    # Enable URL rewriting using .htaccess
-    && a2enmod rewrite \
-    # Enable headers
-    && a2enmod headers \
-    # Clean Up
-    && apt-get autoremove -y \
-    && apt-get clean -y \
-    && rm -rf /var/lib/apt/lists/*
-    
+# DEVELOPMENT Image
+# ----BEGIN----
+FROM hashtopolis-web-ui-base AS hashtopolis-web-ui-dev
+# Enable tooling like 'ng' for regular users
+RUN echo "export PATH=/app/node_modules/.bin:${PATH}" >> /etc/profile.d/npm.inc.sh
+
+# Install required tooling envsubst
+RUN apt-get update && apt-get -y install --no-install-recommends gettext-base 2>&1
+
+USER node
+ENTRYPOINT [ "/bin/bash", "/usr/local/bin/docker-entrypoint.sh", "development" ]
+# ----END----
+
+
+# PRODUCTION Image
+# ----BEGIN----
+FROM nginx:trixie AS hashtopolis-web-ui-prod
+COPY --from=hashtopolis-web-ui-build /app/dist/ /usr/share/nginx/html
+COPY --from=hashtopolis-web-ui-build /usr/local/bin/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY --from=hashtopolis-web-ui-build /usr/local/bin/preload_opt.sh /usr/local/bin/preload_opt.sh
+COPY ./nginx/hashtopolis.conf /etc/nginx/conf.d/default.conf
+COPY ./nginx/ssl.conf /etc/nginx/conf.d/ssl.conf
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+# Custom themes are opt-in at runtime via HASHTOPOLIS_CUSTOM_THEMES_DIR.
+# By default this bakes an empty folder (no themes ship in the image). To bake
+# themes, build with --build-arg CUSTOM_THEMES_DIR=custom-themes (or your own
+# folder of *.css), then set HASHTOPOLIS_CUSTOM_THEMES_DIR=/custom-themes at
+# runtime to enable them.
+ARG CUSTOM_THEMES_DIR=docker/empty-custom-themes
+COPY ${CUSTOM_THEMES_DIR}/ /custom-themes/
+RUN apt-get update && apt-get install -y --no-install-recommends bash jq curl 
+
 ARG BASHIO_VERSION="v0.19.0"
 
 RUN curl -J -L -o /tmp/bashio.tar.gz \
@@ -81,143 +79,9 @@ RUN curl -J -L -o /tmp/bashio.tar.gz \
     \
     && mv /tmp/bashio/lib /usr/lib/bashio \
     && ln -s /usr/lib/bashio/bashio /usr/bin/bashio
-    
-#RUN a2enmod ssl && a2ensite default-ssl
-#&& a2ensite default-ssl
-RUN sed -i 's/KeepAliveTimeout 5/KeepAliveTimeout 10/' /etc/apache2/apache2.conf
-RUN echo "ServerTokens Prod" >> /etc/apache2/apache2.conf \
-    && echo "ServerSignature Off" >> /etc/apache2/apache2.conf
+#ENV HASHTOPOLIS_BACKEND_URL=https://buvi.duckdns.org:8081/api/v2
+#USER root
+#ENTRYPOINT [ "/bin/bash", "/usr/local/bin/docker-entrypoint.sh", "production" ]
+ENTRYPOINT [ "/usr/bin/bashio", "/usr/local/bin/preload_opt.sh"]
 
-
-RUN mkdir -p \
-    ${HASHTOPOLIS_DOCUMENT_ROOT} \
-    ${HASHTOPOLIS_DOCUMENT_ROOT}/../../.git/ \
-    ${HASHTOPOLIS_PATH} \
-    ${HASHTOPOLIS_FILES_PATH} \
-    ${HASHTOPOLIS_IMPORT_PATH} \
-    ${HASHTOPOLIS_LOG_PATH} \
-    ${HASHTOPOLIS_CONFIG_PATH} \
-    ${HASHTOPOLIS_BINARIES_PATH} \
-    ${HASHTOPOLIS_TUS_PATH} \
-    ${HASHTOPOLIS_TEMP_UPLOADS_PATH} \
-    ${HASHTOPOLIS_TEMP_META_PATH} \
-    && chown -R www-data:www-data \
-    ${HASHTOPOLIS_PATH} \
-    ${HASHTOPOLIS_TUS_PATH} \
-    && chmod -R g+w \
-    ${HASHTOPOLIS_PATH} \
-    ${HASHTOPOLIS_TUS_PATH}
-
-COPY --from=prebuild /usr/local/cargo/bin/sqlx /usr/bin/
-
-COPY --from=preprocess /HEA[D] ${HASHTOPOLIS_DOCUMENT_ROOT}/../.git/
-
-# Install composer
-COPY composer.json composer.lock ${HASHTOPOLIS_DOCUMENT_ROOT}/../
-RUN composer install --working-dir=${HASHTOPOLIS_DOCUMENT_ROOT}/..
-
-
-
-ENV DEBIAN_FRONTEND=dialog
-COPY docker-entrypoint.sh /usr/local/bin
-COPY preload_opt.sh /usr/local/bin
-#COPY docker-entrypoint.sh /usr/bin/bashio
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/preload_opt.sh
-#RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-# Setting the hashtopolis document root is done at build time. Because the www-data user cannot write to the apache config folder.
-COPY 000-default.conf /tmp/
-RUN envsubst '${HASHTOPOLIS_DOCUMENT_ROOT} ${HASHTOPOLIS_BINARIES_PATH}' < /tmp/000-default.conf > /etc/apache2/sites-available/000-default.conf && rm /tmp/000-default.conf
-COPY default-ssl.conf /tmp/
-RUN envsubst '${HASHTOPOLIS_DOCUMENT_ROOT} ${HASHTOPOLIS_BINARIES_PATH}' < /tmp/default-ssl.conf > /etc/apache2/sites-available/default-ssl.conf && rm /tmp/default-ssl.conf
-
-#ENTRYPOINT [ "docker-entrypoint.sh" ]
-ENTRYPOINT [ "preload_opt.sh" ]
 # ----END----
-
-
-# DEVELOPMENT Image
-# ----BEGIN----
-FROM hashtopolis-server-base AS hashtopolis-server-dev
-
-# Install python (unittests)
-RUN apt-get update \
-    && apt-get install -y python3 python3-pip python3-requests python3-pytest libtool unzip
-
-# Setting up development requirements, install xdebug via PIE (PECL is deprecated)
-RUN curl -fL --output /tmp/pie.phar https://github.com/php/pie/releases/download/1.4.8/pie.phar \
-    && echo "ef9f19c2698334aa8ce8fc458c8cf2a31a2fd6a29230216dbde3422343cf952d  /tmp/pie.phar" | sha256sum -c - \
-    && chmod +x /tmp/pie.phar \
-    && mv /tmp/pie.phar /usr/local/bin/pie \
-    && pie install --skip-enable-extension xdebug/xdebug:3.5.3 \
-    && XDEBUG_SO="$(find /usr/local/lib/php/extensions/ -name xdebug.so -print -quit)" \
-    && test -n "$XDEBUG_SO" \
-    && echo "zend_extension=$XDEBUG_SO" > /usr/local/etc/php/conf.d/xdebug.ini \
-    && echo "xdebug.mode = debug" >> /usr/local/etc/php/conf.d/xdebug.ini \
-    && echo "xdebug.start_with_request = yes" >> /usr/local/etc/php/conf.d/xdebug.ini \
-	&& echo "xdebug.client_port = 9003" >> /usr/local/etc/php/conf.d/xdebug.ini \
-	&& echo "xdebug.idekey = PHPSTORM" >> /usr/local/etc/php/conf.d/xdebug.ini \
-    \
-    # Configuring PHP \
-    && touch "/usr/local/etc/php/conf.d/custom.ini" \
-	&& echo "display_errors = 1" >> /usr/local/etc/php/conf.d/custom.ini \
-	&& echo "memory_limit = 256m" >> /usr/local/etc/php/conf.d/custom.ini \
-	&& echo "upload_max_filesize = 256m" >> /usr/local/etc/php/conf.d/custom.ini \
-	&& echo "max_execution_time = 60" >> /usr/local/etc/php/conf.d/custom.ini \
-	&& echo "log_errors = On" >> /usr/local/etc/php/conf.d/custom.ini \
-	&& echo "error_log = /dev/stderr" >> /usr/local/etc/php/conf.d/custom.ini
-
-# Install python (unittests)
-RUN apt-get update \
-    && apt-get install -y python3 python3-venv
-
-# Create virtualenv for Python test dependencies (isolates from system-managed packages)
-RUN python3 -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-# install dependencies from ./ci/apiv2/requirements.txt
-COPY ./ci/apiv2/requirements.txt /tmp/requirements.txt
-RUN /opt/venv/bin/pip install -r /tmp/requirements.txt
-
-# install python-hashtopolis (floating, always newest; cannot be hashed in requirements.txt)
-RUN /opt/venv/bin/pip install git+https://github.com/hashtopolis/python-hashtopolis.git@main
-
-# Adding VSCode user and fixing permissions
-RUN groupadd vscode && useradd -rm -d /var/www -s /bin/bash -g vscode -G www-data -u 1001 vscode \
-    && chown -R vscode:www-data /var/www /opt/venv \
-    && chmod -R g+w /var/www
-    
-
-
-# This is a seperate step so that changes to the code do not cause the container to be rebuild
-# And it will be ran last
-COPY --chown=vscode:www-data . ${HASHTOPOLIS_DOCUMENT_ROOT}/..
-
-USER vscode
-# ----END----
-
-
-# PRODUCTION Image
-# ----BEGIN----
-FROM hashtopolis-server-base AS hashtopolis-server-prod
-
-COPY --chown=www-data:www-data ./src/ $HASHTOPOLIS_DOCUMENT_ROOT
-
-# protect install/update directory
-RUN echo "Order deny,allow\nDeny from all" > "${HASHTOPOLIS_DOCUMENT_ROOT}/install/.htaccess"
-
-RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" \
-    && touch "/usr/local/etc/php/conf.d/custom.ini" \
-    && echo "memory_limit = 256m" >> /usr/local/etc/php/conf.d/custom.ini \
-    && echo "upload_max_filesize = 256m" >> /usr/local/etc/php/conf.d/custom.ini \
-    && echo "max_execution_time = 60" >> /usr/local/etc/php/conf.d/custom.ini \
-    && echo "display_errors = 0" >> /usr/local/etc/php/conf.d/custom.ini
-
-
-#WORKDIR /
-#USER www-data
-# ----END----
-
-
-#ENV HASHTOPOLIS_FRONTEND_URLS=https://buvi.duckdns.org:4201,http://buvi.duckdns.org:4200,https://buvi.duckdns.org:8123
-#ENV HASHTOPOLIS_FRONTEND_PORT=4200

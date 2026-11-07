@@ -1,3 +1,5 @@
+import { HttpHeaderName } from '@constants/http.config';
+import { zConfigResponse, zGetAccessGroupsHelperApiResponse, zHashTypeListResponse } from '@generated/api/zod';
 import { concat, of, throwError } from 'rxjs';
 
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
@@ -23,9 +25,9 @@ import { ButtonsModule } from '@src/app/shared/buttons/buttons.module';
 import { ComponentsModule } from '@src/app/shared/components.module';
 import { InputModule } from '@src/app/shared/input/input.module';
 import { PageSubTitleComponent } from '@src/app/shared/page-headers/page-subtitle/page-subtitle.component';
-import { mockResponse } from '@src/app/testing/mock-response';
+import { mockResponse, mockValidResponse } from '@src/app/testing/mock-response';
 
-const mockAccessGroups: ResponseWrapper = mockResponse({
+const mockAccessGroups: ResponseWrapper = mockValidResponse(zGetAccessGroupsHelperApiResponse, {
   data: [
     {
       id: 1,
@@ -44,7 +46,7 @@ const mockAccessGroups: ResponseWrapper = mockResponse({
   ]
 });
 
-const mockHashtypes: ResponseWrapper = mockResponse({
+const mockHashtypes: ResponseWrapper = mockValidResponse(zHashTypeListResponse, {
   data: [
     {
       id: 2500,
@@ -76,7 +78,7 @@ const mockHashtypes: ResponseWrapper = mockResponse({
   ]
 });
 
-const mockConfigs: ResponseWrapper = mockResponse({
+const mockConfigs: ResponseWrapper = mockValidResponse(zConfigResponse, {
   data: {
     id: 66,
     type: 'config',
@@ -334,7 +336,7 @@ describe('NewHashlistComponent', () => {
 
       // The component handles the error itself, so it tells the interceptor to skip the modal.
       const httpOptions = gsSpy.create.calls.mostRecent().args[2];
-      expect(httpOptions?.headers?.get('X-Skip-Error-Dialog')).toBe('true');
+      expect(httpOptions?.headers?.get(HttpHeaderName.SKIP_ERROR_DIALOG)).toBe('true');
 
       expect(alertSpy.showErrorMessage).toHaveBeenCalledWith('Failed to create Hashlist: Hashlist has too many lines!');
       expect(routerSpy.navigate).not.toHaveBeenCalled();
@@ -349,7 +351,7 @@ describe('NewHashlistComponent', () => {
       const call = gsSpy.chelper.calls.mostRecent();
       expect(call.args[1]).toBe('importFile');
       const httpOptions = call.args[4];
-      expect(httpOptions?.headers?.get('X-Skip-Error-Dialog')).toBe('true');
+      expect(httpOptions?.headers?.get(HttpHeaderName.SKIP_ERROR_DIALOG)).toBe('true');
     }));
   });
 
@@ -407,7 +409,7 @@ describe('NewHashlistComponent', () => {
     });
 
     it('should NOT show brain section when brain is globally disabled', fakeAsync(() => {
-      const disabledConfig: ResponseWrapper = mockResponse({
+      const disabledConfig: ResponseWrapper = mockValidResponse(zConfigResponse, {
         data: {
           id: 66,
           type: 'config',

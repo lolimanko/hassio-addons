@@ -119,7 +119,6 @@ if [ "$environment" = "development" ]; then
   npm start
 else
   # Prepare configuration
-
   update_app_config "/usr/share/nginx/html"
   sync_custom_themes "/usr/share/nginx/html"
 

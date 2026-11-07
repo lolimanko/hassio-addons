@@ -1,13 +1,16 @@
 import * as z from 'zod';
 
+import { zUserResponse } from './user';
+
 export const zApiTokenCreate = z.object({
   data: z.object({
     type: z.literal('apiToken'),
     attributes: z.object({
-      scopes: z.array(z.int()),
+      scopes: z.array(z.string()),
       startValid: z.number(),
       endValid: z.number(),
-      userId: z.int(),
+      userId: z.int().nullish(),
+      tokenName: z.string(),
       isRevoked: z.boolean()
     })
   })
@@ -17,9 +20,32 @@ export const zApiTokenPatch = z.object({
   data: z.object({
     type: z.literal('apiToken'),
     attributes: z.object({
-      isRevoked: z.boolean().optional()
+      isRevoked: z.boolean().optional(),
+      tokenName: z.string().optional()
     })
   })
+});
+
+export const zApiTokenPatchMultiple = z.object({
+  data: z.array(
+    z.object({
+      id: z.int(),
+      type: z.literal('apiToken'),
+      attributes: z.object({
+        isRevoked: z.boolean().optional(),
+        tokenName: z.string().optional()
+      })
+    })
+  )
+});
+
+export const zApiTokenDeleteMultiple = z.object({
+  data: z.array(
+    z.object({
+      id: z.int(),
+      type: z.literal('apiToken')
+    })
+  )
 });
 
 export const zApiTokenResponse = z.object({
@@ -27,28 +53,24 @@ export const zApiTokenResponse = z.object({
     version: z.string().default('1.1'),
     ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
   }),
-  links: z
-    .object({
-      self: z.string().default('/api/v2/ui/apiTokens?page[size]=25'),
-      first: z.string().optional().default('/api/v2/ui/apiTokens?page[size]=25&page[after]=0'),
-      last: z.string().optional().default('/api/v2/ui/apiTokens?page[size]=25&page[before]=500'),
-      next: z.string().nullish().default('/api/v2/ui/apiTokens?page[size]=25&page[after]=25'),
-      previous: z.string().nullish().default('/api/v2/ui/apiTokens?page[size]=25&page[before]=25')
-    })
-    .optional(),
+  links: z.object({
+    self: z.string().default('/api/v2/ui/apiTokens/1')
+  }),
   data: z.object({
     id: z.int(),
     type: z.literal('apiToken'),
     attributes: z.object({
       startValid: z.number(),
       endValid: z.number(),
-      userId: z.int(),
+      userId: z.int().nullable(),
+      tokenName: z.string(),
       isRevoked: z.boolean(),
       token: z.string().optional()
-    })
-  }),
-  relationships: z
-    .object({
+    }),
+    links: z.object({
+      self: z.string().default('/api/v2/ui/apiTokens/1')
+    }),
+    relationships: z.object({
       user: z.object({
         links: z.object({
           self: z.string().default('/api/v2/ui/apiTokens/relationships/user'),
@@ -62,7 +84,7 @@ export const zApiTokenResponse = z.object({
           .nullish()
       })
     })
-    .optional(),
+  }),
   included: z
     .array(
       z.object({
@@ -76,12 +98,7 @@ export const zApiTokenResponse = z.object({
           lastLoginDate: z.number().optional(),
           registeredSince: z.number().optional(),
           sessionLifetime: z.int().optional(),
-          globalPermissionGroupId: z.int().optional(),
-          yubikey: z.string().optional(),
-          otp1: z.string().optional(),
-          otp2: z.string().optional(),
-          otp3: z.string().optional(),
-          otp4: z.string().optional()
+          globalPermissionGroupId: z.int().optional()
         })
       })
     )
@@ -93,48 +110,24 @@ export const zApiTokenPostPatchResponse = z.object({
     version: z.string().default('1.1'),
     ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
   }),
+  links: z.object({
+    self: z.string().default('/api/v2/ui/apiTokens/1')
+  }),
   data: z.object({
     id: z.int(),
     type: z.literal('apiToken'),
     attributes: z.object({
       startValid: z.number(),
       endValid: z.number(),
-      userId: z.int(),
+      userId: z.int().nullable(),
+      tokenName: z.string(),
       isRevoked: z.boolean(),
       token: z.string().optional()
-    })
-  })
-});
-
-export const zApiTokenListResponse = z.object({
-  jsonapi: z.object({
-    version: z.string().default('1.1'),
-    ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
-  }),
-  links: z
-    .object({
-      self: z.string().default('/api/v2/ui/apiTokens?page[size]=25'),
-      first: z.string().optional().default('/api/v2/ui/apiTokens?page[size]=25&page[after]=0'),
-      last: z.string().optional().default('/api/v2/ui/apiTokens?page[size]=25&page[before]=500'),
-      next: z.string().nullish().default('/api/v2/ui/apiTokens?page[size]=25&page[after]=25'),
-      previous: z.string().nullish().default('/api/v2/ui/apiTokens?page[size]=25&page[before]=25')
-    })
-    .optional(),
-  data: z.array(
-    z.object({
-      id: z.int(),
-      type: z.literal('apiToken'),
-      attributes: z.object({
-        startValid: z.number(),
-        endValid: z.number(),
-        userId: z.int(),
-        isRevoked: z.boolean(),
-        token: z.string().optional()
-      })
-    })
-  ),
-  relationships: z
-    .object({
+    }),
+    links: z.object({
+      self: z.string().default('/api/v2/ui/apiTokens/1')
+    }),
+    relationships: z.object({
       user: z.object({
         links: z.object({
           self: z.string().default('/api/v2/ui/apiTokens/relationships/user'),
@@ -148,7 +141,7 @@ export const zApiTokenListResponse = z.object({
           .nullish()
       })
     })
-    .optional(),
+  }),
   included: z
     .array(
       z.object({
@@ -162,62 +155,147 @@ export const zApiTokenListResponse = z.object({
           lastLoginDate: z.number().optional(),
           registeredSince: z.number().optional(),
           sessionLifetime: z.int().optional(),
-          globalPermissionGroupId: z.int().optional(),
-          yubikey: z.string().optional(),
-          otp1: z.string().optional(),
-          otp2: z.string().optional(),
-          otp3: z.string().optional(),
-          otp4: z.string().optional()
+          globalPermissionGroupId: z.int().optional()
         })
       })
     )
     .optional()
 });
 
+export const zApiTokenListResponse = z.object({
+  jsonapi: z.object({
+    version: z.string().default('1.1'),
+    ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
+  }),
+  links: z.object({
+    self: z.string().default('/api/v2/ui/apiTokens?page[size]=25'),
+    first: z.string().default('/api/v2/ui/apiTokens?page[size]=25'),
+    last: z
+      .string()
+      .nullable()
+      .default(
+        '/api/v2/ui/apiTokens?page[size]=25&page[before]=eyJwcmltYXJ5Ijp7InNvbWVVbnFpdWVGaWVsZCI6MTIzfSwic2Vjb25kYXJ5Ijp7InNvbWVPdGhlck9wdGlvbmFsRmllbGQiOiJGb28ifX0='
+      ),
+    next: z
+      .string()
+      .nullable()
+      .default(
+        '/api/v2/ui/apiTokens?page[size]=25&page[after]=eyJwcmltYXJ5Ijp7InNvbWVVbnFpdWVGaWVsZCI6MTIzfSwic2Vjb25kYXJ5Ijp7InNvbWVPdGhlck9wdGlvbmFsRmllbGQiOiJGb28ifX0='
+      ),
+    prev: z
+      .string()
+      .nullable()
+      .default(
+        '/api/v2/ui/apiTokens?page[size]=25&page[before]=eyJwcmltYXJ5Ijp7InNvbWVVbnFpdWVGaWVsZCI6MTIzfSwic2Vjb25kYXJ5Ijp7InNvbWVPdGhlck9wdGlvbmFsRmllbGQiOiJGb28ifX0='
+      )
+  }),
+  meta: z.object({
+    page: z.object({
+      total_elements: z.int()
+    })
+  }),
+  data: z.array(
+    z.object({
+      id: z.int(),
+      type: z.literal('apiToken'),
+      attributes: z.object({
+        startValid: z.number(),
+        endValid: z.number(),
+        userId: z.int().nullable(),
+        tokenName: z.string(),
+        isRevoked: z.boolean(),
+        token: z.string().optional()
+      }),
+      links: z.object({
+        self: z.string().default('/api/v2/ui/apiTokens/1')
+      }),
+      relationships: z.object({
+        user: z.object({
+          links: z.object({
+            self: z.string().default('/api/v2/ui/apiTokens/relationships/user'),
+            related: z.string().default('/api/v2/ui/apiTokens/user')
+          }),
+          data: z
+            .object({
+              type: z.literal('user'),
+              id: z.int()
+            })
+            .nullish()
+        })
+      })
+    })
+  ),
+  included: z
+    .array(
+      z.object({
+        id: z.int(),
+        type: z.literal('user'),
+        attributes: z.object({
+          name: z.string(),
+          email: z.string().optional(),
+          isValid: z.boolean().optional(),
+          isComputedPassword: z.boolean().optional(),
+          lastLoginDate: z.number().optional(),
+          registeredSince: z.number().optional(),
+          sessionLifetime: z.int().optional(),
+          globalPermissionGroupId: z.int().optional()
+        })
+      })
+    )
+    .optional()
+});
+
+export const zApiTokenCountResponse = z.object({
+  jsonapi: z.object({
+    version: z.string().default('1.1'),
+    ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
+  }),
+  meta: z.object({
+    count: z.int(),
+    total_count: z.int().optional()
+  }),
+  data: z.array(z.record(z.string(), z.unknown())).max(0)
+});
+
 export const zApiTokenRelationUser = z.object({
   data: z.object({
     type: z.literal('user'),
-    id: z.int().default(1)
+    id: z.int()
   })
 });
 
 export const zApiTokenRelationUserGetResponse = z.object({
-  data: z.object({
-    type: z.literal('user'),
-    id: z.int().default(1)
-  })
-});
-
-export const zDeleteApiTokensData = z.object({
-  body: z.never().optional(),
-  path: z.never().optional(),
-  query: z.never().optional()
-});
-
-export const zGetApiTokensData = z.object({
-  body: z.never().optional(),
-  path: z.never().optional(),
-  query: z
+  data: z
     .object({
-      'page[after]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      'page[before]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      'page[size]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      filter: z.record(z.string(), z.unknown()).optional(),
-      include: z.string().optional()
+      type: z.literal('user'),
+      id: z.int()
     })
-    .optional()
+    .nullable()
+});
+
+export const zDeleteApiTokensBody = zApiTokenDeleteMultiple;
+
+/**
+ * successfully deleted
+ */
+export const zDeleteApiTokensResponse = z.void();
+
+export const zGetApiTokensQuery = z.object({
+  'page[after]': z
+    .string()
+    .regex(/^[A-Za-z0-9+\/]*={0,2}$/)
+    .optional(),
+  'page[before]': z
+    .string()
+    .regex(/^[A-Za-z0-9+\/]*={0,2}$/)
+    .optional(),
+  'page[size]': z
+    .int()
+    .gte(1)
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+    .optional(),
+  filter: z.record(z.string(), z.string()).optional(),
+  include: z.array(z.enum(['user'])).optional()
 });
 
 /**
@@ -225,108 +303,67 @@ export const zGetApiTokensData = z.object({
  */
 export const zGetApiTokensResponse = zApiTokenListResponse;
 
-export const zPatchApiTokensData = z.object({
-  body: z.never().optional(),
-  path: z.never().optional(),
-  query: z.never().optional()
-});
+export const zPatchApiTokensBody = zApiTokenPatchMultiple;
 
-export const zPostApiTokensData = z.object({
-  body: zApiTokenCreate,
-  path: z.never().optional(),
-  query: z.never().optional()
-});
+/**
+ * successfully updated
+ */
+export const zPatchApiTokensResponse = z.void();
+
+export const zPostApiTokensBody = zApiTokenCreate;
 
 /**
  * successful operation
  */
 export const zPostApiTokensResponse = zApiTokenPostPatchResponse;
 
-export const zGetApiTokensCountData = z.object({
-  body: z.never().optional(),
-  path: z.never().optional(),
-  query: z
-    .object({
-      'page[after]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      'page[before]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      'page[size]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      filter: z.record(z.string(), z.unknown()).optional(),
-      include: z.string().optional()
-    })
-    .optional()
+export const zGetApiTokensCountQuery = z.object({
+  filter: z.record(z.string(), z.string()).optional(),
+  include_total: z.boolean().optional()
 });
 
 /**
  * successful operation
  */
-export const zGetApiTokensCountResponse = zApiTokenListResponse;
+export const zGetApiTokensCountResponse = zApiTokenCountResponse;
 
-export const zGetApiTokensByIdByRelationData = z.object({
-  body: z.never().optional(),
-  path: z.object({
-    id: z
-      .int()
-      .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-      .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-    relation: z.string()
-  }),
-  query: z.never().optional()
+export const zGetApiTokensByIdUserPath = z.object({
+  id: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
 });
 
 /**
  * successful operation
  */
-export const zGetApiTokensByIdByRelationResponse = zApiTokenRelationUserGetResponse;
+export const zGetApiTokensByIdUserResponse = zUserResponse;
 
-export const zGetApiTokensByIdRelationshipsByRelationData = z.object({
-  body: z.never().optional(),
-  path: z.object({
-    id: z
-      .int()
-      .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-      .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-    relation: z.string()
-  }),
-  query: z.never().optional()
+export const zGetApiTokensByIdRelationshipsUserPath = z.object({
+  id: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
 });
 
 /**
  * successful operation
  */
-export const zGetApiTokensByIdRelationshipsByRelationResponse = zApiTokenResponse;
+export const zGetApiTokensByIdRelationshipsUserResponse = zApiTokenRelationUserGetResponse;
 
-export const zPatchApiTokensByIdRelationshipsByRelationData = z.object({
-  body: zApiTokenRelationUser,
-  path: z.object({
-    id: z.int(),
-    relation: z.string()
-  }),
-  query: z.never().optional()
+export const zPatchApiTokensByIdRelationshipsUserBody = zApiTokenRelationUser;
+
+export const zPatchApiTokensByIdRelationshipsUserPath = z.object({
+  id: z.int()
 });
 
 /**
  * Successfull operation
  */
-export const zPatchApiTokensByIdRelationshipsByRelationResponse = z.void();
+export const zPatchApiTokensByIdRelationshipsUserResponse = z.void();
 
-export const zDeleteApiTokensByIdData = z.object({
-  body: z.record(z.string(), z.unknown()),
-  path: z.object({
-    id: z.int()
-  }),
-  query: z.never().optional()
+export const zDeleteApiTokensByIdPath = z.object({
+  id: z.int()
 });
 
 /**
@@ -334,19 +371,15 @@ export const zDeleteApiTokensByIdData = z.object({
  */
 export const zDeleteApiTokensByIdResponse = z.void();
 
-export const zGetApiTokensByIdData = z.object({
-  body: z.never().optional(),
-  path: z.object({
-    id: z
-      .int()
-      .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-      .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-  }),
-  query: z
-    .object({
-      include: z.string().optional()
-    })
-    .optional()
+export const zGetApiTokensByIdPath = z.object({
+  id: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+});
+
+export const zGetApiTokensByIdQuery = z.object({
+  include: z.array(z.enum(['user'])).optional()
 });
 
 /**
@@ -354,12 +387,10 @@ export const zGetApiTokensByIdData = z.object({
  */
 export const zGetApiTokensByIdResponse = zApiTokenResponse;
 
-export const zPatchApiTokensByIdData = z.object({
-  body: zApiTokenPatch,
-  path: z.object({
-    id: z.int()
-  }),
-  query: z.never().optional()
+export const zPatchApiTokensByIdBody = zApiTokenPatch;
+
+export const zPatchApiTokensByIdPath = z.object({
+  id: z.int()
 });
 
 /**

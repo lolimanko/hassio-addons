@@ -7,17 +7,15 @@ import { AutoTitleService } from 'src/app/core/_services/shared/autotitle.servic
 import { Component, DestroyRef, OnInit, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
 
 import { JUser } from '@models/user.model';
 
 import { SERV } from '@services/main.config';
 
-import { changeOwnPasswordResponseSchema } from '@src/app/account/settings/acc-settings/acc-settings.schema';
 import { JsonAPISerializer } from '@src/app/core/_services/api/serializer-service';
 import { emailValidator } from '@src/app/core/_validators/email.validator';
 import { passwordMatchValidator } from '@src/app/core/_validators/password.validator';
-import { zUserResponse } from '@src/generated/api/zod';
+import { zChangeOwnPasswordHelperApiResponse, zCurrentUserHelperApiResponse } from '@src/generated/api/zod';
 
 export interface UpdateUserPassword {
   oldPassword: string;
@@ -82,7 +80,6 @@ export class AccountSettingsComponent implements OnInit {
   private datePipe = inject(uiDatePipe);
   private alert = inject(AlertService);
   private gs = inject(GlobalService);
-  private router = inject(Router);
 
   constructor() {
     this.titleService.set(['Account Settings']);
@@ -193,7 +190,7 @@ export class AccountSettingsComponent implements OnInit {
       .chelper(SERV.HELPER, 'changeOwnPassword', { ...payload })
       .pipe(
         map((r) => {
-          const parseResult = changeOwnPasswordResponseSchema.safeParse(r);
+          const parseResult = zChangeOwnPasswordHelperApiResponse.safeParse(r);
           if (!parseResult.success) {
             console.error('Password change response validation failed', parseResult.error);
             this.alert.showErrorMessage('Unexpected response from server.');
@@ -223,7 +220,7 @@ export class AccountSettingsComponent implements OnInit {
       .ghelper(SERV.HELPER, 'currentUser')
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((response) => {
-        const user: JUser = new JsonAPISerializer().deserialize(response, zUserResponse);
+        const user: JUser = new JsonAPISerializer().deserialize(response, zCurrentUserHelperApiResponse);
 
         this.form.patchValue({
           name: user.name,

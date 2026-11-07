@@ -4,9 +4,13 @@ import { z } from 'zod';
 
 import { DOCUMENT, Inject, Injectable, InjectionToken, Renderer2, RendererFactory2 } from '@angular/core';
 
+import { BuiltInTheme } from '@models/config-ui.model';
+
 const themeSchema = z.string().min(1);
 
-export type DetectedTheme = 'dark' | 'light';
+/** Local-storage key the selected theme is persisted under. */
+export const THEME_STORAGE_KEY = 'theme';
+
 export type ThemeLoader = () => Observable<string | null>;
 export type ThemeSaver = (theme: string | null) => void;
 
@@ -17,9 +21,9 @@ export const THEME_LOADER: InjectionToken<ThemeLoader> = new InjectionToken<Them
         return of(null);
       }
       return fromEvent<StorageEvent>(window, 'storage').pipe(
-        filter((event: StorageEvent) => event.key === 'theme'),
+        filter((event: StorageEvent) => event.key === THEME_STORAGE_KEY),
         map((event: StorageEvent): string | null => event.newValue),
-        startWith<string | null>(localStorage.getItem('theme', themeSchema) ?? null)
+        startWith<string | null>(localStorage.getItem(THEME_STORAGE_KEY, themeSchema) ?? null)
       );
     };
   }
@@ -36,9 +40,9 @@ export const THEME_SAVER: InjectionToken<ThemeSaver> = new InjectionToken<ThemeS
         return;
       }
       if (theme) {
-        localStorage.setItem('theme', theme, themeSchema);
+        localStorage.setItem(THEME_STORAGE_KEY, theme, themeSchema);
       } else {
-        localStorage.removeItem('theme');
+        localStorage.removeItem(THEME_STORAGE_KEY);
       }
     };
   }
@@ -51,15 +55,15 @@ export class ThemeService {
   private _theme = new BehaviorSubject<string | null>(null);
   private readonly supportedThemeClasses = ['light-theme', 'dark-theme'];
   private readonly customThemeHrefs = new Map<string, string>();
-  private readonly darkThemes = new Set<string>(['dark']);
+  private readonly darkThemes = new Set<string>([BuiltInTheme.DARK]);
   private activeThemeClass: string | null = null;
 
   public get current(): string {
-    return localStorage.getItem('theme', themeSchema) ?? 'light';
+    return localStorage.getItem(THEME_STORAGE_KEY, themeSchema) ?? BuiltInTheme.LIGHT;
   }
 
   public set current(value: string) {
-    localStorage.setItem('theme', value, themeSchema);
+    localStorage.setItem(THEME_STORAGE_KEY, value, themeSchema);
   }
 
   private readonly style: HTMLLinkElement;
@@ -116,7 +120,7 @@ export class ThemeService {
   setCustomThemes(themes: Array<{ value: string; href?: string; isDark?: boolean }>): void {
     this.customThemeHrefs.clear();
     this.darkThemes.clear();
-    this.darkThemes.add('dark');
+    this.darkThemes.add(BuiltInTheme.DARK);
 
     for (const theme of themes) {
       if (theme.href) {
@@ -167,31 +171,6 @@ export class ThemeService {
    */
   get theme$(): Subject<string | null> {
     return this._theme;
-  }
-
-  /**
-   * @return `dark` if the user agent prefers dark color scheme, `light` otherwise
-   */
-  get detectedTheme(): DetectedTheme {
-    return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
-      ? 'dark'
-      : 'light';
-  }
-
-  /**
-   * @return an observable version of {@link detectedTheme} that automatically updates on changes, e.g. when the user
-   * changes their operating system theme preference, or it switches depending on day/night.
-   */
-  get detectedTheme$(): Observable<DetectedTheme> {
-    if (typeof window === 'undefined') {
-      return of('light');
-    }
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    return fromEvent<MediaQueryListEvent>(mediaQuery, 'change').pipe(
-      map((event) => event.matches),
-      startWith(mediaQuery.matches),
-      map((matches) => (matches ? 'dark' : 'light'))
-    );
   }
 
   /**

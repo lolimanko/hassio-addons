@@ -1,3 +1,4 @@
+import { HttpStatus } from '@constants/http.config';
 import { zApiTokenResponse } from '@generated/api/zod';
 import { lastValueFrom } from 'rxjs';
 
@@ -6,7 +7,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
 import { ApiTokenStatus, JApiToken, computeApiTokenStatus } from '@models/api-token.model';
-import { DEFAULT_DATETIME_FORMAT, UIConfig } from '@models/config-ui.model';
+import { DEFAULT_DATETIME_FORMAT } from '@models/config-ui.model';
 import { zIdRouteParams } from '@models/routes.schema';
 
 import { JsonAPISerializer } from '@services/api/serializer-service';
@@ -15,9 +16,8 @@ import { GlobalService } from '@services/main.service';
 import { RequestParamBuilder } from '@services/params/builder-implementation.service';
 import { AlertService } from '@services/shared/alert.service';
 import { AutoTitleService } from '@services/shared/autotitle.service';
-import { LocalStorageService } from '@services/storage/local-storage.service';
+import { UiSettingsService } from '@services/shared/ui-settings.service';
 
-import { UISettingsUtilityClass } from '@src/app/shared/utils/config';
 import { TimePrecision, formatUnixTimestamp, lastValidSecond } from '@src/app/shared/utils/datetime';
 
 @Component({
@@ -31,7 +31,7 @@ export class ApiKeyDetailComponent implements OnInit {
   private router = inject(Router);
   private alert = inject(AlertService);
   private serializer = inject(JsonAPISerializer);
-  private settingsService = inject<LocalStorageService<UIConfig>>(LocalStorageService);
+  private uiSettings = inject(UiSettingsService);
   private titleService = inject(AutoTitleService);
 
   protected readonly ApiTokenStatus = ApiTokenStatus;
@@ -47,7 +47,7 @@ export class ApiKeyDetailComponent implements OnInit {
 
   ngOnInit() {
     this.titleService.set(['API Key Details']);
-    this.dateTimeFormat = new UISettingsUtilityClass(this.settingsService).getDateTimeFormat(TimePrecision.SECONDS);
+    this.dateTimeFormat = this.uiSettings.getDateTimeFormat(TimePrecision.SECONDS);
     this.loadToken();
   }
 
@@ -68,7 +68,7 @@ export class ApiKeyDetailComponent implements OnInit {
       this.token = token;
       this.status = computeApiTokenStatus(token);
     } catch (error) {
-      if (error instanceof HttpErrorResponse && error.status === 404) {
+      if (error instanceof HttpErrorResponse && error.status === HttpStatus.NOT_FOUND) {
         this.notFound = true;
         this.alert.showErrorMessage('Could not load API key.');
       } else {

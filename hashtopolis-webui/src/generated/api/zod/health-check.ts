@@ -1,5 +1,9 @@
 import * as z from 'zod';
 
+import { zCrackerBinaryResponse } from './cracker-binary';
+import { zHashTypeResponse } from './hash-type';
+import { zHealthCheckAgentListResponse } from './health-check-agent';
+
 export const zHealthCheckCreate = z.object({
   data: z.object({
     type: z.literal('healthCheck'),
@@ -20,20 +24,35 @@ export const zHealthCheckPatch = z.object({
   })
 });
 
+export const zHealthCheckPatchMultiple = z.object({
+  data: z.array(
+    z.object({
+      id: z.int(),
+      type: z.literal('healthCheck'),
+      attributes: z.object({
+        checkType: z.union([z.literal(0), z.literal(3200)]).optional()
+      })
+    })
+  )
+});
+
+export const zHealthCheckDeleteMultiple = z.object({
+  data: z.array(
+    z.object({
+      id: z.int(),
+      type: z.literal('healthCheck')
+    })
+  )
+});
+
 export const zHealthCheckResponse = z.object({
   jsonapi: z.object({
     version: z.string().default('1.1'),
     ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
   }),
-  links: z
-    .object({
-      self: z.string().default('/api/v2/ui/healthchecks?page[size]=25'),
-      first: z.string().optional().default('/api/v2/ui/healthchecks?page[size]=25&page[after]=0'),
-      last: z.string().optional().default('/api/v2/ui/healthchecks?page[size]=25&page[before]=500'),
-      next: z.string().nullish().default('/api/v2/ui/healthchecks?page[size]=25&page[after]=25'),
-      previous: z.string().nullish().default('/api/v2/ui/healthchecks?page[size]=25&page[before]=25')
-    })
-    .optional(),
+  links: z.object({
+    self: z.string().default('/api/v2/ui/healthchecks/1')
+  }),
   data: z.object({
     id: z.int(),
     type: z.literal('healthCheck'),
@@ -45,10 +64,11 @@ export const zHealthCheckResponse = z.object({
       crackerBinaryId: z.int(),
       expectedCracks: z.int(),
       attackCmd: z.string()
-    })
-  }),
-  relationships: z
-    .object({
+    }),
+    links: z.object({
+      self: z.string().default('/api/v2/ui/healthchecks/1')
+    }),
+    relationships: z.object({
       crackerBinary: z.object({
         links: z.object({
           self: z.string().default('/api/v2/ui/healthchecks/relationships/crackerBinary'),
@@ -88,7 +108,7 @@ export const zHealthCheckResponse = z.object({
           .optional()
       })
     })
-    .optional(),
+  }),
   included: z
     .array(
       z.union([
@@ -98,8 +118,10 @@ export const zHealthCheckResponse = z.object({
           attributes: z.object({
             crackerBinaryTypeId: z.int(),
             version: z.string(),
-            downloadUrl: z.string(),
-            binaryName: z.string()
+            downloadUrl: z.string().nullable(),
+            binaryName: z.string(),
+            filename: z.string().nullable(),
+            accessGroupId: z.int()
           })
         }),
         z.object({
@@ -135,6 +157,9 @@ export const zHealthCheckPostPatchResponse = z.object({
     version: z.string().default('1.1'),
     ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
   }),
+  links: z.object({
+    self: z.string().default('/api/v2/ui/healthchecks/1')
+  }),
   data: z.object({
     id: z.int(),
     type: z.literal('healthCheck'),
@@ -146,41 +171,11 @@ export const zHealthCheckPostPatchResponse = z.object({
       crackerBinaryId: z.int(),
       expectedCracks: z.int(),
       attackCmd: z.string()
-    })
-  })
-});
-
-export const zHealthCheckListResponse = z.object({
-  jsonapi: z.object({
-    version: z.string().default('1.1'),
-    ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
-  }),
-  links: z
-    .object({
-      self: z.string().default('/api/v2/ui/healthchecks?page[size]=25'),
-      first: z.string().optional().default('/api/v2/ui/healthchecks?page[size]=25&page[after]=0'),
-      last: z.string().optional().default('/api/v2/ui/healthchecks?page[size]=25&page[before]=500'),
-      next: z.string().nullish().default('/api/v2/ui/healthchecks?page[size]=25&page[after]=25'),
-      previous: z.string().nullish().default('/api/v2/ui/healthchecks?page[size]=25&page[before]=25')
-    })
-    .optional(),
-  data: z.array(
-    z.object({
-      id: z.int(),
-      type: z.literal('healthCheck'),
-      attributes: z.object({
-        time: z.number(),
-        status: z.union([z.literal(-1), z.literal(0), z.literal(1)]),
-        checkType: z.union([z.literal(0), z.literal(3200)]),
-        hashtypeId: z.int(),
-        crackerBinaryId: z.int(),
-        expectedCracks: z.int(),
-        attackCmd: z.string()
-      })
-    })
-  ),
-  relationships: z
-    .object({
+    }),
+    links: z.object({
+      self: z.string().default('/api/v2/ui/healthchecks/1')
+    }),
+    relationships: z.object({
       crackerBinary: z.object({
         links: z.object({
           self: z.string().default('/api/v2/ui/healthchecks/relationships/crackerBinary'),
@@ -220,7 +215,7 @@ export const zHealthCheckListResponse = z.object({
           .optional()
       })
     })
-    .optional(),
+  }),
   included: z
     .array(
       z.union([
@@ -230,8 +225,10 @@ export const zHealthCheckListResponse = z.object({
           attributes: z.object({
             crackerBinaryTypeId: z.int(),
             version: z.string(),
-            downloadUrl: z.string(),
-            binaryName: z.string()
+            downloadUrl: z.string().nullable(),
+            binaryName: z.string(),
+            filename: z.string().nullable(),
+            accessGroupId: z.int()
           })
         }),
         z.object({
@@ -262,11 +259,188 @@ export const zHealthCheckListResponse = z.object({
     .optional()
 });
 
+export const zHealthCheckListResponse = z.object({
+  jsonapi: z.object({
+    version: z.string().default('1.1'),
+    ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
+  }),
+  links: z.object({
+    self: z.string().default('/api/v2/ui/healthchecks?page[size]=25'),
+    first: z.string().default('/api/v2/ui/healthchecks?page[size]=25'),
+    last: z
+      .string()
+      .nullable()
+      .default(
+        '/api/v2/ui/healthchecks?page[size]=25&page[before]=eyJwcmltYXJ5Ijp7InNvbWVVbnFpdWVGaWVsZCI6MTIzfSwic2Vjb25kYXJ5Ijp7InNvbWVPdGhlck9wdGlvbmFsRmllbGQiOiJGb28ifX0='
+      ),
+    next: z
+      .string()
+      .nullable()
+      .default(
+        '/api/v2/ui/healthchecks?page[size]=25&page[after]=eyJwcmltYXJ5Ijp7InNvbWVVbnFpdWVGaWVsZCI6MTIzfSwic2Vjb25kYXJ5Ijp7InNvbWVPdGhlck9wdGlvbmFsRmllbGQiOiJGb28ifX0='
+      ),
+    prev: z
+      .string()
+      .nullable()
+      .default(
+        '/api/v2/ui/healthchecks?page[size]=25&page[before]=eyJwcmltYXJ5Ijp7InNvbWVVbnFpdWVGaWVsZCI6MTIzfSwic2Vjb25kYXJ5Ijp7InNvbWVPdGhlck9wdGlvbmFsRmllbGQiOiJGb28ifX0='
+      )
+  }),
+  meta: z.object({
+    page: z.object({
+      total_elements: z.int()
+    })
+  }),
+  data: z.array(
+    z.object({
+      id: z.int(),
+      type: z.literal('healthCheck'),
+      attributes: z.object({
+        time: z.number(),
+        status: z.union([z.literal(-1), z.literal(0), z.literal(1)]),
+        checkType: z.union([z.literal(0), z.literal(3200)]),
+        hashtypeId: z.int(),
+        crackerBinaryId: z.int(),
+        expectedCracks: z.int(),
+        attackCmd: z.string()
+      }),
+      links: z.object({
+        self: z.string().default('/api/v2/ui/healthchecks/1')
+      }),
+      relationships: z.object({
+        crackerBinary: z.object({
+          links: z.object({
+            self: z.string().default('/api/v2/ui/healthchecks/relationships/crackerBinary'),
+            related: z.string().default('/api/v2/ui/healthchecks/crackerBinary')
+          }),
+          data: z
+            .object({
+              type: z.literal('crackerBinary'),
+              id: z.int()
+            })
+            .nullish()
+        }),
+        hashType: z.object({
+          links: z.object({
+            self: z.string().default('/api/v2/ui/healthchecks/relationships/hashType'),
+            related: z.string().default('/api/v2/ui/healthchecks/hashType')
+          }),
+          data: z
+            .object({
+              type: z.literal('hashType'),
+              id: z.int()
+            })
+            .nullish()
+        }),
+        healthCheckAgents: z.object({
+          links: z.object({
+            self: z.string().default('/api/v2/ui/healthchecks/relationships/healthCheckAgents'),
+            related: z.string().default('/api/v2/ui/healthchecks/healthCheckAgents')
+          }),
+          data: z
+            .array(
+              z.object({
+                type: z.literal('healthCheckAgent'),
+                id: z.int()
+              })
+            )
+            .optional()
+        })
+      })
+    })
+  ),
+  included: z
+    .array(
+      z.union([
+        z.object({
+          id: z.int(),
+          type: z.literal('crackerBinary'),
+          attributes: z.object({
+            crackerBinaryTypeId: z.int(),
+            version: z.string(),
+            downloadUrl: z.string().nullable(),
+            binaryName: z.string(),
+            filename: z.string().nullable(),
+            accessGroupId: z.int()
+          })
+        }),
+        z.object({
+          id: z.int(),
+          type: z.literal('hashType'),
+          attributes: z.object({
+            description: z.string(),
+            isSalted: z.boolean(),
+            isSlowHash: z.boolean()
+          })
+        }),
+        z.object({
+          id: z.int(),
+          type: z.literal('healthCheckAgent'),
+          attributes: z.object({
+            healthCheckId: z.int(),
+            agentId: z.int(),
+            status: z.union([z.literal(-1), z.literal(0), z.literal(1)]),
+            cracked: z.int(),
+            numGpus: z.int(),
+            start: z.number(),
+            end: z.number(),
+            errors: z.string()
+          })
+        })
+      ])
+    )
+    .optional()
+});
+
+export const zHealthCheckCountResponse = z.object({
+  jsonapi: z.object({
+    version: z.string().default('1.1'),
+    ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
+  }),
+  meta: z.object({
+    count: z.int(),
+    total_count: z.int().optional()
+  }),
+  data: z.array(z.record(z.string(), z.unknown())).max(0)
+});
+
+export const zHealthCheckRelationCrackerBinary = z.object({
+  data: z.object({
+    type: z.literal('crackerBinary'),
+    id: z.int()
+  })
+});
+
+export const zHealthCheckRelationCrackerBinaryGetResponse = z.object({
+  data: z
+    .object({
+      type: z.literal('crackerBinary'),
+      id: z.int()
+    })
+    .nullable()
+});
+
+export const zHealthCheckRelationHashType = z.object({
+  data: z.object({
+    type: z.literal('hashType'),
+    id: z.int()
+  })
+});
+
+export const zHealthCheckRelationHashTypeGetResponse = z.object({
+  data: z
+    .object({
+      type: z.literal('hashType'),
+      id: z.int()
+    })
+    .nullable()
+});
+
 export const zHealthCheckRelationHealthCheckAgents = z.object({
   data: z.array(
     z.object({
-      type: z.literal('healthCheckAgents'),
-      id: z.int().default(1)
+      type: z.literal('healthCheckAgent'),
+      id: z.int()
     })
   )
 });
@@ -274,42 +448,35 @@ export const zHealthCheckRelationHealthCheckAgents = z.object({
 export const zHealthCheckRelationHealthCheckAgentsGetResponse = z.object({
   data: z.array(
     z.object({
-      type: z.literal('healthCheckAgents'),
-      id: z.int().default(1)
+      type: z.literal('healthCheckAgent'),
+      id: z.int()
     })
   )
 });
 
-export const zDeleteHealthchecksData = z.object({
-  body: z.never().optional(),
-  path: z.never().optional(),
-  query: z.never().optional()
-});
+export const zDeleteHealthchecksBody = zHealthCheckDeleteMultiple;
 
-export const zGetHealthchecksData = z.object({
-  body: z.never().optional(),
-  path: z.never().optional(),
-  query: z
-    .object({
-      'page[after]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      'page[before]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      'page[size]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      filter: z.record(z.string(), z.unknown()).optional(),
-      include: z.string().optional()
-    })
-    .optional()
+/**
+ * successfully deleted
+ */
+export const zDeleteHealthchecksResponse = z.void();
+
+export const zGetHealthchecksQuery = z.object({
+  'page[after]': z
+    .string()
+    .regex(/^[A-Za-z0-9+\/]*={0,2}$/)
+    .optional(),
+  'page[before]': z
+    .string()
+    .regex(/^[A-Za-z0-9+\/]*={0,2}$/)
+    .optional(),
+  'page[size]': z
+    .int()
+    .gte(1)
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+    .optional(),
+  filter: z.record(z.string(), z.string()).optional(),
+  include: z.array(z.enum(['crackerBinary', 'hashType', 'healthCheckAgents'])).optional()
 });
 
 /**
@@ -317,136 +484,160 @@ export const zGetHealthchecksData = z.object({
  */
 export const zGetHealthchecksResponse = zHealthCheckListResponse;
 
-export const zPatchHealthchecksData = z.object({
-  body: z.never().optional(),
-  path: z.never().optional(),
-  query: z.never().optional()
-});
+export const zPatchHealthchecksBody = zHealthCheckPatchMultiple;
 
-export const zPostHealthchecksData = z.object({
-  body: zHealthCheckCreate,
-  path: z.never().optional(),
-  query: z.never().optional()
-});
+/**
+ * successfully updated
+ */
+export const zPatchHealthchecksResponse = z.void();
+
+export const zPostHealthchecksBody = zHealthCheckCreate;
 
 /**
  * successful operation
  */
 export const zPostHealthchecksResponse = zHealthCheckPostPatchResponse;
 
-export const zGetHealthchecksCountData = z.object({
-  body: z.never().optional(),
-  path: z.never().optional(),
-  query: z
-    .object({
-      'page[after]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      'page[before]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      'page[size]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      filter: z.record(z.string(), z.unknown()).optional(),
-      include: z.string().optional()
-    })
-    .optional()
+export const zGetHealthchecksCountQuery = z.object({
+  filter: z.record(z.string(), z.string()).optional(),
+  include_total: z.boolean().optional()
 });
 
 /**
  * successful operation
  */
-export const zGetHealthchecksCountResponse = zHealthCheckListResponse;
+export const zGetHealthchecksCountResponse = zHealthCheckCountResponse;
 
-export const zGetHealthchecksByIdByRelationData = z.object({
-  body: z.never().optional(),
-  path: z.object({
-    id: z
-      .int()
-      .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-      .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-    relation: z.string()
-  }),
-  query: z.never().optional()
+export const zGetHealthchecksByIdCrackerBinaryPath = z.object({
+  id: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
 });
 
 /**
  * successful operation
  */
-export const zGetHealthchecksByIdByRelationResponse = zHealthCheckRelationHealthCheckAgentsGetResponse;
+export const zGetHealthchecksByIdCrackerBinaryResponse = zCrackerBinaryResponse;
 
-export const zDeleteHealthchecksByIdRelationshipsByRelationData = z.object({
-  body: zHealthCheckRelationHealthCheckAgents,
-  path: z.object({
-    id: z.int(),
-    relation: z.string()
-  }),
-  query: z.never().optional()
-});
-
-/**
- * successfully deleted
- */
-export const zDeleteHealthchecksByIdRelationshipsByRelationResponse = z.void();
-
-export const zGetHealthchecksByIdRelationshipsByRelationData = z.object({
-  body: z.never().optional(),
-  path: z.object({
-    id: z
-      .int()
-      .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-      .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-    relation: z.string()
-  }),
-  query: z.never().optional()
+export const zGetHealthchecksByIdRelationshipsCrackerBinaryPath = z.object({
+  id: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
 });
 
 /**
  * successful operation
  */
-export const zGetHealthchecksByIdRelationshipsByRelationResponse = zHealthCheckResponse;
+export const zGetHealthchecksByIdRelationshipsCrackerBinaryResponse = zHealthCheckRelationCrackerBinaryGetResponse;
 
-export const zPatchHealthchecksByIdRelationshipsByRelationData = z.object({
-  body: zHealthCheckRelationHealthCheckAgents,
-  path: z.object({
-    id: z.int(),
-    relation: z.string()
-  }),
-  query: z.never().optional()
+export const zPatchHealthchecksByIdRelationshipsCrackerBinaryBody = zHealthCheckRelationCrackerBinary;
+
+export const zPatchHealthchecksByIdRelationshipsCrackerBinaryPath = z.object({
+  id: z.int()
 });
 
 /**
  * Successfull operation
  */
-export const zPatchHealthchecksByIdRelationshipsByRelationResponse = z.void();
+export const zPatchHealthchecksByIdRelationshipsCrackerBinaryResponse = z.void();
 
-export const zPostHealthchecksByIdRelationshipsByRelationData = z.object({
-  body: z.record(z.string(), z.unknown()),
-  path: z.object({
-    id: z.int(),
-    relation: z.string()
-  }),
-  query: z.never().optional()
+export const zGetHealthchecksByIdHashTypePath = z.object({
+  id: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+});
+
+/**
+ * successful operation
+ */
+export const zGetHealthchecksByIdHashTypeResponse = zHashTypeResponse;
+
+export const zGetHealthchecksByIdRelationshipsHashTypePath = z.object({
+  id: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+});
+
+/**
+ * successful operation
+ */
+export const zGetHealthchecksByIdRelationshipsHashTypeResponse = zHealthCheckRelationHashTypeGetResponse;
+
+export const zPatchHealthchecksByIdRelationshipsHashTypeBody = zHealthCheckRelationHashType;
+
+export const zPatchHealthchecksByIdRelationshipsHashTypePath = z.object({
+  id: z.int()
+});
+
+/**
+ * Successfull operation
+ */
+export const zPatchHealthchecksByIdRelationshipsHashTypeResponse = z.void();
+
+export const zGetHealthchecksByIdHealthCheckAgentsPath = z.object({
+  id: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+});
+
+/**
+ * successful operation
+ */
+export const zGetHealthchecksByIdHealthCheckAgentsResponse = zHealthCheckAgentListResponse;
+
+export const zDeleteHealthchecksByIdRelationshipsHealthCheckAgentsBody = zHealthCheckRelationHealthCheckAgents;
+
+export const zDeleteHealthchecksByIdRelationshipsHealthCheckAgentsPath = z.object({
+  id: z.int()
+});
+
+/**
+ * successfully deleted
+ */
+export const zDeleteHealthchecksByIdRelationshipsHealthCheckAgentsResponse = z.void();
+
+export const zGetHealthchecksByIdRelationshipsHealthCheckAgentsPath = z.object({
+  id: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+});
+
+/**
+ * successful operation
+ */
+export const zGetHealthchecksByIdRelationshipsHealthCheckAgentsResponse =
+  zHealthCheckRelationHealthCheckAgentsGetResponse;
+
+export const zPatchHealthchecksByIdRelationshipsHealthCheckAgentsBody = zHealthCheckRelationHealthCheckAgents;
+
+export const zPatchHealthchecksByIdRelationshipsHealthCheckAgentsPath = z.object({
+  id: z.int()
+});
+
+/**
+ * Successfull operation
+ */
+export const zPatchHealthchecksByIdRelationshipsHealthCheckAgentsResponse = z.void();
+
+export const zPostHealthchecksByIdRelationshipsHealthCheckAgentsBody = zHealthCheckRelationHealthCheckAgents;
+
+export const zPostHealthchecksByIdRelationshipsHealthCheckAgentsPath = z.object({
+  id: z.int()
 });
 
 /**
  * successfully created
  */
-export const zPostHealthchecksByIdRelationshipsByRelationResponse = z.void();
+export const zPostHealthchecksByIdRelationshipsHealthCheckAgentsResponse = z.void();
 
-export const zDeleteHealthchecksByIdData = z.object({
-  body: z.record(z.string(), z.unknown()),
-  path: z.object({
-    id: z.int()
-  }),
-  query: z.never().optional()
+export const zDeleteHealthchecksByIdPath = z.object({
+  id: z.int()
 });
 
 /**
@@ -454,19 +645,15 @@ export const zDeleteHealthchecksByIdData = z.object({
  */
 export const zDeleteHealthchecksByIdResponse = z.void();
 
-export const zGetHealthchecksByIdData = z.object({
-  body: z.never().optional(),
-  path: z.object({
-    id: z
-      .int()
-      .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-      .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-  }),
-  query: z
-    .object({
-      include: z.string().optional()
-    })
-    .optional()
+export const zGetHealthchecksByIdPath = z.object({
+  id: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+});
+
+export const zGetHealthchecksByIdQuery = z.object({
+  include: z.array(z.enum(['crackerBinary', 'hashType', 'healthCheckAgents'])).optional()
 });
 
 /**
@@ -474,12 +661,10 @@ export const zGetHealthchecksByIdData = z.object({
  */
 export const zGetHealthchecksByIdResponse = zHealthCheckResponse;
 
-export const zPatchHealthchecksByIdData = z.object({
-  body: zHealthCheckPatch,
-  path: z.object({
-    id: z.int()
-  }),
-  query: z.never().optional()
+export const zPatchHealthchecksByIdBody = zHealthCheckPatch;
+
+export const zPatchHealthchecksByIdPath = z.object({
+  id: z.int()
 });
 
 /**

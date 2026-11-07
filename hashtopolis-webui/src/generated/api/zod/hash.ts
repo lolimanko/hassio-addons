@@ -1,19 +1,60 @@
 import * as z from 'zod';
 
+import { zChunkResponse } from './chunk';
+import { zHashlistResponse } from './hashlist';
+
+export const zHashResourceObject = z.object({
+  id: z.int(),
+  type: z.literal('hash'),
+  attributes: z.object({
+    hashlistId: z.int(),
+    hash: z.string(),
+    salt: z.string(),
+    plaintext: z.string(),
+    timeCracked: z.number(),
+    chunkId: z.int().nullable(),
+    isCracked: z.boolean(),
+    crackPos: z.number()
+  }),
+  links: z.object({
+    self: z.string().default('/api/v2/ui/hashes/1')
+  }),
+  relationships: z.object({
+    chunk: z.object({
+      links: z.object({
+        self: z.string().default('/api/v2/ui/hashes/relationships/chunk'),
+        related: z.string().default('/api/v2/ui/hashes/chunk')
+      }),
+      data: z
+        .object({
+          type: z.literal('chunk'),
+          id: z.int()
+        })
+        .nullish()
+    }),
+    hashlist: z.object({
+      links: z.object({
+        self: z.string().default('/api/v2/ui/hashes/relationships/hashlist'),
+        related: z.string().default('/api/v2/ui/hashes/hashlist')
+      }),
+      data: z
+        .object({
+          type: z.literal('hashlist'),
+          id: z.int()
+        })
+        .nullish()
+    })
+  })
+});
+
 export const zHashResponse = z.object({
   jsonapi: z.object({
     version: z.string().default('1.1'),
     ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
   }),
-  links: z
-    .object({
-      self: z.string().default('/api/v2/ui/hashes?page[size]=25'),
-      first: z.string().optional().default('/api/v2/ui/hashes?page[size]=25&page[after]=0'),
-      last: z.string().optional().default('/api/v2/ui/hashes?page[size]=25&page[before]=500'),
-      next: z.string().nullish().default('/api/v2/ui/hashes?page[size]=25&page[after]=25'),
-      previous: z.string().nullish().default('/api/v2/ui/hashes?page[size]=25&page[before]=25')
-    })
-    .optional(),
+  links: z.object({
+    self: z.string().default('/api/v2/ui/hashes/1')
+  }),
   data: z.object({
     id: z.int(),
     type: z.literal('hash'),
@@ -26,10 +67,11 @@ export const zHashResponse = z.object({
       chunkId: z.int().nullable(),
       isCracked: z.boolean(),
       crackPos: z.number()
-    })
-  }),
-  relationships: z
-    .object({
+    }),
+    links: z.object({
+      self: z.string().default('/api/v2/ui/hashes/1')
+    }),
+    relationships: z.object({
       chunk: z.object({
         links: z.object({
           self: z.string().default('/api/v2/ui/hashes/relationships/chunk'),
@@ -55,7 +97,7 @@ export const zHashResponse = z.object({
           .nullish()
       })
     })
-    .optional(),
+  }),
   included: z
     .array(
       z.union([
@@ -66,7 +108,7 @@ export const zHashResponse = z.object({
             taskId: z.int(),
             skip: z.int(),
             length: z.int(),
-            agentId: z.int(),
+            agentId: z.int().nullable(),
             dispatchTime: z.number(),
             solveTime: z.number(),
             checkpoint: z.number(),
@@ -118,15 +160,33 @@ export const zHashListResponse = z.object({
     version: z.string().default('1.1'),
     ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
   }),
-  links: z
-    .object({
-      self: z.string().default('/api/v2/ui/hashes?page[size]=25'),
-      first: z.string().optional().default('/api/v2/ui/hashes?page[size]=25&page[after]=0'),
-      last: z.string().optional().default('/api/v2/ui/hashes?page[size]=25&page[before]=500'),
-      next: z.string().nullish().default('/api/v2/ui/hashes?page[size]=25&page[after]=25'),
-      previous: z.string().nullish().default('/api/v2/ui/hashes?page[size]=25&page[before]=25')
+  links: z.object({
+    self: z.string().default('/api/v2/ui/hashes?page[size]=25'),
+    first: z.string().default('/api/v2/ui/hashes?page[size]=25'),
+    last: z
+      .string()
+      .nullable()
+      .default(
+        '/api/v2/ui/hashes?page[size]=25&page[before]=eyJwcmltYXJ5Ijp7InNvbWVVbnFpdWVGaWVsZCI6MTIzfSwic2Vjb25kYXJ5Ijp7InNvbWVPdGhlck9wdGlvbmFsRmllbGQiOiJGb28ifX0='
+      ),
+    next: z
+      .string()
+      .nullable()
+      .default(
+        '/api/v2/ui/hashes?page[size]=25&page[after]=eyJwcmltYXJ5Ijp7InNvbWVVbnFpdWVGaWVsZCI6MTIzfSwic2Vjb25kYXJ5Ijp7InNvbWVPdGhlck9wdGlvbmFsRmllbGQiOiJGb28ifX0='
+      ),
+    prev: z
+      .string()
+      .nullable()
+      .default(
+        '/api/v2/ui/hashes?page[size]=25&page[before]=eyJwcmltYXJ5Ijp7InNvbWVVbnFpdWVGaWVsZCI6MTIzfSwic2Vjb25kYXJ5Ijp7InNvbWVPdGhlck9wdGlvbmFsRmllbGQiOiJGb28ifX0='
+      )
+  }),
+  meta: z.object({
+    page: z.object({
+      total_elements: z.int()
     })
-    .optional(),
+  }),
   data: z.array(
     z.object({
       id: z.int(),
@@ -140,37 +200,38 @@ export const zHashListResponse = z.object({
         chunkId: z.int().nullable(),
         isCracked: z.boolean(),
         crackPos: z.number()
+      }),
+      links: z.object({
+        self: z.string().default('/api/v2/ui/hashes/1')
+      }),
+      relationships: z.object({
+        chunk: z.object({
+          links: z.object({
+            self: z.string().default('/api/v2/ui/hashes/relationships/chunk'),
+            related: z.string().default('/api/v2/ui/hashes/chunk')
+          }),
+          data: z
+            .object({
+              type: z.literal('chunk'),
+              id: z.int()
+            })
+            .nullish()
+        }),
+        hashlist: z.object({
+          links: z.object({
+            self: z.string().default('/api/v2/ui/hashes/relationships/hashlist'),
+            related: z.string().default('/api/v2/ui/hashes/hashlist')
+          }),
+          data: z
+            .object({
+              type: z.literal('hashlist'),
+              id: z.int()
+            })
+            .nullish()
+        })
       })
     })
   ),
-  relationships: z
-    .object({
-      chunk: z.object({
-        links: z.object({
-          self: z.string().default('/api/v2/ui/hashes/relationships/chunk'),
-          related: z.string().default('/api/v2/ui/hashes/chunk')
-        }),
-        data: z
-          .object({
-            type: z.literal('chunk'),
-            id: z.int()
-          })
-          .nullish()
-      }),
-      hashlist: z.object({
-        links: z.object({
-          self: z.string().default('/api/v2/ui/hashes/relationships/hashlist'),
-          related: z.string().default('/api/v2/ui/hashes/hashlist')
-        }),
-        data: z
-          .object({
-            type: z.literal('hashlist'),
-            id: z.int()
-          })
-          .nullish()
-      })
-    })
-    .optional(),
   included: z
     .array(
       z.union([
@@ -181,7 +242,7 @@ export const zHashListResponse = z.object({
             taskId: z.int(),
             skip: z.int(),
             length: z.int(),
-            agentId: z.int(),
+            agentId: z.int().nullable(),
             dispatchTime: z.number(),
             solveTime: z.number(),
             checkpoint: z.number(),
@@ -228,44 +289,66 @@ export const zHashListResponse = z.object({
     .optional()
 });
 
+export const zHashCountResponse = z.object({
+  jsonapi: z.object({
+    version: z.string().default('1.1'),
+    ext: z.array(z.string()).optional().default(['https://jsonapi.org/profiles/ethanresnick/cursor-pagination'])
+  }),
+  meta: z.object({
+    count: z.int(),
+    total_count: z.int().optional()
+  }),
+  data: z.array(z.record(z.string(), z.unknown())).max(0)
+});
+
+export const zHashRelationChunk = z.object({
+  data: z.object({
+    type: z.literal('chunk'),
+    id: z.int()
+  })
+});
+
+export const zHashRelationChunkGetResponse = z.object({
+  data: z
+    .object({
+      type: z.literal('chunk'),
+      id: z.int()
+    })
+    .nullable()
+});
+
 export const zHashRelationHashlist = z.object({
   data: z.object({
     type: z.literal('hashlist'),
-    id: z.int().default(1)
+    id: z.int()
   })
 });
 
 export const zHashRelationHashlistGetResponse = z.object({
-  data: z.object({
-    type: z.literal('hashlist'),
-    id: z.int().default(1)
-  })
+  data: z
+    .object({
+      type: z.literal('hashlist'),
+      id: z.int()
+    })
+    .nullable()
 });
 
-export const zGetHashesData = z.object({
-  body: z.never().optional(),
-  path: z.never().optional(),
-  query: z
-    .object({
-      'page[after]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      'page[before]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      'page[size]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      filter: z.record(z.string(), z.unknown()).optional(),
-      include: z.string().optional()
-    })
-    .optional()
+export const zGetHashesQuery = z.object({
+  'page[after]': z
+    .string()
+    .regex(/^[A-Za-z0-9+\/]*={0,2}$/)
+    .optional(),
+  'page[before]': z
+    .string()
+    .regex(/^[A-Za-z0-9+\/]*={0,2}$/)
+    .optional(),
+  'page[size]': z
+    .int()
+    .gte(1)
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+    .optional(),
+  filter: z.record(z.string(), z.string()).optional(),
+  include: z.array(z.enum(['chunk', 'hashlist'])).optional()
 });
 
 /**
@@ -273,98 +356,95 @@ export const zGetHashesData = z.object({
  */
 export const zGetHashesResponse = zHashListResponse;
 
-export const zGetHashesCountData = z.object({
-  body: z.never().optional(),
-  path: z.never().optional(),
-  query: z
-    .object({
-      'page[after]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      'page[before]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      'page[size]': z
-        .int()
-        .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-        .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-        .optional(),
-      filter: z.record(z.string(), z.unknown()).optional(),
-      include: z.string().optional()
-    })
-    .optional()
+export const zGetHashesCountQuery = z.object({
+  filter: z.record(z.string(), z.string()).optional(),
+  include_total: z.boolean().optional()
 });
 
 /**
  * successful operation
  */
-export const zGetHashesCountResponse = zHashListResponse;
+export const zGetHashesCountResponse = zHashCountResponse;
 
-export const zGetHashesByIdByRelationData = z.object({
-  body: z.never().optional(),
-  path: z.object({
-    id: z
-      .int()
-      .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-      .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-    relation: z.string()
-  }),
-  query: z.never().optional()
+export const zGetHashesByIdChunkPath = z.object({
+  id: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
 });
 
 /**
  * successful operation
  */
-export const zGetHashesByIdByRelationResponse = zHashRelationHashlistGetResponse;
+export const zGetHashesByIdChunkResponse = zChunkResponse;
 
-export const zGetHashesByIdRelationshipsByRelationData = z.object({
-  body: z.never().optional(),
-  path: z.object({
-    id: z
-      .int()
-      .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-      .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-    relation: z.string()
-  }),
-  query: z.never().optional()
+export const zGetHashesByIdRelationshipsChunkPath = z.object({
+  id: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
 });
 
 /**
  * successful operation
  */
-export const zGetHashesByIdRelationshipsByRelationResponse = zHashResponse;
+export const zGetHashesByIdRelationshipsChunkResponse = zHashRelationChunkGetResponse;
 
-export const zPatchHashesByIdRelationshipsByRelationData = z.object({
-  body: zHashRelationHashlist,
-  path: z.object({
-    id: z.int(),
-    relation: z.string()
-  }),
-  query: z.never().optional()
+export const zPatchHashesByIdRelationshipsChunkBody = zHashRelationChunk;
+
+export const zPatchHashesByIdRelationshipsChunkPath = z.object({
+  id: z.int()
 });
 
 /**
  * Successfull operation
  */
-export const zPatchHashesByIdRelationshipsByRelationResponse = z.void();
+export const zPatchHashesByIdRelationshipsChunkResponse = z.void();
 
-export const zGetHashesByIdData = z.object({
-  body: z.never().optional(),
-  path: z.object({
-    id: z
-      .int()
-      .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-      .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-  }),
-  query: z
-    .object({
-      include: z.string().optional()
-    })
-    .optional()
+export const zGetHashesByIdHashlistPath = z.object({
+  id: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+});
+
+/**
+ * successful operation
+ */
+export const zGetHashesByIdHashlistResponse = zHashlistResponse;
+
+export const zGetHashesByIdRelationshipsHashlistPath = z.object({
+  id: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+});
+
+/**
+ * successful operation
+ */
+export const zGetHashesByIdRelationshipsHashlistResponse = zHashRelationHashlistGetResponse;
+
+export const zPatchHashesByIdRelationshipsHashlistBody = zHashRelationHashlist;
+
+export const zPatchHashesByIdRelationshipsHashlistPath = z.object({
+  id: z.int()
+});
+
+/**
+ * Successfull operation
+ */
+export const zPatchHashesByIdRelationshipsHashlistResponse = z.void();
+
+export const zGetHashesByIdPath = z.object({
+  id: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+});
+
+export const zGetHashesByIdQuery = z.object({
+  include: z.array(z.enum(['chunk', 'hashlist'])).optional()
 });
 
 /**

@@ -1,10 +1,10 @@
 import { IconDefinition } from '@fortawesome/angular-fontawesome';
 import { Observable } from 'rxjs';
 
-import { SortDirection } from '@angular/material/sort';
 import { SafeHtml } from '@angular/platform-browser';
 
 import { BaseModel } from '@models/base.model';
+import { TableSortDirection } from '@models/config-ui.model';
 
 export type DataType =
   | 'agents'
@@ -33,6 +33,8 @@ export type DataType =
   | 'health-checks'
   | 'health-check-agents'
   | 'logs'
+  | 'background-jobs'
+  | 'cracker-hashtypes'
   | 'permissions'
   | 'cracks'
   | 'vouchers'
@@ -55,6 +57,8 @@ export interface HTTableRouterLink {
   routerLink: Array<string | number> | null;
   tooltip?: string | undefined;
   icon?: { faIcon?: IconDefinition | undefined; tooltip?: string | undefined };
+  /** Render a plain-text entry (routerLink null, no onClick) in the muted foreground color, e.g. "(deleted)". */
+  muted?: boolean;
   // click handler for cells that trigger an action
   onClick?: () => void;
   visualGraph?: {
@@ -70,6 +74,8 @@ export interface HTTableEditable<T> {
   data: T;
   value: string;
   action: string;
+  // Optional hard cap on the number of characters that can be typed/pasted into the edit input.
+  maxLength?: number;
   disabled?: boolean;
   // Optional matTooltip text for the cell — useful for explaining why a disabled cell can't be toggled.
   tooltip?: string;
@@ -82,7 +88,11 @@ export interface HTTableEditable<T> {
 }
 
 /** Column type for checkbox toggle events in attack file tables. */
-export type CheckboxColumnType = 'CMD' | 'CMD_PREPRO';
+export const CheckboxColumnType = {
+  CMD: 'CMD',
+  CMD_PREPRO: 'CMD_PREPRO'
+} as const;
+export type CheckboxColumnType = (typeof CheckboxColumnType)[keyof typeof CheckboxColumnType];
 
 export interface CheckboxChangeEvent {
   row: BaseModel;
@@ -95,6 +105,25 @@ export interface CheckboxFiles {
 }
 
 export type HTTableColumnType = 'default' | 'link' | 'editable';
+
+/**
+ * Truncates long cell values with a middle ellipsis. Truncated values get a button
+ * that opens a dialog showing the full value.
+ */
+export interface HTTableTruncate {
+  /** Title of the dialog showing the full value */
+  dialogTitle?(data: BaseModel): string;
+}
+
+/**
+ * Adds a button to the cell that copies a value of the row to the clipboard.
+ */
+export interface HTTableCopy {
+  /** Name of the copied value used in the user feedback messages, e.g. 'Hash value' */
+  label: string;
+  /** Returns the value to copy */
+  value(data: BaseModel): string;
+}
 
 export interface HTTableColumn {
   type?: HTTableColumnType;
@@ -118,13 +147,13 @@ export interface HTTableColumn {
   render?(data: BaseModel): SafeHtml;
   async?(data: BaseModel): Promise<SafeHtml>;
   export?(data: BaseModel): Promise<string>;
-  truncate?(data: BaseModel): boolean;
+  truncate?: HTTableTruncate;
   editable?(data: BaseModel): HTTableEditable<BaseModel>;
   checkbox?(data: BaseModel): HTTableEditable<BaseModel>;
   customCellColor?: customCellColorInput;
   routerLink?(data: BaseModel): Observable<HTTableRouterLink[]>;
   icon?(data: BaseModel): HTTableIcon;
-  isCopy?: boolean;
+  copy?: HTTableCopy;
   parent?: string; //parent is to build relation sort query in format "task.taskName"
 }
 
@@ -147,7 +176,7 @@ export interface customCellColorInput {
 export interface SortingColumn {
   id?: number;
   dataKey: string;
-  direction: SortDirection | string;
+  direction: TableSortDirection;
   isSortable: boolean;
   parent?: string | undefined; // Parent is in order to build sort queries for relationships
 }

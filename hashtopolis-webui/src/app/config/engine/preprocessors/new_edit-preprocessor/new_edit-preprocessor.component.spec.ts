@@ -1,3 +1,4 @@
+import { zPreprocessorResponse } from '@generated/api/zod';
 import { of, throwError } from 'rxjs';
 
 import { provideHttpClient } from '@angular/common/http';
@@ -12,7 +13,7 @@ import { PreprocessorRoleService } from '@services/roles/binaries/preprocessor-r
 import { AlertService } from '@services/shared/alert.service';
 
 import { NewEditPreprocessorComponent } from '@src/app/config/engine/preprocessors/new_edit-preprocessor/new_edit-preprocessor.component';
-import { mockResponse } from '@src/app/testing/mock-response';
+import { mockResponse, mockValidResponse } from '@src/app/testing/mock-response';
 
 describe('NewEditPreprocessorComponent', () => {
   let component: NewEditPreprocessorComponent;
@@ -24,7 +25,7 @@ describe('NewEditPreprocessorComponent', () => {
   let mockRoleService: jasmine.SpyObj<PreprocessorRoleService>;
   let httpMock: HttpTestingController;
 
-  const preprocessorResponse = mockResponse({
+  const preprocessorResponse = mockValidResponse(zPreprocessorResponse, {
     data: {
       id: 9,
       type: 'preprocessor',
@@ -82,40 +83,6 @@ describe('NewEditPreprocessorComponent', () => {
       (request) => request.method === 'GET' && request.url.includes('/ui/preprocessors/9')
     );
     req.flush(preprocessorResponse);
-  }
-
-  /**
-   * Helper to check page title and button text
-   * @param title Title text
-   * @param buttonText Button text
-   */
-  /**
-   * Helper to check page title and button text
-   * @param title Title text
-   * @param buttonText Button text
-   */
-  function expectPageTitleAndButton(title: string, buttonText: string) {
-    const hostElement: HTMLElement = fixture.nativeElement;
-
-    let buttonEl = hostElement.querySelector('[data-testid="submit-button-newPreprocessor"]') as HTMLElement | null;
-
-    if (!buttonEl) {
-      buttonEl = hostElement.querySelector('button[type="submit"]') as HTMLElement | null;
-    }
-
-    expect(buttonEl).withContext('Submit button not found').not.toBeNull();
-
-    if (buttonEl) {
-      expect(buttonEl.textContent).toContain(buttonText);
-    }
-
-    const titleEl = hostElement.querySelector('.page__title') as HTMLElement | null;
-
-    expect(titleEl).withContext('Page title not found').not.toBeNull();
-
-    if (titleEl) {
-      expect(titleEl.textContent).toContain(title);
-    }
   }
 
   it('should create component and form', () => {

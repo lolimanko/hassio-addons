@@ -1,4 +1,95 @@
-import type { ErrorResponse, NotFoundResponse } from './common';
+import type { ErrorResponse } from './common';
+import type { ConfigSectionResponse } from './config-section';
+
+export type ConfigResourceObject = {
+  id: number;
+  type: 'config';
+  attributes:
+    | {
+        configSectionId: number;
+        item: 'serverLogLevel';
+        value: '0' | '10' | '20' | '30' | '40' | '50';
+        valueBoundaries?: {
+          /**
+           * Smallest accepted value of a numeric item
+           */
+          min?: number;
+          /**
+           * Largest accepted value of a numeric item
+           */
+          max?: number;
+          /**
+           * Longest accepted value of a textual item
+           */
+          maxLength?: number;
+          /**
+           * The two values a tickbox item accepts
+           */
+          binaryValues?: Array<string>;
+        };
+      }
+    | {
+        configSectionId: number;
+        item: 'notificationsProxyType';
+        value: 'HTTP' | 'HTTPS' | 'SOCKS4' | 'SOCKS5';
+        valueBoundaries?: {
+          /**
+           * Smallest accepted value of a numeric item
+           */
+          min?: number;
+          /**
+           * Largest accepted value of a numeric item
+           */
+          max?: number;
+          /**
+           * Longest accepted value of a textual item
+           */
+          maxLength?: number;
+          /**
+           * The two values a tickbox item accepts
+           */
+          binaryValues?: Array<string>;
+        };
+      }
+    | {
+        configSectionId: number;
+        item: string;
+        value: string;
+        valueBoundaries?: {
+          /**
+           * Smallest accepted value of a numeric item
+           */
+          min?: number;
+          /**
+           * Largest accepted value of a numeric item
+           */
+          max?: number;
+          /**
+           * Longest accepted value of a textual item
+           */
+          maxLength?: number;
+          /**
+           * The two values a tickbox item accepts
+           */
+          binaryValues?: Array<string>;
+        };
+      };
+  links: {
+    self: string;
+  };
+  relationships: {
+    configSection: {
+      links: {
+        self: string;
+        related: string;
+      };
+      data?: {
+        type: 'configSection';
+        id: number;
+      } | null;
+    };
+  };
+};
 
 export type ConfigPatch = {
   data: {
@@ -10,17 +101,24 @@ export type ConfigPatch = {
   };
 };
 
+export type ConfigPatchMultiple = {
+  data: Array<{
+    id: number;
+    type: 'config';
+    attributes: {
+      item?: string;
+      value?: string;
+    };
+  }>;
+};
+
 export type ConfigResponse = {
   jsonapi: {
     version: string;
     ext?: Array<string>;
   };
-  links?: {
+  links: {
     self: string;
-    first?: string;
-    last?: string;
-    next?: string | null;
-    previous?: string | null;
   };
   data: {
     id: number;
@@ -30,28 +128,85 @@ export type ConfigResponse = {
           configSectionId: number;
           item: 'serverLogLevel';
           value: '0' | '10' | '20' | '30' | '40' | '50';
+          valueBoundaries?: {
+            /**
+             * Smallest accepted value of a numeric item
+             */
+            min?: number;
+            /**
+             * Largest accepted value of a numeric item
+             */
+            max?: number;
+            /**
+             * Longest accepted value of a textual item
+             */
+            maxLength?: number;
+            /**
+             * The two values a tickbox item accepts
+             */
+            binaryValues?: Array<string>;
+          };
         }
       | {
           configSectionId: number;
           item: 'notificationsProxyType';
           value: 'HTTP' | 'HTTPS' | 'SOCKS4' | 'SOCKS5';
+          valueBoundaries?: {
+            /**
+             * Smallest accepted value of a numeric item
+             */
+            min?: number;
+            /**
+             * Largest accepted value of a numeric item
+             */
+            max?: number;
+            /**
+             * Longest accepted value of a textual item
+             */
+            maxLength?: number;
+            /**
+             * The two values a tickbox item accepts
+             */
+            binaryValues?: Array<string>;
+          };
         }
       | {
           configSectionId: number;
           item: string;
           value: string;
+          valueBoundaries?: {
+            /**
+             * Smallest accepted value of a numeric item
+             */
+            min?: number;
+            /**
+             * Largest accepted value of a numeric item
+             */
+            max?: number;
+            /**
+             * Longest accepted value of a textual item
+             */
+            maxLength?: number;
+            /**
+             * The two values a tickbox item accepts
+             */
+            binaryValues?: Array<string>;
+          };
         };
-  };
-  relationships?: {
-    configSection: {
-      links: {
-        self: string;
-        related: string;
+    links: {
+      self: string;
+    };
+    relationships: {
+      configSection: {
+        links: {
+          self: string;
+          related: string;
+        };
+        data?: {
+          type: 'configSection';
+          id: number;
+        } | null;
       };
-      data?: {
-        type: 'configSection';
-        id: number;
-      } | null;
     };
   };
   included?: Array<{
@@ -68,6 +223,9 @@ export type ConfigPostPatchResponse = {
     version: string;
     ext?: Array<string>;
   };
+  links: {
+    self: string;
+  };
   data: {
     id: number;
     type: 'config';
@@ -76,18 +234,94 @@ export type ConfigPostPatchResponse = {
           configSectionId: number;
           item: 'serverLogLevel';
           value: '0' | '10' | '20' | '30' | '40' | '50';
+          valueBoundaries?: {
+            /**
+             * Smallest accepted value of a numeric item
+             */
+            min?: number;
+            /**
+             * Largest accepted value of a numeric item
+             */
+            max?: number;
+            /**
+             * Longest accepted value of a textual item
+             */
+            maxLength?: number;
+            /**
+             * The two values a tickbox item accepts
+             */
+            binaryValues?: Array<string>;
+          };
         }
       | {
           configSectionId: number;
           item: 'notificationsProxyType';
           value: 'HTTP' | 'HTTPS' | 'SOCKS4' | 'SOCKS5';
+          valueBoundaries?: {
+            /**
+             * Smallest accepted value of a numeric item
+             */
+            min?: number;
+            /**
+             * Largest accepted value of a numeric item
+             */
+            max?: number;
+            /**
+             * Longest accepted value of a textual item
+             */
+            maxLength?: number;
+            /**
+             * The two values a tickbox item accepts
+             */
+            binaryValues?: Array<string>;
+          };
         }
       | {
           configSectionId: number;
           item: string;
           value: string;
+          valueBoundaries?: {
+            /**
+             * Smallest accepted value of a numeric item
+             */
+            min?: number;
+            /**
+             * Largest accepted value of a numeric item
+             */
+            max?: number;
+            /**
+             * Longest accepted value of a textual item
+             */
+            maxLength?: number;
+            /**
+             * The two values a tickbox item accepts
+             */
+            binaryValues?: Array<string>;
+          };
         };
+    links: {
+      self: string;
+    };
+    relationships: {
+      configSection: {
+        links: {
+          self: string;
+          related: string;
+        };
+        data?: {
+          type: 'configSection';
+          id: number;
+        } | null;
+      };
+    };
   };
+  included?: Array<{
+    id: number;
+    type: 'configSection';
+    attributes: {
+      sectionName: string;
+    };
+  }>;
 };
 
 export type ConfigListResponse = {
@@ -95,12 +329,17 @@ export type ConfigListResponse = {
     version: string;
     ext?: Array<string>;
   };
-  links?: {
+  links: {
     self: string;
-    first?: string;
-    last?: string;
-    next?: string | null;
-    previous?: string | null;
+    first: string;
+    last: string | null;
+    next: string | null;
+    prev: string | null;
+  };
+  meta: {
+    page: {
+      total_elements: number;
+    };
   };
   data: Array<{
     id: number;
@@ -110,36 +349,116 @@ export type ConfigListResponse = {
           configSectionId: number;
           item: 'serverLogLevel';
           value: '0' | '10' | '20' | '30' | '40' | '50';
+          valueBoundaries?: {
+            /**
+             * Smallest accepted value of a numeric item
+             */
+            min?: number;
+            /**
+             * Largest accepted value of a numeric item
+             */
+            max?: number;
+            /**
+             * Longest accepted value of a textual item
+             */
+            maxLength?: number;
+            /**
+             * The two values a tickbox item accepts
+             */
+            binaryValues?: Array<string>;
+          };
         }
       | {
           configSectionId: number;
           item: 'notificationsProxyType';
           value: 'HTTP' | 'HTTPS' | 'SOCKS4' | 'SOCKS5';
+          valueBoundaries?: {
+            /**
+             * Smallest accepted value of a numeric item
+             */
+            min?: number;
+            /**
+             * Largest accepted value of a numeric item
+             */
+            max?: number;
+            /**
+             * Longest accepted value of a textual item
+             */
+            maxLength?: number;
+            /**
+             * The two values a tickbox item accepts
+             */
+            binaryValues?: Array<string>;
+          };
         }
       | {
           configSectionId: number;
           item: string;
           value: string;
+          valueBoundaries?: {
+            /**
+             * Smallest accepted value of a numeric item
+             */
+            min?: number;
+            /**
+             * Largest accepted value of a numeric item
+             */
+            max?: number;
+            /**
+             * Longest accepted value of a textual item
+             */
+            maxLength?: number;
+            /**
+             * The two values a tickbox item accepts
+             */
+            binaryValues?: Array<string>;
+          };
         };
-  }>;
-  relationships?: {
-    configSection: {
-      links: {
-        self: string;
-        related: string;
-      };
-      data?: {
-        type: 'configSection';
-        id: number;
-      } | null;
+    links: {
+      self: string;
     };
-  };
+    relationships: {
+      configSection: {
+        links: {
+          self: string;
+          related: string;
+        };
+        data?: {
+          type: 'configSection';
+          id: number;
+        } | null;
+      };
+    };
+  }>;
   included?: Array<{
     id: number;
     type: 'configSection';
     attributes: {
       sectionName: string;
     };
+  }>;
+};
+
+export type ConfigCountResponse = {
+  jsonapi: {
+    version: string;
+    ext?: Array<string>;
+  };
+  meta: {
+    /**
+     * Number of objects accessible to the current user matching the given filters
+     */
+    count: number;
+    /**
+     * Number of objects accessible to the current user without any filter applied, only present when `include_total=true` was requested
+     */
+    total_count?: number;
+  };
+  /**
+   * Always empty: the count is reported under meta.
+   */
+  data: Array<{
+    [key: string]: unknown;
   }>;
 };
 
@@ -154,7 +473,7 @@ export type ConfigRelationConfigSectionGetResponse = {
   data: {
     type: 'configSection';
     id: number;
-  };
+  } | null;
 };
 
 export type GetConfigsData = {
@@ -162,27 +481,45 @@ export type GetConfigsData = {
   path?: never;
   query?: {
     /**
-     * Pointer to paginate to retrieve the data after the value provided
+     * Pointer to paginate to retrieve the data after the object provided. Specify the `base64` encoded JSON string in a **uniquely identifiable** manner (e.g. object IDs), i.e. by using one (primary) or two (primary and secondary) fields that allow for **stable** sorting.
+     *
+     *
+     * Format: `{"primary":{"someField": 123},"secondary":{"someOtherOptionalField": "Foo"}}`
+     *
+     *
+     * Example: `{"primary":{"configId": 123}}` -> `eyJwcmltYXJ5Ijp7ImNvbmZpZ0lkIjogMTIzfX0=`
      */
-    'page[after]'?: number;
+    'page[after]'?: string;
     /**
-     * Pointer to paginate to retrieve the data before the value provided
+     * Pointer to paginate to retrieve the data before the object provided. Specify the `base64` encoded JSON string in a **uniquely identifiable** manner (e.g. object IDs), i.e. by using one (primary) or two (primary and secondary) fields that allow for **stable** sorting.
+     *
+     *
+     * Format: `{"primary":{"someField": 123},"secondary":{"someOtherOptionalField": "Foo"}}`
+     *
+     *
+     * Example: `{"primary":{"configId": 123}}` -> `eyJwcmltYXJ5Ijp7ImNvbmZpZ0lkIjogMTIzfX0=`
      */
-    'page[before]'?: number;
+    'page[before]'?: string;
     /**
-     * Amout of data to retrieve inside a single page
+     * Amount of data to retrieve inside a single page
      */
     'page[size]'?: number;
     /**
-     * Filters results using a query
+     * Filters results using a query. Every key is an attribute name optionally suffixed with a comparison operator, e.g. `filter[configId__gt]=200`.
      */
     filter?: {
-      [key: string]: unknown;
+      [key: string]: string;
     };
     /**
-     * Items to include, comma seperated. Possible options: Array
+     * Relationships to include in the response, comma seperated. Possible options: configSection
      */
-    include?: string;
+    include?: Array<'configSection'>;
+    /**
+     * Aggregated fields to include by type (comma separated values). Possible options: config: valueBoundaries
+     */
+    aggregate?: {
+      [key: string]: string;
+    };
   };
   url: '/api/v2/ui/configs';
 };
@@ -196,6 +533,10 @@ export type GetConfigsErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
+  /**
+   * Permission denied
+   */
+  403: ErrorResponse;
 };
 
 export type GetConfigsError = GetConfigsErrors[keyof GetConfigsErrors];
@@ -210,7 +551,7 @@ export type GetConfigsResponses = {
 export type GetConfigsResponse = GetConfigsResponses[keyof GetConfigsResponses];
 
 export type PatchConfigsData = {
-  body?: never;
+  body: ConfigPatchMultiple;
   path?: never;
   query?: never;
   url: '/api/v2/ui/configs';
@@ -225,43 +566,45 @@ export type PatchConfigsErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
+  /**
+   * Permission denied
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Resource already exists
+   */
+  409: ErrorResponse;
 };
 
 export type PatchConfigsError = PatchConfigsErrors[keyof PatchConfigsErrors];
 
 export type PatchConfigsResponses = {
   /**
-   * successful operation
+   * successfully updated
    */
-  200: unknown;
+  204: void;
 };
+
+export type PatchConfigsResponse = PatchConfigsResponses[keyof PatchConfigsResponses];
 
 export type GetConfigsCountData = {
   body?: never;
   path?: never;
   query?: {
     /**
-     * Pointer to paginate to retrieve the data after the value provided
-     */
-    'page[after]'?: number;
-    /**
-     * Pointer to paginate to retrieve the data before the value provided
-     */
-    'page[before]'?: number;
-    /**
-     * Amout of data to retrieve inside a single page
-     */
-    'page[size]'?: number;
-    /**
-     * Filters results using a query
+     * Filters results using a query. Every key is an attribute name optionally suffixed with a comparison operator, e.g. `filter[configId__gt]=200`.
      */
     filter?: {
-      [key: string]: unknown;
+      [key: string]: string;
     };
     /**
-     * Items to include, comma seperated. Possible options: Array
+     * Also report the number of accessible objects without any filter applied, as `meta.total_count`
      */
-    include?: string;
+    include_total?: boolean;
   };
   url: '/api/v2/ui/configs/count';
 };
@@ -275,6 +618,10 @@ export type GetConfigsCountErrors = {
    * Authentication failed
    */
   401: ErrorResponse;
+  /**
+   * Permission denied
+   */
+  403: ErrorResponse;
 };
 
 export type GetConfigsCountError = GetConfigsCountErrors[keyof GetConfigsCountErrors];
@@ -283,22 +630,21 @@ export type GetConfigsCountResponses = {
   /**
    * successful operation
    */
-  200: ConfigListResponse;
+  200: ConfigCountResponse;
 };
 
 export type GetConfigsCountResponse = GetConfigsCountResponses[keyof GetConfigsCountResponses];
 
-export type GetConfigsByIdByRelationData = {
+export type GetConfigsByIdConfigSectionData = {
   body?: never;
   path: {
     id: number;
-    relation: string;
   };
   query?: never;
-  url: '/api/v2/ui/configs/{id}/{relation}';
+  url: '/api/v2/ui/configs/{id}/configSection';
 };
 
-export type GetConfigsByIdByRelationErrors = {
+export type GetConfigsByIdConfigSectionErrors = {
   /**
    * Invalid request
    */
@@ -308,72 +654,79 @@ export type GetConfigsByIdByRelationErrors = {
    */
   401: ErrorResponse;
   /**
+   * Permission denied
+   */
+  403: ErrorResponse;
+  /**
    * Not Found
    */
-  404: NotFoundResponse;
+  404: ErrorResponse;
 };
 
-export type GetConfigsByIdByRelationError = GetConfigsByIdByRelationErrors[keyof GetConfigsByIdByRelationErrors];
+export type GetConfigsByIdConfigSectionError =
+  GetConfigsByIdConfigSectionErrors[keyof GetConfigsByIdConfigSectionErrors];
 
-export type GetConfigsByIdByRelationResponses = {
+export type GetConfigsByIdConfigSectionResponses = {
+  /**
+   * successful operation
+   */
+  200: ConfigSectionResponse;
+};
+
+export type GetConfigsByIdConfigSectionResponse =
+  GetConfigsByIdConfigSectionResponses[keyof GetConfigsByIdConfigSectionResponses];
+
+export type GetConfigsByIdRelationshipsConfigSectionData = {
+  body?: never;
+  path: {
+    id: number;
+  };
+  query?: never;
+  url: '/api/v2/ui/configs/{id}/relationships/configSection';
+};
+
+export type GetConfigsByIdRelationshipsConfigSectionErrors = {
+  /**
+   * Invalid request
+   */
+  400: ErrorResponse;
+  /**
+   * Authentication failed
+   */
+  401: ErrorResponse;
+  /**
+   * Permission denied
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+};
+
+export type GetConfigsByIdRelationshipsConfigSectionError =
+  GetConfigsByIdRelationshipsConfigSectionErrors[keyof GetConfigsByIdRelationshipsConfigSectionErrors];
+
+export type GetConfigsByIdRelationshipsConfigSectionResponses = {
   /**
    * successful operation
    */
   200: ConfigRelationConfigSectionGetResponse;
 };
 
-export type GetConfigsByIdByRelationResponse =
-  GetConfigsByIdByRelationResponses[keyof GetConfigsByIdByRelationResponses];
+export type GetConfigsByIdRelationshipsConfigSectionResponse =
+  GetConfigsByIdRelationshipsConfigSectionResponses[keyof GetConfigsByIdRelationshipsConfigSectionResponses];
 
-export type GetConfigsByIdRelationshipsByRelationData = {
-  body?: never;
-  path: {
-    id: number;
-    relation: string;
-  };
-  query?: never;
-  url: '/api/v2/ui/configs/{id}/relationships/{relation}';
-};
-
-export type GetConfigsByIdRelationshipsByRelationErrors = {
-  /**
-   * Invalid request
-   */
-  400: ErrorResponse;
-  /**
-   * Authentication failed
-   */
-  401: ErrorResponse;
-  /**
-   * Not Found
-   */
-  404: NotFoundResponse;
-};
-
-export type GetConfigsByIdRelationshipsByRelationError =
-  GetConfigsByIdRelationshipsByRelationErrors[keyof GetConfigsByIdRelationshipsByRelationErrors];
-
-export type GetConfigsByIdRelationshipsByRelationResponses = {
-  /**
-   * successful operation
-   */
-  200: ConfigResponse;
-};
-
-export type GetConfigsByIdRelationshipsByRelationResponse =
-  GetConfigsByIdRelationshipsByRelationResponses[keyof GetConfigsByIdRelationshipsByRelationResponses];
-
-export type PatchConfigsByIdRelationshipsByRelationData = {
+export type PatchConfigsByIdRelationshipsConfigSectionData = {
   body: ConfigRelationConfigSection;
   path: {
     id: number;
-    relation: string;
   };
   query?: never;
-  url: '/api/v2/ui/configs/{id}/relationships/{relation}';
+  url: '/api/v2/ui/configs/{id}/relationships/configSection';
 };
 
-export type PatchConfigsByIdRelationshipsByRelationErrors = {
+export type PatchConfigsByIdRelationshipsConfigSectionErrors = {
   /**
    * Invalid request
    */
@@ -383,23 +736,31 @@ export type PatchConfigsByIdRelationshipsByRelationErrors = {
    */
   401: ErrorResponse;
   /**
+   * Permission denied
+   */
+  403: ErrorResponse;
+  /**
    * Not Found
    */
-  404: NotFoundResponse;
+  404: ErrorResponse;
+  /**
+   * Resource already exists
+   */
+  409: ErrorResponse;
 };
 
-export type PatchConfigsByIdRelationshipsByRelationError =
-  PatchConfigsByIdRelationshipsByRelationErrors[keyof PatchConfigsByIdRelationshipsByRelationErrors];
+export type PatchConfigsByIdRelationshipsConfigSectionError =
+  PatchConfigsByIdRelationshipsConfigSectionErrors[keyof PatchConfigsByIdRelationshipsConfigSectionErrors];
 
-export type PatchConfigsByIdRelationshipsByRelationResponses = {
+export type PatchConfigsByIdRelationshipsConfigSectionResponses = {
   /**
    * Successfull operation
    */
   204: void;
 };
 
-export type PatchConfigsByIdRelationshipsByRelationResponse =
-  PatchConfigsByIdRelationshipsByRelationResponses[keyof PatchConfigsByIdRelationshipsByRelationResponses];
+export type PatchConfigsByIdRelationshipsConfigSectionResponse =
+  PatchConfigsByIdRelationshipsConfigSectionResponses[keyof PatchConfigsByIdRelationshipsConfigSectionResponses];
 
 export type GetConfigsByIdData = {
   body?: never;
@@ -408,9 +769,9 @@ export type GetConfigsByIdData = {
   };
   query?: {
     /**
-     * Items to include. Comma seperated
+     * Relationships to include in the response, comma seperated. Possible options: configSection
      */
-    include?: string;
+    include?: Array<'configSection'>;
   };
   url: '/api/v2/ui/configs/{id}';
 };
@@ -425,9 +786,13 @@ export type GetConfigsByIdErrors = {
    */
   401: ErrorResponse;
   /**
+   * Permission denied
+   */
+  403: ErrorResponse;
+  /**
    * Not Found
    */
-  404: NotFoundResponse;
+  404: ErrorResponse;
 };
 
 export type GetConfigsByIdError = GetConfigsByIdErrors[keyof GetConfigsByIdErrors];
@@ -460,9 +825,17 @@ export type PatchConfigsByIdErrors = {
    */
   401: ErrorResponse;
   /**
+   * Permission denied
+   */
+  403: ErrorResponse;
+  /**
    * Not Found
    */
-  404: NotFoundResponse;
+  404: ErrorResponse;
+  /**
+   * Resource already exists
+   */
+  409: ErrorResponse;
 };
 
 export type PatchConfigsByIdError = PatchConfigsByIdErrors[keyof PatchConfigsByIdErrors];

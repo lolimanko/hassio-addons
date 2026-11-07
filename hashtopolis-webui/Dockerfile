@@ -66,22 +66,7 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 # runtime to enable them.
 ARG CUSTOM_THEMES_DIR=docker/empty-custom-themes
 COPY ${CUSTOM_THEMES_DIR}/ /custom-themes/
-RUN apt-get update && apt-get install -y --no-install-recommends bash jq curl 
-
-ARG BASHIO_VERSION="v0.19.0"
-
-RUN curl -J -L -o /tmp/bashio.tar.gz \
-        "https://github.com/hassio-addons/bashio/archive/${BASHIO_VERSION}.tar.gz" \
-    && mkdir /tmp/bashio \
-    && tar zxvf \
-        /tmp/bashio.tar.gz \
-        --strip 1 -C /tmp/bashio \
-    \
-    && mv /tmp/bashio/lib /usr/lib/bashio \
-    && ln -s /usr/lib/bashio/bashio /usr/bin/bashio
-#ENV HASHTOPOLIS_BACKEND_URL=https://buvi.duckdns.org:8081/api/v2
-#USER root
+RUN apt-get update && apt-get install -y --no-install-recommends jq 
 #ENTRYPOINT [ "/bin/bash", "/usr/local/bin/docker-entrypoint.sh", "production" ]
-ENTRYPOINT [ "/usr/bin/bashio", "/usr/local/bin/preload_opt.sh"]
-
+ENTRYPOINT [ "/bin/bash", "/usr/local/bin/preload_opt.sh"]
 # ----END----

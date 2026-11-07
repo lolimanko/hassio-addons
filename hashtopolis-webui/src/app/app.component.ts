@@ -7,7 +7,7 @@ import { AfterViewInit, Component, ElementRef, OnInit, PLATFORM_ID, inject } fro
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { NavigationEnd, Router } from '@angular/router';
 
-import { UIConfig } from '@models/config-ui.model';
+import { Layout } from '@models/config-ui.model';
 import { UiSettings, uisSettingsSchema } from '@models/config-ui.schema';
 import { UserData, userDataSchema } from '@models/user-data.schema';
 
@@ -19,12 +19,11 @@ import { CookieService } from '@services/shared/cookies.service';
 import { UIConfigService } from '@services/shared/storage.service';
 import { ThemeCatalogService } from '@services/shared/theme-catalog.service';
 import { ThemeService } from '@services/shared/theme.service';
+import { UiSettingsService } from '@services/shared/ui-settings.service';
 import '@services/storage/local-storage';
-import { LocalStorageService } from '@services/storage/local-storage.service';
 
 import { TimeoutDialogComponent } from '@src/app/shared/dialog/timeout/timeout-dialog.component';
 import { DialogData } from '@src/app/shared/dialog/timeout/timeout-dialog.model';
-import { UISettingsUtilityClass } from '@src/app/shared/utils/config';
 
 @Component({
   selector: 'app-root',
@@ -40,23 +39,18 @@ export class AppComponent implements OnInit, AfterViewInit {
   private keepalive = inject(Keepalive);
   private router = inject(Router);
   private idle = inject(Idle);
-  private storage = inject<LocalStorageService<UIConfig>>(LocalStorageService);
   private themeService = inject(ThemeService);
   private themeCatalog = inject(ThemeCatalogService);
   screen = inject(BreakpointService);
   private elementRef = inject(ElementRef);
   private platformId = inject(PLATFORM_ID);
 
-  currentUrl: string;
-  currentStep: string;
-  idleState = 'Not Started';
   timedOut = false;
-  lastPing: Date | null = null;
   timeoutCountdown: number | null = null;
   timeoutMax = this.onTimeout();
   idleTime: number = this.onTimeout();
   showingModal = false;
-  uiSettings: UISettingsUtilityClass;
+  uiSettings = inject(UiSettingsService);
   isLogged: boolean;
 
   private dialogRef: MatDialogRef<TimeoutDialogComponent> | null = null;
@@ -66,9 +60,7 @@ export class AppComponent implements OnInit, AfterViewInit {
     const idle = this.idle;
 
     inject(CheckTokenService);
-    this.router.events.pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd)).subscribe((e) => {
-      this.currentUrl = e.url;
-      this.findCurrentStep(this.currentUrl);
+    this.router.events.pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd)).subscribe(() => {
       if (isPlatformBrowser(this.platformId)) {
         window.scrollTo(0, 0);
       }
@@ -81,11 +73,9 @@ export class AppComponent implements OnInit, AfterViewInit {
     idle.onIdleStart.subscribe(() => {
       idle.clearInterrupts();
       this.checkLogin();
-      this.idleState = "You'll be logged out in 15 seconds!";
     });
 
     idle.onIdleEnd.subscribe(() => {
-      this.idleState = 'NOT_IDLE.';
       this.dialogData.timedOut = false;
       this.timeoutCountdown = null;
       this.reset();
@@ -93,7 +83,6 @@ export class AppComponent implements OnInit, AfterViewInit {
     });
 
     idle.onTimeout.subscribe(() => {
-      this.idleState = 'TIMED_OUT';
       this.timedOut = true;
       this.timeoutCountdown = null;
       this.dialogData.timedOut = true;
@@ -109,7 +98,6 @@ export class AppComponent implements OnInit, AfterViewInit {
     });
 
     this.keepalive.interval(15);
-    this.keepalive.onPing.subscribe(() => (this.lastPing = new Date()));
 
     this.authService.getUserLoggedIn().subscribe((userLoggedIn) => {
       if (userLoggedIn) {
@@ -133,7 +121,6 @@ export class AppComponent implements OnInit, AfterViewInit {
       }
     });
     this.authService.checkStatus();
-    this.uiSettings = new UISettingsUtilityClass(this.storage, this.themeService);
   }
 
   ngAfterViewInit() {
@@ -153,32 +140,24 @@ export class AppComponent implements OnInit, AfterViewInit {
    */
   private setBodyClasses(): void {
     const classes: string[] = [];
-    if (this.uiSettings) {
-      const layout = this.uiSettings.getSetting('layout');
-      if (layout === 'fixed') {
-        classes.push('fixed-width-layout');
-      } else if (layout === 'full') {
-        classes.push('full-width-layout');
-      }
+    const layout = this.uiSettings.getSetting('layout');
+    if (layout === Layout.FIXED) {
+      classes.push('fixed-width-layout');
+    } else if (layout === Layout.FULL) {
+      classes.push('full-width-layout');
+    }
 
-      const theme = this.uiSettings.getSetting('theme');
-      if (theme) {
-        classes.push(`${theme}-theme`);
-      }
+    const theme = this.uiSettings.getSetting('theme');
+    if (theme) {
+      classes.push(`${theme}-theme`);
     }
     if (classes) {
       this.elementRef.nativeElement.ownerDocument.body.className = classes.join(' ');
     }
   }
 
-  private findCurrentStep(currentRoute: string) {
-    const currRouteFragments = currentRoute.split('/');
-    const length = currRouteFragments.length;
-    this.currentStep = currentRoute.split('/')[length - 1];
-  }
-
   checkLogin() {
-    const userData = localStorage.getItem<UserData>('userData', userDataSchema);
+    const userData = localStorage.getItem<UserData>(AuthService.STORAGE_KEY, userDataSchema);
     if (!userData) {
       return;
     }
@@ -192,10 +171,8 @@ export class AppComponent implements OnInit, AfterViewInit {
     this.idle.setTimeout(false);
     this.idle.watch();
     this.idle.setInterrupts(DEFAULT_INTERRUPTSOURCES);
-    this.idleState = 'NOT_IDLE.';
     this.timedOut = false;
     this.timeoutCountdown = 0;
-    this.lastPing = null;
     this.closeModal();
   }
 

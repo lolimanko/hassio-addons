@@ -1,4 +1,5 @@
-import { Observable, catchError, debounceTime, forkJoin, of, switchMap, throwError } from 'rxjs';
+import { HttpHeaderName, HttpMethod } from '@constants/http.config';
+import { Observable, catchError, forkJoin, map, of, switchMap, throwError } from 'rxjs';
 
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
@@ -12,6 +13,9 @@ import { JsonAPISerializer } from '@src/app/core/_services/api/serializer-servic
 import { setParameter } from '@src/app/core/_services/buildparams';
 import { ConfigService } from '@src/app/core/_services/shared/config.service';
 import { environment } from '@src/environments/environment';
+
+/** The two methods the `helper` endpoints accept. */
+type HelperHttpMethod = typeof HttpMethod.GET | typeof HttpMethod.POST;
 
 interface JsonApiRelationshipData {
   data: { type: string; id: number }[];
@@ -160,35 +164,40 @@ export class GlobalService {
   }
 
   /**
-   * Download a file from the backend
+   * Download a file from the backend helper endpoint
    * @param serviceConfig Service config for the requested endpoint (URL and resource type)
    * @param id            ID of file to get
    * @param filename      Filname to use for the downloaded file
    */
   getFile(serviceConfig: ServiceConfig, id: number, filename: string): void {
-    this.http
-      .get(`${this.cs.getEndpoint() + serviceConfig.URL}?file=${id}`, {
-        responseType: 'blob'
+    this.downloadFromUrl(`${this.cs.getEndpoint() + serviceConfig.URL}?file=${id}`, filename).subscribe({
+      error: (error) => {
+        console.error('Error downloading file:', error);
+      }
+    });
+  }
+
+  /**
+   * Download a blob from an absolute url and save it in the browser
+   * @param url       Absolute url to download from, the auth interceptor adds the bearer token
+   * @param filename  Filename to use for the downloaded file
+   * @param headers   Optional request headers (e.g. to skip the global error dialog)
+   * @returns Observable emitting once the download was handed to the browser
+   */
+  downloadFromUrl(url: string, filename: string, headers?: HttpHeaders): Observable<void> {
+    // archives can be large, never keep them in the in-memory response cache
+    const requestHeaders = (headers ?? new HttpHeaders()).set(HttpHeaderName.SKIP_CACHE, 'true');
+    return this.http.get(url, { responseType: 'blob', headers: requestHeaders }).pipe(
+      map((response: Blob) => {
+        const blob = new Blob([response], { type: response.type });
+        const objectUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = filename;
+        a.click();
+        window.URL.revokeObjectURL(objectUrl);
       })
-      .subscribe({
-        next: (response: Blob) => {
-          // Generate Blob-URL
-          const blob = new Blob([response], { type: response.type });
-          const url = window.URL.createObjectURL(blob);
-
-          // Create a temporary ‘a’ element for download
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = filename;
-          a.click();
-
-          // Release the URL of the blob again
-          window.URL.revokeObjectURL(url);
-        },
-        error: (error) => {
-          console.error('Fehler beim Download der Datei:', error);
-        }
-      });
+    );
   }
 
   /**
@@ -222,7 +231,7 @@ export class GlobalService {
       objectdata.push({ id: object.id, type: serviceConfig.RESOURCE });
     }
     const data = { data: objectdata };
-    return this.http.delete<object>(this.cs.getEndpoint() + serviceConfig.URL, { body: data }).pipe(debounceTime(2000));
+    return this.http.delete<object>(this.cs.getEndpoint() + serviceConfig.URL, { body: data });
   }
 
   /**
@@ -235,9 +244,7 @@ export class GlobalService {
   update(serviceConfig: ServiceConfig, id: number, arr: Record<string, unknown>): Observable<object> {
     const item = { type: serviceConfig.RESOURCE, id: id, ...arr };
     const serializedData = new JsonAPISerializer().serialize({ stuff: item });
-    return this.http
-      .patch<object>(this.cs.getEndpoint() + serviceConfig.URL + '/' + id, serializedData)
-      .pipe(debounceTime(2000));
+    return this.http.patch<object>(this.cs.getEndpoint() + serviceConfig.URL + '/' + id, serializedData);
   }
 
   /**
@@ -261,18 +268,21 @@ export class GlobalService {
       });
     }
     const data = { data: objectdata };
-    return this.http.patch<object>(this.cs.getEndpoint() + serviceConfig.URL, data).pipe(debounceTime(2000));
+    return this.http.patch<object>(this.cs.getEndpoint() + serviceConfig.URL, data);
   }
 
   postRelationships(
     serviceConfig: ServiceConfig,
     id: number,
     relType: string,
-    data: JsonApiRelationshipData
+    data: JsonApiRelationshipData,
+    httpOptions?: { headers?: HttpHeaders }
   ): Observable<object> {
-    return this.http
-      .post<object>(this.cs.getEndpoint() + serviceConfig.URL + '/' + id + '/relationships/' + relType, data)
-      .pipe(debounceTime(2000));
+    return this.http.post<object>(
+      this.cs.getEndpoint() + serviceConfig.URL + '/' + id + '/relationships/' + relType,
+      data,
+      httpOptions
+    );
   }
 
   deleteRelationships(
@@ -281,17 +291,35 @@ export class GlobalService {
     relType: string,
     data: JsonApiRelationshipData
   ): Observable<object> {
-    return this.http
-      .delete<object>(this.cs.getEndpoint() + serviceConfig.URL + '/' + id + '/relationships/' + relType, {
+    return this.http.delete<object>(
+      this.cs.getEndpoint() + serviceConfig.URL + '/' + id + '/relationships/' + relType,
+      {
         body: data
-      })
-      .pipe(debounceTime(2000));
+      }
+    );
+  }
+
+  /**
+   * Get the ids of a to-many relationship (the relationship link, without the related resources)
+   * @param serviceConfig the serviceconfig of the API endpoint
+   * @param id id of the base resource
+   * @param relType name of the relationship
+   * @param httpOptions optional headers, e.g. to bypass the HTTP cache
+   */
+  getRelationshipLink(
+    serviceConfig: ServiceConfig,
+    id: number,
+    relType: string,
+    httpOptions?: { headers?: HttpHeaders }
+  ): Observable<ResponseWrapper> {
+    return this.http.get<ResponseWrapper>(
+      this.cs.getEndpoint() + serviceConfig.URL + '/' + id + '/relationships/' + relType,
+      httpOptions
+    );
   }
 
   getRelationships(serviceConfig: ServiceConfig, id: number, relType: string): Observable<ResponseWrapper> {
-    return this.http
-      .get<ResponseWrapper>(this.cs.getEndpoint() + serviceConfig.URL + '/' + id + '/' + relType)
-      .pipe(debounceTime(2000));
+    return this.http.get<ResponseWrapper>(this.cs.getEndpoint() + serviceConfig.URL + '/' + id + '/' + relType);
   }
 
   /**
@@ -337,12 +365,12 @@ export class GlobalService {
     serviceConfig: ServiceConfig,
     option: HelperEndpoint,
     arr?: Record<string, unknown>,
-    method: 'POST' | 'GET' = 'POST',
+    method: HelperHttpMethod = HttpMethod.POST,
     httpOptions?: { headers?: HttpHeaders }
   ): Observable<T> {
     const url = `${this.cs.getEndpoint()}${serviceConfig.URL}/${option}`;
 
-    if (method === 'GET') {
+    if (method === HttpMethod.GET) {
       let params = new HttpParams();
       if (arr) {
         for (const [key, value] of Object.entries(arr)) {
