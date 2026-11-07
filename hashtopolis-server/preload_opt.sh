@@ -1,5 +1,5 @@
 #!/bin/bash
-
+chown -R www-data:www-data   ${HASHTOPOLIS_PATH}  && chmod -R g+w  ${HASHTOPOLIS_PATH} 
 ssl=$(jq -r '.SSL' /data/options.json)
 
 if [ "$ssl" = "true" ]; then
