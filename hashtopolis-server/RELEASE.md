@@ -12,19 +12,21 @@ When cutting a release, create an issue under this repository with the version a
 
 ### Release Preparations
 
-#### Agent
+#### Agents
 
-- [ ] Update agent release notes and version in [hashtopolis-agent-python](https://github.com/hashtopolis/hashtopolis-agent-python) if needed
-- [ ] Release the agent
+- [ ] Update agent version in [hashtopolis/agent-python](https://github.com/hashtopolis/agent-python) if needed
+- [ ] Release the python agent
+- [ ] Update agent version in [hashtopolis/agent-rust](https://github.com/hashtopolis/agent-rust) if needed
+- [ ] Release the rust agent
 
 #### Backend
 
 - [ ] Start branch for release preparations
-- [ ] Update hashcat modes in the database schema (`hashtopolis.sql` and update scripts) — see [Hashcat Modes Diff](#hashcat-modes-diff) below
-- [ ] Build the agent via `./build.sh` in [hashtopolis-agent-python](https://github.com/hashtopolis/hashtopolis-agent-python), copy the resulting zip to `src/bin/`
-- [ ] Update agent version references in migration for initial setups
-- [ ] Insert newest hashcat version as a migration for initial setups
-- [ ] Adjust server release notes (`changelog.md`) _(legacy)_
+- [ ] Build the python agent via `./build.sh` in [hashtopolis/agent-python](https://github.com/hashtopolis/agent-python), copy the resulting zip to `src/bin/`
+- [ ] Copy the built rust agent release zip to `src/bin/`
+- [ ] Update agent versions references in setup.json
+- [ ] Add migration to update existing agent versions
+- [ ] Insert newest hashcat version in setup.json
 - [ ] Update `StartupConfig::getVersion()` from `"vMAJOR.MINOR.PATCH+dev"` to `"vMAJOR.MINOR.PATCH"`
 - [ ] Ensure `master` is in sync with any long-running feature branches
 - [ ] Create PR for merging
@@ -60,23 +62,12 @@ When cutting a release, create an issue under this repository with the version a
   docker tag hashtopolis/frontend:vMAJOR.MINOR.PATCH hashtopolis/frontend:latest
   docker push hashtopolis/frontend:latest
   ```
+- [ ] Update maintained tags on docker readme page.
 
 ### Post-Release
 
 - [ ] **Bump version to `+dev` on `master`**: update backend `StartupConfig::getVersion()` to `"vMAJOR.MINOR.PATCH+dev"` (e.g., `v1.1.0+dev` after releasing `v1.1.0`).
 - [ ] **Bump version to `+dev` on `master`**: update frontend (`src/config/default/app/main.ts`)
-
-## Hashcat Modes Diff
-
-To check whether hashcat added or removed modes since the last release:
-
-```
-cat dbmodes | grep -Eo '\([0-9]+,' | tr -d '(,' > dbmodes.num
-cat hcmodes | cut -d'|' -f 1 | tr -d ' ' | sort -n > hcmodes.num
-comm -32 hcmodes.num dbmodes.num | tee diff
-```
-
-Where `dbmodes` contains the current SQL entries and `hcmodes` is a dump of the hashcat wiki mode table.
 
 ## Version Schema
 

@@ -1,12 +1,4 @@
 #!/usr/bin/env bash
-
-#echo $HASHTOPOLIS_DB_TYPE
-#echo $HASHTOPOLIS_DB_USER
-#echo $HASHTOPOLIS_DB_PASS
-#echo $HASHTOPOLIS_DB_HOST
-#echo $HASHTOPOLIS_DB_PORT
-#echo $HASHTOPOLIS_DB_DATABASE
-
 paths=(inc/utils/locks)
 
 for path in ${paths[@]}; do
@@ -26,15 +18,15 @@ if [[ "$HASHTOPOLIS_DB_TYPE" == "mysql" ]]; then
     echo "Using MySQL..."
     DB_CMD="mysql -u${HASHTOPOLIS_DB_USER} -p${HASHTOPOLIS_DB_PASS} -h ${HASHTOPOLIS_DB_HOST} --skip-ssl"
     DB_TYPE="mysql"
-    if [[ -n "${HASHTOPOLIS_DB_PORT:3306}" ]]; then
-        DB_CMD="${DB_CMD} -P${HASHTOPOLIS_DB_PORT:3306}"
+    if [[ -n "${HASHTOPOLIS_DB_PORT}" ]]; then
+        DB_CMD="${DB_CMD} -P${HASHTOPOLIS_DB_PORT}"
     fi
 elif [[ "$HASHTOPOLIS_DB_TYPE" == "postgres" ]]; then
     echo "Using postgres..."
     DB_CMD="psql -U${HASHTOPOLIS_DB_USER} -h ${HASHTOPOLIS_DB_HOST} ${HASHTOPOLIS_DB_DATABASE}"
     DB_TYPE="postgres"
-    if [[ -n "${HASHTOPOLIS_DB_PORT:5432}" ]]; then
-        DB_CMD="${DB_CMD} -p${HASHTOPOLIS_DB_PORT:5432}}"
+    if [[ -n "${HASHTOPOLIS_DB_PORT}" ]]; then
+        DB_CMD="${DB_CMD} -p${HASHTOPOLIS_DB_PORT}"
     fi
 else
     echo "INVALID DATABASE TYPE PROVIDED: $HASHTOPOLIS_DB_TYPE"
@@ -63,6 +55,7 @@ directories=(
   "${HASHTOPOLIS_LOG_PATH}"
   "${HASHTOPOLIS_IMPORT_PATH}"
   "${HASHTOPOLIS_BINARIES_PATH}"
+  "${HASHTOPOLIS_CRACKERS_PATH}"
   "${HASHTOPOLIS_TUS_PATH}"
   "${HASHTOPOLIS_TEMP_UPLOADS_PATH}"
   "${HASHTOPOLIS_TEMP_META_PATH}"
@@ -123,7 +116,27 @@ echo ""
 echo "                        Hashtopolis is now ready to use!"
 echo "                                      *\0/*"
 echo ""
+
 echo ""
 
+
+# Schedule the background job runner. It is called once a minute, overlapping runs
+# are prevented by the runner itself using a lock file. A cron daemon cannot be used
+# here as the container runs with an unprivileged user (vscode/www-data), so a simple
+# scheduler loop is started in the background instead. The loop inherits the container
+# environment, which a cron daemon would not. Set HASHTOPOLIS_CRON_ENABLE=0 to disable
+# it, for example to run the runner with an external cron or for deterministic tests.
+if [[ -z "${HASHTOPOLIS_CRON_ENABLE+x}" ]]; then
+    HASHTOPOLIS_CRON_ENABLE="1"
+fi
+if [[ "$HASHTOPOLIS_CRON_ENABLE" == "1" ]]; then
+    echo "Starting background job runner scheduler (every 60s)..."
+    (
+        while true; do
+            php -d xdebug.mode=off -f ${HASHTOPOLIS_DOCUMENT_ROOT}/inc/cron.php
+            sleep 60
+        done
+    ) &
+fi
 
 docker-php-entrypoint apache2-foreground
