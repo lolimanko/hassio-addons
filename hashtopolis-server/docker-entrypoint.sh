@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
+echo 
+echo $HASHTOPOLIS_DB_TYPE
+echo $HASHTOPOLIS_DB_USER
 echo "$HASHTOPOLIS_DB_PASS"
+echo $HASHTOPOLIS_DB_HOST
+echo $HASHTOPOLIS_DB_PORT
+echo $HASHTOPOLIS_DB_DATABASE
 paths=(inc/utils/locks)
 
 for path in ${paths[@]}; do
