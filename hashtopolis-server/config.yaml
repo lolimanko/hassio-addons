@@ -1,6 +1,6 @@
 name: "hashtopolis-server"
 description: "hashtopolis-server"
-version: "1.0.18"
+version: "1.0.19"
 slug: "hashtopolis-server"
 #init: false
 #host_network: true
