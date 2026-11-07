@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-echo 
 echo $HASHTOPOLIS_DB_TYPE
 echo $HASHTOPOLIS_DB_USER
 echo "$HASHTOPOLIS_DB_PASS"
