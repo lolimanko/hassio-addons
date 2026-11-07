@@ -13,4 +13,4 @@ export HASHTOPOLIS_ADMIN_USER=$(bashio::config 'hashtopolis_admin_user')
 export HASHTOPOLIS_ADMIN_PASSWORD=$(bashio::config 'hashtopolis_admin_password')
 export HASHTOPOLIS_BACKEND_URL=$(bashio::config 'hashtopolis_backend_url')
 export HASHTOPOLIS_FRONTEND_URLS=$(bashio::config 'hashtopolis_frontend_urls')
-/usr/local/bin/docker-entrypoint.sh
+gosu www-data /usr/local/bin/docker-entrypoint.sh
