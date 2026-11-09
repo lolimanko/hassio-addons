@@ -6,4 +6,13 @@
    ```
    http://homeassistant.local:8888/
    ```
-or use Web UI
+   or use Web UI
+
+## Data Persistence
+All sensitive data is stored in /addon_configs/fdd0cf77_hyphanet
+
+## Security Notes
+- 🔐 FProxy bound to container network only by default
+- 🛡️ All sensitive files stored in isolated volume
+- 📜 Automatic log rotation
+- ⚠️ Never expose port 8888 publicly without authentication
