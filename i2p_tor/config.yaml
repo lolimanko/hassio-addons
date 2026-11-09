@@ -28,3 +28,4 @@ schema:
   PORT_HTTP_PROXY: str
   ENABLE_HTTPPROXY: bool
   ENABLE_SOCKSPROXY: bool
+image: ghcr.io/lolimanko/{arch}-i2p_tor
