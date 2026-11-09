@@ -6,3 +6,4 @@
    ```
    http://homeassistant.local:8888/
    ```
+or use Web UI
