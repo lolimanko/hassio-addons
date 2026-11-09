@@ -1,6 +1,6 @@
 name: "hashtopolis-webui"
 description: "frontend"
-version: "1.0.4"
+version: "1.1.0"
 slug: "hashtopolis-webui"
 #init: false
 #host_network: true
@@ -25,4 +25,4 @@ options:
 schema:
   hashtopolis_backend_url: str
   SSL: bool
-#image: "ghcr.io/lolimanko/{arch}-hashtopolos-webui"
+image: "ghcr.io/lolimanko/{arch}-hashtopolos-webui"
