@@ -32,8 +32,8 @@ options:
   keyfile: privkey.pem
 schema:
   http_auth: bool
-  auth_user: "str?"
-  auth_pass: "str?"
+  auth_user: str?
+  auth_pass: str?
   ssl: bool
   certfile: str
   keyfile: str
