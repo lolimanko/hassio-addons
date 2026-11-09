@@ -1,4 +1,4 @@
-# Hashtopolis Web UI
+# Hashtopolis Web UI for Home Assistant Community Add-ons
 
 The **Hashtopolis Web UI** is the Angular-based frontend for [Hashtopolis](https://hashtopolis.org), a free and open-source platform for
 distributing and managing [hashcat](https://hashcat.net/hashcat/) tasks across a fleet of agents. This repository contains the web client 
