@@ -51,3 +51,4 @@ schema:
   SSL: bool
 ingress: true
 ingress_port: 80
+image: ghcr.io/lolimanko/{arch}-hashtopolis-server
