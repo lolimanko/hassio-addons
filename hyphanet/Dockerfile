@@ -127,7 +127,7 @@ RUN chmod +x /usr/local/bin/hyphanet.sh
 #USER ROOT
 WORKDIR ${HYPHANET_HOME}
 
-EXPOSE 8123
+EXPOSE 8888
 VOLUME [ "${HYPHANET_DATA}" ]
 
 ENTRYPOINT [ "/usr/local/bin/entrypoint.sh" ]
