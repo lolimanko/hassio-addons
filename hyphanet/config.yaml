@@ -24,7 +24,7 @@ ingress: true
 #ingress_port: 80
 #panel_icon: mdi:television
 options:
-  http_auth: true
+  http_auth: false
   ssl: false
   certfile: fullchain.pem
   keyfile: privkey.pem
