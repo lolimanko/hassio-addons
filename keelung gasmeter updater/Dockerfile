@@ -1,6 +1,6 @@
-ARG BUILD_FROM
+FROM ghcr.io/hassio-addons/ubuntu-base:9.0.0
 # hadolint ignore=DL3006
-FROM ${BUILD_FROM}
+
 
 #WORKDIR /
 #ADD . /
