@@ -1,4 +1,4 @@
-# Hashtopolis
+# Hashtopolis for Home Assistant Community Add-ons
 
 <img src="https://github.com/hashtopolis/server/blob/master/src/static/logo.png" alt='Hashtopolis' width="100">
 
