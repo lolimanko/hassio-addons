@@ -19,7 +19,7 @@ map:
   - type: ssl
     read_only: false
 #image: "ghcr.io/lolimanko/{arch}-anigamerplus" 
-#ingress: true 
+ingress: true 
 #ingress_stream: true
 #ingress_port: 80
 #panel_icon: mdi:television
