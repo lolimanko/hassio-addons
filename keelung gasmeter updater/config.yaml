@@ -1,6 +1,6 @@
 name: "Keelung Gasmeter Updater"
 description: "欣隆瓦斯自動用戶線上自報度數"
-version: "0.0.100"
+version: "0.0.2"
 slug: "keelung-gasmeter-updater"
 url: "https://github.com/lolimanko/hassio-addons/tree/master/keelung%20gasmeter%20updater"
 init: false
@@ -10,7 +10,7 @@ arch:
   - armhf
   - armv7
   - i386
-#image: ghcr.io/lolimanko/{arch}-keelung-gasmeter-updater
+image: ghcr.io/lolimanko/{arch}-keelung-gasmeter-updater
 map:
   - share:rw
 options:
