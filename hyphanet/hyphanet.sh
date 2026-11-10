@@ -10,6 +10,7 @@ HYPHANET_DATA="${HYPHANET_DATA:-/config}"
 
 HYPHANET_FPROXY_PORT=8888
 
+RUN_SCRIPT="${HYPHANET_HOME}/run.sh"
 CONFIG_INI="${HYPHANET_DATA}/freenet.ini"
 WRAPPER_CONF="${HYPHANET_HOME}/wrapper.conf"
 WRAPPER_LOG_PATH="${HYPHANET_DATA}/wrapper.log"
@@ -57,15 +58,13 @@ done
 echo "[2/7] Checking freenet.ini..."
 
 if [ ! -f "${CONFIG_INI}" ]; then
-
     if [ ! -f "${HYPHANET_HOME}/freenet.ini" ]; then
         echo "ERROR: Initial freenet.ini not found!"
         exit 1
     fi
 
-    echo "Initializing freenet.ini..."
     cp -a "${HYPHANET_HOME}/freenet.ini" "${CONFIG_INI}"
-
+    echo "Initialized freenet.ini."
 else
     echo "Existing freenet.ini found."
 fi
@@ -77,9 +76,6 @@ fi
 
 echo "[3/7] Preparing persistent files..."
 
-# Copy only when destination does not exist.
-# Never overwrite existing persistent identity or state.
-
 PERSISTENT_FILES=(
     "freenet.ini.bak"
     "node.random"
@@ -88,24 +84,18 @@ PERSISTENT_FILES=(
 )
 
 for item in "${PERSISTENT_FILES[@]}"; do
+    src="${HYPHANET_HOME}/${item}"
+    dest="${HYPHANET_DATA}/${item}"
 
-    src_path="${HYPHANET_HOME}/${item}"
-    dest_path="${HYPHANET_DATA}/${item}"
-
-    if [ ! -e "${dest_path}" ] && [ -f "${src_path}" ]; then
-        echo "Copying ${item}..."
-        cp -a "${src_path}" "${dest_path}"
+    if [ ! -e "${dest}" ] && [ -f "${src}" ]; then
+        cp -a "${src}" "${dest}"
     fi
-
 done
 
-
-# Seed nodes are stored under the persistent node directory.
 SEED_SOURCE="${HYPHANET_HOME}/seednodes.fref"
 SEED_DEST="${HYPHANET_DATA}/noderef/seednodes.fref"
 
 if [ ! -e "${SEED_DEST}" ] && [ -f "${SEED_SOURCE}" ]; then
-    echo "Copying seednodes.fref..."
     cp -a "${SEED_SOURCE}" "${SEED_DEST}"
 fi
 
@@ -127,16 +117,8 @@ BEGIN {
 
     count = 0
 
-    # ----------------------------------------------
-    # Persistent identity
-    # ----------------------------------------------
-
     keys[++count] = "node.masterKeyFile"
     values["node.masterKeyFile"] = data "/master.keys"
-
-    # ----------------------------------------------
-    # Installation directories
-    # ----------------------------------------------
 
     keys[++count] = "node.install.cfgDir"
     values["node.install.cfgDir"] = data "/config"
@@ -149,10 +131,6 @@ BEGIN {
 
     keys[++count] = "node.install.runDir"
     values["node.install.runDir"] = data "/run"
-
-    # ----------------------------------------------
-    # Persistent storage paths
-    # ----------------------------------------------
 
     keys[++count] = "ssl.sslKeyStore"
     values["ssl.sslKeyStore"] = data "/datastore/certs"
@@ -175,10 +153,6 @@ BEGIN {
     keys[++count] = "node.install.pluginDir"
     values["node.install.pluginDir"] = data "/plugins"
 
-    # ----------------------------------------------
-    # FProxy
-    # ----------------------------------------------
-
     keys[++count] = "fproxy.enabled"
     values["fproxy.enabled"] = "true"
 
@@ -194,24 +168,20 @@ BEGIN {
     keys[++count] = "fproxy.allowedHostsFullAccess"
     values["fproxy.allowedHostsFullAccess"] = "*"
 
-    # Build managed-key lookup
     for (i = 1; i <= count; i++) {
         managed[keys[i]] = 1
     }
 }
 
 {
-    # Remove End; restore it once at the end.
     if ($0 ~ /^[[:space:]]*End[[:space:]]*$/) {
         next
     }
 
-    # Identify key before "="
     key = $1
     sub(/^[[:space:]]*/, "", key)
     sub(/[[:space:]]*$/, "", key)
 
-    # Replace managed keys and remove duplicates.
     if (key in managed) {
         if (!(key in written)) {
             print key "=" values[key]
@@ -220,12 +190,10 @@ BEGIN {
         next
     }
 
-    # Preserve all unmanaged original settings.
     print
 }
 
 END {
-    # Add managed keys that were missing.
     for (i = 1; i <= count; i++) {
         key = keys[i]
 
@@ -234,7 +202,6 @@ END {
         }
     }
 
-    # Exactly one End at the end.
     print "End"
 }
 ' "${CONFIG_INI}" > "${TMP_INI}"
@@ -249,11 +216,6 @@ echo "Configuration updated."
 # ==================================================
 
 echo "[5/7] Verifying freenet.ini..."
-
-echo "Managed configuration:"
-grep -nE \
-'^(node\.masterKeyFile|node\.install\.|node\.downloadsDir|ssl\.sslKeyStore|fproxy\.)|^End$' \
-"${CONFIG_INI}" || true
 
 END_COUNT=$(grep -c '^End$' "${CONFIG_INI}" || true)
 
@@ -277,109 +239,44 @@ echo "freenet.ini structure OK."
 echo "[6/7] Configuring Wrapper..."
 
 if [ ! -f "${WRAPPER_CONF}" ]; then
-    echo "ERROR: wrapper.conf not found!"
+    echo "ERROR: wrapper.conf not found: ${WRAPPER_CONF}"
     exit 1
 fi
 
 if grep -q '^wrapper.app.parameter.1=' "${WRAPPER_CONF}"; then
-
     sed -i \
         "s#^wrapper.app.parameter.1=.*#wrapper.app.parameter.1=${CONFIG_INI}#" \
         "${WRAPPER_CONF}"
-
 else
     echo "ERROR: wrapper.app.parameter.1 not found!"
     exit 1
 fi
 
-echo "Wrapper configuration:"
-grep '^wrapper.app.parameter.1=' "${WRAPPER_CONF}"
+echo "Wrapper configured."
 
 
-if [ "$1" = "start" ]; then
+if [ "${1:-}" = "start" ]; then
 
-    echo "[7/7] Searching for Hyphanet start script..."
+    echo "[7/7] Starting Hyphanet..."
 
-    potential_scripts=(
-        "${HYPHANET_HOME}/run.sh"
-        "${HYPHANET_HOME}/Hyphanet/run.sh"
-        "${HYPHANET_HOME}/Freenet/run.sh"
-        "${HYPHANET_HOME}/freenet/run.sh"
-    )
-
-    found_script=""
-
-    for start_script in "${potential_scripts[@]}"; do
-
-        if [ -f "${start_script}" ]; then
-
-            if [ ! -x "${start_script}" ]; then
-                chmod +x "${start_script}"
-            fi
-
-            if [ -x "${start_script}" ]; then
-                found_script="${start_script}"
-                break
-            fi
-
-        fi
-
-    done
-
-
-    # ----------------------------------------------
-    # Start node
-    # ----------------------------------------------
-
-    if [ -n "${found_script}" ]; then
-
-        echo "Starting Hyphanet: ${found_script}"
-
-        echo "========================================"
-        echo "CONFIG BEFORE START"
-        echo "========================================"
-
-        grep -nE \
-        '^(node\.masterKeyFile|node\.install\.|node\.downloadsDir|ssl\.sslKeyStore|fproxy\.)|^End$' \
-        "${CONFIG_INI}" || true
-
-        "${found_script}" start
-
-        echo "Waiting for Hyphanet..."
-        sleep 15
-
-        echo "========================================"
-        echo "CONFIG AFTER START"
-        echo "========================================"
-
-        grep -nE \
-        '^(node\.masterKeyFile|node\.install\.|node\.downloadsDir|ssl\.sslKeyStore|fproxy\.)|^End$' \
-        "${CONFIG_INI}" || true
-
-        if [ ! -f "${WRAPPER_LOG_PATH}" ]; then
-            echo "Creating wrapper.log..."
-            touch "${WRAPPER_LOG_PATH}"
-        fi
-
-        echo "Following log: ${WRAPPER_LOG_PATH}"
-
-        tail -f "${WRAPPER_LOG_PATH}"
-
-    else
-
-        echo "ERROR: Could not find a valid start script!"
-
-        printf "Searched paths:\n"
-        printf " - %s\n" "${potential_scripts[@]}"
-
-        ls -laR "${HYPHANET_HOME}" || true
-
+    if [ ! -f "${RUN_SCRIPT}" ]; then
+        echo "ERROR: run.sh not found: ${RUN_SCRIPT}"
         exit 1
-
     fi
 
+    bash "${RUN_SCRIPT}" start
+
+    echo "Waiting for Hyphanet..."
+    sleep 15
+
+    if [ ! -f "${WRAPPER_LOG_PATH}" ]; then
+        touch "${WRAPPER_LOG_PATH}"
+    fi
+
+    echo "Following log: ${WRAPPER_LOG_PATH}"
+
+    exec tail -n 100 -F "${WRAPPER_LOG_PATH}"
+
 else
-
     exec "$@"
-
 fi
