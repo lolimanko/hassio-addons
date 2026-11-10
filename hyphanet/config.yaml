@@ -1,5 +1,5 @@
 name: "hyphanet"
-version: 0.75.1510
+version: 0.75.1507
 slug: "hyphanet"
 description: "hyphanet"
 arch:
@@ -18,7 +18,7 @@ map:
     read_only: false
   - type: ssl
     read_only: false
-#image: "ghcr.io/lolimanko/{arch}-anigamerplus" 
+image: "ghcr.io/lolimanko/{arch}-hyphanet" 
 ingress: true 
 #ingress_stream: true
 #ingress_port: 80
