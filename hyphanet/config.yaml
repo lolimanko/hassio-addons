@@ -18,7 +18,7 @@ map:
     read_only: false
   - type: ssl
     read_only: false
-image: "ghcr.io/lolimanko/{arch}-hyphanet" 
+#image: "ghcr.io/lolimanko/{arch}-hyphanet" 
 ingress: true 
 #ingress_stream: true
 #ingress_port: 80
