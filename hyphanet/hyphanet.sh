@@ -8,7 +8,6 @@ set -e
 HYPHANET_HOME="${HYPHANET_HOME:-/opt/hyphanet}"
 HYPHANET_DATA="${HYPHANET_DATA:-/config}"
 
-#SOCAT_LISTEN_PORT=8123
 HYPHANET_FPROXY_PORT=8888
 
 CONFIG_INI="${HYPHANET_DATA}/freenet.ini"
@@ -21,7 +20,6 @@ echo "========================================"
 echo "User:          $(whoami)"
 echo "Home:          ${HYPHANET_HOME}"
 echo "Data:          ${HYPHANET_DATA}"
-#echo "SOCAT Port:    ${SOCAT_LISTEN_PORT}"
 echo "FProxy Port:   ${HYPHANET_FPROXY_PORT}"
 echo "========================================"
 
@@ -30,20 +28,21 @@ echo "========================================"
 # 2. Prepare persistent storage
 # ==================================================
 
-echo "[1/6] Preparing persistent storage..."
+echo "[1/7] Preparing persistent storage..."
 
 mkdir -p "${HYPHANET_DATA}"
 
 PERSISTENT_DIRS=(
+    "config"
+    "state"
+    "noderef"
+    "run"
     "downloads"
     "persistent-temp"
     "datastore/certs"
     "plugin-data"
     "temp"
     "plugins"
-    "stats"
-    "store"
-    "freenet"
 )
 
 for item in "${PERSISTENT_DIRS[@]}"; do
@@ -55,7 +54,7 @@ done
 # 3. Initialize freenet.ini
 # ==================================================
 
-echo "[2/6] Checking freenet.ini..."
+echo "[2/7] Checking freenet.ini..."
 
 if [ ! -f "${CONFIG_INI}" ]; then
 
@@ -73,10 +72,49 @@ fi
 
 
 # ==================================================
-# 4. Update freenet.ini
+# 4. Initialize persistent files
 # ==================================================
 
-echo "[3/6] Updating freenet.ini..."
+echo "[3/7] Preparing persistent files..."
+
+# Copy only when destination does not exist.
+# Never overwrite existing persistent identity or state.
+
+PERSISTENT_FILES=(
+    "freenet.ini.bak"
+    "node.random"
+    "master.keys"
+    "wrapper.log"
+)
+
+for item in "${PERSISTENT_FILES[@]}"; do
+
+    src_path="${HYPHANET_HOME}/${item}"
+    dest_path="${HYPHANET_DATA}/${item}"
+
+    if [ ! -e "${dest_path}" ] && [ -f "${src_path}" ]; then
+        echo "Copying ${item}..."
+        cp -a "${src_path}" "${dest_path}"
+    fi
+
+done
+
+
+# Seed nodes are stored under the persistent node directory.
+SEED_SOURCE="${HYPHANET_HOME}/seednodes.fref"
+SEED_DEST="${HYPHANET_DATA}/noderef/seednodes.fref"
+
+if [ ! -e "${SEED_DEST}" ] && [ -f "${SEED_SOURCE}" ]; then
+    echo "Copying seednodes.fref..."
+    cp -a "${SEED_SOURCE}" "${SEED_DEST}"
+fi
+
+
+# ==================================================
+# 5. Update freenet.ini
+# ==================================================
+
+echo "[4/7] Updating freenet.ini..."
 
 TMP_INI="${CONFIG_INI}.tmp"
 
@@ -87,8 +125,34 @@ BEGIN {
     FS = "="
     OFS = "="
 
-    # All managed configuration keys
     count = 0
+
+    # ----------------------------------------------
+    # Persistent identity
+    # ----------------------------------------------
+
+    keys[++count] = "node.masterKeyFile"
+    values["node.masterKeyFile"] = data "/master.keys"
+
+    # ----------------------------------------------
+    # Installation directories
+    # ----------------------------------------------
+
+    keys[++count] = "node.install.cfgDir"
+    values["node.install.cfgDir"] = data "/config"
+
+    keys[++count] = "node.install.userDir"
+    values["node.install.userDir"] = data "/state"
+
+    keys[++count] = "node.install.nodeDir"
+    values["node.install.nodeDir"] = data "/noderef"
+
+    keys[++count] = "node.install.runDir"
+    values["node.install.runDir"] = data "/run"
+
+    # ----------------------------------------------
+    # Persistent storage paths
+    # ----------------------------------------------
 
     keys[++count] = "ssl.sslKeyStore"
     values["ssl.sslKeyStore"] = data "/datastore/certs"
@@ -111,6 +175,10 @@ BEGIN {
     keys[++count] = "node.install.pluginDir"
     values["node.install.pluginDir"] = data "/plugins"
 
+    # ----------------------------------------------
+    # FProxy
+    # ----------------------------------------------
+
     keys[++count] = "fproxy.enabled"
     values["fproxy.enabled"] = "true"
 
@@ -126,23 +194,24 @@ BEGIN {
     keys[++count] = "fproxy.allowedHostsFullAccess"
     values["fproxy.allowedHostsFullAccess"] = "*"
 
+    # Build managed-key lookup
     for (i = 1; i <= count; i++) {
         managed[keys[i]] = 1
     }
 }
 
 {
-    # Remove End; it will be written once at the end
+    # Remove End; restore it once at the end.
     if ($0 ~ /^[[:space:]]*End[[:space:]]*$/) {
         next
     }
 
-    # Identify configuration key
+    # Identify key before "="
     key = $1
     sub(/^[[:space:]]*/, "", key)
     sub(/[[:space:]]*$/, "", key)
 
-    # Replace managed keys only once
+    # Replace managed keys and remove duplicates.
     if (key in managed) {
         if (!(key in written)) {
             print key "=" values[key]
@@ -151,12 +220,12 @@ BEGIN {
         next
     }
 
-    # Preserve all other original lines
+    # Preserve all unmanaged original settings.
     print
 }
 
 END {
-    # Add managed keys that did not exist
+    # Add managed keys that were missing.
     for (i = 1; i <= count; i++) {
         key = keys[i]
 
@@ -165,49 +234,47 @@ END {
         }
     }
 
-    # Restore exactly one End at the end
+    # Exactly one End at the end.
     print "End"
 }
 ' "${CONFIG_INI}" > "${TMP_INI}"
 
 mv "${TMP_INI}" "${CONFIG_INI}"
 
-echo "Configuration after update:"
-cat "${CONFIG_INI}"
+echo "Configuration updated."
 
 
 # ==================================================
-# 5. Initialize other persistent files
+# 6. Verify configuration
 # ==================================================
 
-echo "[4/6] Preparing persistent files..."
+echo "[5/7] Verifying freenet.ini..."
 
-PERSISTENT_FILES=(
-    "freenet.ini.bak"
-    "node.random"
-    "master.keys"
-    "seednodes.fref"
-    "wrapper.log"
-)
+echo "Managed configuration:"
+grep -nE \
+'^(node\.masterKeyFile|node\.install\.|node\.downloadsDir|ssl\.sslKeyStore|fproxy\.)|^End$' \
+"${CONFIG_INI}" || true
 
-for item in "${PERSISTENT_FILES[@]}"; do
+END_COUNT=$(grep -c '^End$' "${CONFIG_INI}" || true)
 
-    src_path="${HYPHANET_HOME}/${item}"
-    dest_path="${HYPHANET_DATA}/${item}"
+if [ "${END_COUNT}" -ne 1 ]; then
+    echo "ERROR: freenet.ini must contain exactly one End!"
+    exit 1
+fi
 
-    if [ ! -e "${dest_path}" ] && [ -f "${src_path}" ]; then
-        echo "Copying ${item}..."
-        cp -a "${src_path}" "${dest_path}"
-    fi
+if [ "$(tail -n 1 "${CONFIG_INI}")" != "End" ]; then
+    echo "ERROR: End is not the last line!"
+    exit 1
+fi
 
-done
+echo "freenet.ini structure OK."
 
 
 # ==================================================
-# 6. Configure Java Service Wrapper
+# 7. Configure Wrapper and start Hyphanet
 # ==================================================
 
-echo "[5/6] Configuring Wrapper..."
+echo "[6/7] Configuring Wrapper..."
 
 if [ ! -f "${WRAPPER_CONF}" ]; then
     echo "ERROR: wrapper.conf not found!"
@@ -229,13 +296,9 @@ echo "Wrapper configuration:"
 grep '^wrapper.app.parameter.1=' "${WRAPPER_CONF}"
 
 
-# ==================================================
-# 7. Start Hyphanet
-# ==================================================
-
 if [ "$1" = "start" ]; then
 
-    echo "[6/6] Searching for Hyphanet start script..."
+    echo "[7/7] Searching for Hyphanet start script..."
 
     potential_scripts=(
         "${HYPHANET_HOME}/run.sh"
@@ -272,18 +335,26 @@ if [ "$1" = "start" ]; then
 
         echo "Starting Hyphanet: ${found_script}"
 
-        echo "CONFIG BEFORE START:"
-        grep -nE '^(ssl\.sslKeyStore|node\.downloadsDir|node\.install\.|fproxy\.)|^End$' \
-            "${CONFIG_INI}" || true
+        echo "========================================"
+        echo "CONFIG BEFORE START"
+        echo "========================================"
+
+        grep -nE \
+        '^(node\.masterKeyFile|node\.install\.|node\.downloadsDir|ssl\.sslKeyStore|fproxy\.)|^End$' \
+        "${CONFIG_INI}" || true
 
         "${found_script}" start
 
         echo "Waiting for Hyphanet..."
         sleep 15
 
-        echo "CONFIG AFTER START:"
-        grep -nE '^(ssl\.sslKeyStore|node\.downloadsDir|node\.install\.|fproxy\.)|^End$' \
-            "${CONFIG_INI}" || true
+        echo "========================================"
+        echo "CONFIG AFTER START"
+        echo "========================================"
+
+        grep -nE \
+        '^(node\.masterKeyFile|node\.install\.|node\.downloadsDir|ssl\.sslKeyStore|fproxy\.)|^End$' \
+        "${CONFIG_INI}" || true
 
         if [ ! -f "${WRAPPER_LOG_PATH}" ]; then
             echo "Creating wrapper.log..."
