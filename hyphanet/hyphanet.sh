@@ -8,7 +8,7 @@ set -e
 HYPHANET_HOME="${HYPHANET_HOME:-/opt/hyphanet}"
 HYPHANET_DATA="${HYPHANET_DATA:-/config}"
 
-SOCAT_LISTEN_PORT=8123
+#SOCAT_LISTEN_PORT=8123
 HYPHANET_FPROXY_PORT=8888
 
 CONFIG_INI="${HYPHANET_DATA}/freenet.ini"
@@ -21,7 +21,7 @@ echo "========================================"
 echo "User:          $(whoami)"
 echo "Home:          ${HYPHANET_HOME}"
 echo "Data:          ${HYPHANET_DATA}"
-echo "SOCAT Port:    ${SOCAT_LISTEN_PORT}"
+#echo "SOCAT Port:    ${SOCAT_LISTEN_PORT}"
 echo "FProxy Port:   ${HYPHANET_FPROXY_PORT}"
 echo "========================================"
 
@@ -65,32 +65,122 @@ if [ ! -f "${CONFIG_INI}" ]; then
     fi
 
     echo "Initializing freenet.ini..."
-
     cp -a "${HYPHANET_HOME}/freenet.ini" "${CONFIG_INI}"
 
-    # Configure persistent paths
-    sed -i \
-        -e "s#^ssl\\.sslKeyStore=.*#ssl.sslKeyStore=${HYPHANET_DATA}/datastore/certs#" \
-        -e "s#^node\\.downloadsDir=.*#node.downloadsDir=${HYPHANET_DATA}/downloads#" \
-        -e "s#^node\\.install\\.persistentTempDir=.*#node.install.persistentTempDir=${HYPHANET_DATA}/persistent-temp#" \
-        -e "s#^node\\.install\\.storeDir=.*#node.install.storeDir=${HYPHANET_DATA}/datastore#" \
-        -e "s#^node\\.install\\.pluginStoresDir=.*#node.install.pluginStoresDir=${HYPHANET_DATA}/plugin-data#" \
-        -e "s#^node\\.install\\.tempDir=.*#node.install.tempDir=${HYPHANET_DATA}/temp#" \
-        -e "s#^node\\.install\\.pluginDir=.*#node.install.pluginDir=${HYPHANET_DATA}/plugins#" \
-        "${CONFIG_INI}"
-
-    echo "Initial configuration created."
-
 else
-    echo "Existing freenet.ini found. Keeping existing configuration."
+    echo "Existing freenet.ini found."
 fi
 
 
 # ==================================================
-# 4. Initialize other persistent files
+# 4. Update freenet.ini
 # ==================================================
 
-echo "[3/6] Preparing persistent files..."
+echo "[3/6] Updating freenet.ini..."
+
+TMP_INI="${CONFIG_INI}.tmp"
+
+awk \
+    -v data="${HYPHANET_DATA}" \
+    -v fproxy_port="${HYPHANET_FPROXY_PORT}" '
+BEGIN {
+    FS = "="
+    OFS = "="
+
+    # All managed configuration keys
+    count = 0
+
+    keys[++count] = "ssl.sslKeyStore"
+    values["ssl.sslKeyStore"] = data "/datastore/certs"
+
+    keys[++count] = "node.downloadsDir"
+    values["node.downloadsDir"] = data "/downloads"
+
+    keys[++count] = "node.install.persistentTempDir"
+    values["node.install.persistentTempDir"] = data "/persistent-temp"
+
+    keys[++count] = "node.install.storeDir"
+    values["node.install.storeDir"] = data "/datastore"
+
+    keys[++count] = "node.install.pluginStoresDir"
+    values["node.install.pluginStoresDir"] = data "/plugin-data"
+
+    keys[++count] = "node.install.tempDir"
+    values["node.install.tempDir"] = data "/temp"
+
+    keys[++count] = "node.install.pluginDir"
+    values["node.install.pluginDir"] = data "/plugins"
+
+    keys[++count] = "fproxy.enabled"
+    values["fproxy.enabled"] = "true"
+
+    keys[++count] = "fproxy.port"
+    values["fproxy.port"] = fproxy_port
+
+    keys[++count] = "fproxy.bindTo"
+    values["fproxy.bindTo"] = "0.0.0.0"
+
+    keys[++count] = "fproxy.allowedHosts"
+    values["fproxy.allowedHosts"] = "*"
+
+    keys[++count] = "fproxy.allowedHostsFullAccess"
+    values["fproxy.allowedHostsFullAccess"] = "*"
+
+    for (i = 1; i <= count; i++) {
+        managed[keys[i]] = 1
+    }
+}
+
+{
+    # Remove End; it will be written once at the end
+    if ($0 ~ /^[[:space:]]*End[[:space:]]*$/) {
+        next
+    }
+
+    # Identify configuration key
+    key = $1
+    sub(/^[[:space:]]*/, "", key)
+    sub(/[[:space:]]*$/, "", key)
+
+    # Replace managed keys only once
+    if (key in managed) {
+        if (!(key in written)) {
+            print key "=" values[key]
+            written[key] = 1
+        }
+        next
+    }
+
+    # Preserve all other original lines
+    print
+}
+
+END {
+    # Add managed keys that did not exist
+    for (i = 1; i <= count; i++) {
+        key = keys[i]
+
+        if (!(key in written)) {
+            print key "=" values[key]
+        }
+    }
+
+    # Restore exactly one End at the end
+    print "End"
+}
+' "${CONFIG_INI}" > "${TMP_INI}"
+
+mv "${TMP_INI}" "${CONFIG_INI}"
+
+echo "Configuration after update:"
+cat "${CONFIG_INI}"
+
+
+# ==================================================
+# 5. Initialize other persistent files
+# ==================================================
+
+echo "[4/6] Preparing persistent files..."
 
 PERSISTENT_FILES=(
     "freenet.ini.bak"
@@ -114,10 +204,10 @@ done
 
 
 # ==================================================
-# 5. Configure Java Service Wrapper
+# 6. Configure Java Service Wrapper
 # ==================================================
 
-echo "[4/6] Configuring Wrapper..."
+echo "[5/6] Configuring Wrapper..."
 
 if [ ! -f "${WRAPPER_CONF}" ]; then
     echo "ERROR: wrapper.conf not found!"
@@ -140,47 +230,10 @@ grep '^wrapper.app.parameter.1=' "${WRAPPER_CONF}"
 
 
 # ==================================================
-# 6. Start Hyphanet
+# 7. Start Hyphanet
 # ==================================================
 
 if [ "$1" = "start" ]; then
-
-    echo "[5/6] Configuring FProxy..."
-
-    sed -i -E \
-        's#^fproxy\.bindTo[[:space:]]*=.*#fproxy.bindTo=0.0.0.0#' \
-        "${CONFIG_INI}"
-
-    sed -i -E \
-        's#^fproxy\.allowedHosts[[:space:]]*=.*#fproxy.allowedHosts=*#' \
-        "${CONFIG_INI}"
-
-    sed -i -E \
-        's#^fproxy\.allowedHostsFullAccess[[:space:]]*=.*#fproxy.allowedHostsFullAccess=*#' \
-        "${CONFIG_INI}"
-
-    grep -q '^fproxy.enabled=' "${CONFIG_INI}" || \
-        echo "fproxy.enabled=true" >> "${CONFIG_INI}"
-
-    grep -q '^fproxy.port=' "${CONFIG_INI}" || \
-        echo "fproxy.port=${HYPHANET_FPROXY_PORT}" >> "${CONFIG_INI}"
-
-    grep -q '^fproxy.bindTo=' "${CONFIG_INI}" || \
-        echo "fproxy.bindTo=0.0.0.0" >> "${CONFIG_INI}"
-
-    grep -q '^fproxy.allowedHosts=' "${CONFIG_INI}" || \
-        echo "fproxy.allowedHosts=*" >> "${CONFIG_INI}"
-
-    grep -q '^fproxy.allowedHostsFullAccess=' "${CONFIG_INI}" || \
-        echo "fproxy.allowedHostsFullAccess=*" >> "${CONFIG_INI}"
-
-    echo "FProxy configuration:"
-    grep '^fproxy\.' "${CONFIG_INI}" || true
-
-
-    # ----------------------------------------------
-    # Find run.sh
-    # ----------------------------------------------
 
     echo "[6/6] Searching for Hyphanet start script..."
 
@@ -219,10 +272,18 @@ if [ "$1" = "start" ]; then
 
         echo "Starting Hyphanet: ${found_script}"
 
+        echo "CONFIG BEFORE START:"
+        grep -nE '^(ssl\.sslKeyStore|node\.downloadsDir|node\.install\.|fproxy\.)|^End$' \
+            "${CONFIG_INI}" || true
+
         "${found_script}" start
 
         echo "Waiting for Hyphanet..."
         sleep 15
+
+        echo "CONFIG AFTER START:"
+        grep -nE '^(ssl\.sslKeyStore|node\.downloadsDir|node\.install\.|fproxy\.)|^End$' \
+            "${CONFIG_INI}" || true
 
         if [ ! -f "${WRAPPER_LOG_PATH}" ]; then
             echo "Creating wrapper.log..."
