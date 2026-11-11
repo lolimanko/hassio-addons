@@ -1,7 +1,9 @@
 name: "Hyphanet"
 version: 0.75.1507
 slug: "hyphanet"
-description: "hyphanet"
+description: "Hyphanet is peer-to-peer network for
+censorship-resistant and privacy-respecting
+publishing and communication."
 arch:
   - aarch64
   - amd64
