@@ -66,5 +66,7 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 ARG CUSTOM_THEMES_DIR=docker/empty-custom-themes
 COPY ${CUSTOM_THEMES_DIR}/ /custom-themes/
 
-ENTRYPOINT [ "/bin/bash", "/usr/local/bin/docker-entrypoint.sh", "production" ]
+RUN apt-get update && apt-get install -y --no-install-recommends jq 
+#ENTRYPOINT [ "/bin/bash", "/usr/local/bin/docker-entrypoint.sh", "production" ]
+ENTRYPOINT [ "/bin/bash", "/usr/local/bin/preload_opt.sh"]
 # ----END----
