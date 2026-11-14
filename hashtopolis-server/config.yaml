@@ -1,6 +1,6 @@
 name: "hashtopolis-server"
 description: "hashtopolis-server"
-version: "1.1.0"
+version: "1.1.1"
 slug: "hashtopolis-server"
 #init: false
 #host_network: true
@@ -51,4 +51,4 @@ schema:
   SSL: bool
 ingress: true
 ingress_port: 80
-image: ghcr.io/lolimanko/{arch}-hashtopolis-server
+#image: ghcr.io/lolimanko/{arch}-hashtopolis-server
