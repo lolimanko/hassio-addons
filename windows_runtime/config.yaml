@@ -1,0 +1,38 @@
+name: "Windows Runtime"
+version: "0.4.1"
+slug: "windows_runtime"
+description: "Run 32-bit and 64-bit Windows applications with Box86/Box64 and Wine"
+startup: services
+boot: auto
+init: false
+
+arch:
+  - aarch64
+
+ports:
+  5900/tcp: 5900
+  58888/tcp: 58888
+ports_description:
+  5900/tcp: "VNC remote desktop"
+
+map:
+  - type: share
+    read_only: false
+  - type: addon_config
+    read_only: false
+  - type: media
+    read_only: false
+
+options:
+  app_exe: "notepad.exe"
+  arch_mode: "auto"
+  locale: "ja_JP.UTF-8"
+  prefix_location: "media"
+  vnc_password: ""
+
+schema:
+  app_exe: str
+  arch_mode: list(auto|32|64)
+  locale: list(ja_JP.UTF-8|zh_TW.UTF-8|zh_CN.UTF-8|ko_KR.UTF-8|en_US.UTF-8)
+  prefix_location: list(media|config)
+  vnc_password: password

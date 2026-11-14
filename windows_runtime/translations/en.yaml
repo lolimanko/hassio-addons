@@ -1,0 +1,18 @@
+configuration:
+  app_exe:
+    name: Application path
+    description: Windows program to launch. A bare file name is looked up in /share/windows-apps; an absolute path also works.
+  arch_mode:
+    name: Architecture mode
+    description: auto reads the EXE's PE header to pick 32-bit or 64-bit; you can also force 32 or 64.
+  locale:
+    name: Locale
+    description: Locale used by the container and Wine (affects the ANSI code page). The matching CJK font substitutions are applied automatically. Restart the add-on after changing it.
+  prefix_location:
+    name: "Wine prefix location"
+    description: "media: store under /media, which HAOS backups skip, keeping backups small (default); config: store in the add-on config directory, which is backed up. Falls back to config if /media does not support symlinks."
+  vnc_password:
+    name: VNC password
+    description: Password for VNC access (an empty value falls back to 123456, so please set your own).
+network:
+  5900/tcp: VNC remote desktop

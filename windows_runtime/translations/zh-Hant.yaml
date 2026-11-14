@@ -1,0 +1,18 @@
+configuration:
+  app_exe:
+    name: 程式路徑
+    description: 要啟動的 Windows 程式。填檔名時會從 /share/windows-apps 尋找，也可填完整絕對路徑。
+  arch_mode:
+    name: 位元模式
+    description: auto 會讀取 EXE 的 PE 標頭自動判斷 32/64 位元；也可手動指定 32 或 64。
+  locale:
+    name: 語系
+    description: 容器與 Wine 使用的語系（影響程式的 ANSI 碼頁），同時會自動套用對應的 CJK 字型替換。更換後請重新啟動 add-on。
+  prefix_location:
+    name: "Wine prefix 位置"
+    description: "media：放在 /media，不會被 HAOS 備份，備份檔較小（預設）；config：放在 add-on 設定目錄，會被備份。/media 若是不支援符號連結的網路儲存會自動退回 config。"
+  vnc_password:
+    name: VNC 密碼
+    description: VNC 連線密碼（留空時預設為 123456，建議自行設定）。
+network:
+  5900/tcp: VNC 遠端桌面
