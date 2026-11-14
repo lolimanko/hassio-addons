@@ -1,0 +1,138 @@
+import time
+from hashtopolis import AgentAssignment, Chunk
+from hashtopolis_agent import ProcessState
+
+from utils import BaseTest, do_create_dummy_agent, do_create_agentassignent
+
+
+class AgentStatTest(BaseTest):
+    model_class = AgentAssignment
+
+    def create_test_object(self, *nargs, **kwargs):
+        return self.create_agentassignment(*nargs, **kwargs)
+
+    def test_create(self):
+        model_obj = self.create_test_object()
+        self._test_create(model_obj)
+
+    def test_patch(self):
+        model_obj = self.create_test_object()
+        self._test_patch(model_obj, 'benchmark', "1234")
+
+    def test_delete(self):
+        model_obj = self.create_test_object(delete=False)
+        self._test_delete(model_obj)
+
+    def test_expandables(self):
+        model_obj = self.create_test_object()
+        expandables = ['task', 'agent']
+        self._test_expandables(model_obj, expandables)
+
+    def test_agent_assign_task(self):
+        (dummy, agent) = do_create_dummy_agent()
+        self.delete_after_test(agent)
+        hashlist = self.create_hashlist()
+        task = self.create_task(hashlist)
+
+        # no assignment should exist yet
+        check = AgentAssignment.objects.filter(taskId=task.id)
+
+        self.assertEqual(len(check), 0)
+
+        taskId = dummy.get_task()
+
+        self.assertEqual(taskId, task.id)
+
+        # after the agent asked for a task, there should be an assignment
+        check = AgentAssignment.objects.filter(taskId=task.id)
+
+        self.assertEqual(len(check), 1)
+        self.assertEqual(check[0].agentId, agent.id)
+        self.assertEqual(check[0].taskId, task.id)
+
+    def test_acl(self):
+        model_obj = self.create_test_object()
+        self._test_acl_list(model_obj, {'permAgentAssignmentRead': True})
+        self._test_acl_count(model_obj, {'permAgentAssignmentRead': True})
+
+    def test_cracking_time_aggregation(self):
+        dummy_agent, agent, _, task = self.create_agent_with_task().values()
+        time.sleep(1)  # Simulate cracking time
+        dummy_agent.send_process(progress=100)
+        dummy_agent.get_chunk()
+        time.sleep(1)  # Simulate cracking time
+        dummy_agent.send_process(progress=100)
+        dummy_agent.get_chunk()
+        time.sleep(1)  # Simulate cracking time
+        dummy_agent.send_process(progress=100)
+        dummy_agent.get_chunk()  # Leave the last chunk unfinished for a more meaningful test
+
+        # Calculate a reference value for the cracking time by applying an interval merge algorithm
+        chunks = Chunk.objects.filter(agentId=agent.id, taskId=task.id)
+        totalEnd = totalSum = 0
+        for chunk in sorted(chunks, key=lambda c: c.dispatchTime): # Expects list to be sorted by time
+            if chunk.dispatchTime > 0 and chunk.solveTime > 0:
+                totalSum = (
+                    totalSum + (chunk.solveTime - chunk.dispatchTime)
+                    - max(0, totalEnd - chunk.dispatchTime)
+                    + max(0, totalEnd - chunk.solveTime)
+                )
+                totalEnd = max(totalEnd, chunk.solveTime)
+
+        # Get the aggregate cracking time from the application
+        aggregate_attrs = ['crackingTime']
+        assignment = AgentAssignment.objects.params(**{"aggregate[assignment]": ','.join(aggregate_attrs)}).get(agentId=agent.id, taskId=task.id)
+
+        self.assertEqual(totalSum, assignment.crackingTime)
+
+    def _get_current_chunk_id(self, agent, task):
+        assignment = AgentAssignment.objects.params(
+            **{"aggregate[assignment]": "currentChunkId"}
+        ).get(agentId=agent.id, taskId=task.id)
+        return getattr(assignment, 'currentChunkId', None)
+
+    def test_current_chunk_id_null_before_any_chunk(self):
+        dummy_agent, agent = do_create_dummy_agent()
+        self.delete_after_test(agent)
+        hashlist = self.create_hashlist()
+        task = self.create_task(hashlist)
+        do_create_agentassignent(agent, task)
+        # Agent has the assignment but hasn't requested any chunk yet
+        chunk_id = self._get_current_chunk_id(agent, task)
+        self.assertIsNone(chunk_id)
+
+    def test_current_chunk_id_returns_active_chunk(self):
+        dummy_agent, agent, _, task = self.create_agent_with_task().values()
+        dummy_agent.get_chunk()
+        # Partial progress -> chunk is still active (progress < 10000)
+        dummy_agent.send_process(progress=50)
+
+        chunk_id = self._get_current_chunk_id(agent, task)
+        self.assertIsNotNone(chunk_id)
+        self.assertEqual(chunk_id, dummy_agent.chunk['chunkId'])
+
+    def test_current_chunk_id_null_after_chunk_completed(self):
+        dummy_agent, agent, _, task = self.create_agent_with_task().values()
+        dummy_agent.get_chunk()
+        # Full progress -> chunk is completed (progress == 10000, no longer < 10000)
+        dummy_agent.send_process(progress=100, state=ProcessState.EXHAUSTED)
+
+        chunk_id = self._get_current_chunk_id(agent, task)
+        self.assertIsNone(chunk_id)
+
+    def test_current_chunk_id_updates_to_new_chunk(self):
+        dummy_agent, agent, _, task = self.create_agent_with_task().values()
+        # First chunk: complete it
+        dummy_agent.get_chunk()
+        dummy_agent.send_process(progress=100, state=ProcessState.EXHAUSTED)
+        first_chunk_id = self._get_current_chunk_id(agent, task)
+        self.assertIsNone(first_chunk_id)
+
+        # Second chunk: leave it in progress
+        dummy_agent.get_chunk()
+        dummy_agent.send_process(progress=50)
+
+        chunk_id = self._get_current_chunk_id(agent, task)
+        self.assertIsNotNone(chunk_id)
+        self.assertEqual(chunk_id, dummy_agent.chunk['chunkId'])
+        self.assertNotEqual(chunk_id, first_chunk_id)

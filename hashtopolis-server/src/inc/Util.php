@@ -38,6 +38,7 @@ use Hashtopolis\inc\defines\DConfig;
 use Hashtopolis\inc\defines\DDeviceCompress;
 use Hashtopolis\inc\defines\DDirectories;
 use Hashtopolis\inc\defines\DFileType;
+use Hashtopolis\inc\defines\DHashcatStatus;
 use Hashtopolis\inc\defines\DHashlistFormat;
 use Hashtopolis\inc\defines\DLogEntry;
 use Hashtopolis\inc\defines\DLogEntryIssuer;
@@ -48,6 +49,7 @@ use Hashtopolis\inc\defines\DPrince;
 use Hashtopolis\inc\defines\DTaskTypes;
 use Hashtopolis\inc\handlers\NotificationHandler;
 use Hashtopolis\inc\utils\AccessUtils;
+use Hashtopolis\inc\utils\FileChecksumUtils;
 use PDO;
 use Random\RandomException;
 use SplFileObject;
@@ -418,15 +420,18 @@ class Util {
     $qF = new QueryFilter(FileDelete::FILENAME, $name, "=");
     Factory::getFileDeleteFactory()->massDeletion([Factory::FILTER => $qF]);
     if ($fileType == DFileType::RULE) {
-      $file = new File(null, $name, Util::filesize($path), 1, $fileType, $accessGroupId, Util::rulefileLineCount($path));
+      $file = new File(null, $name, Util::filesize($path), 1, $fileType, $accessGroupId, Util::rulefileLineCount($path), null);
     }
     else {
-      $file = new File(null, $name, Util::filesize($path), 1, $fileType, $accessGroupId, Util::fileLineCount($path));
+      $file = new File(null, $name, Util::filesize($path), 1, $fileType, $accessGroupId, Util::fileLineCount($path), null);
     }
     $file = Factory::getFileFactory()->save($file);
     if ($file == null) {
       return false;
     }
+    // the checksum of a file this size cannot be computed inside the request, so it is left to the
+    // background job runner and stays null until that job ran
+    FileChecksumUtils::enqueue($file->getId());
     return true;
   }
   
@@ -1046,17 +1051,21 @@ class Util {
       "hashes_binary"
     );
     $states = array(
-      "New",
-      "Init",
-      "Running",
-      "Paused",
-      "Exhausted",
-      "Cracked",
-      "Aborted",
-      "Quit",
-      "Bypass",
-      "Trimmed",
-      "Aborting..."
+      DHashcatStatus::INIT               => "New",
+      DHashcatStatus::AUTOTUNE           => "Autotune",
+      DHashcatStatus::SELFTEST           => "Selftest",
+      DHashcatStatus::RUNNING            => "Running",
+      DHashcatStatus::PAUSED             => "Paused",
+      DHashcatStatus::EXHAUSTED          => "Exhausted",
+      DHashcatStatus::CRACKED            => "Cracked",
+      DHashcatStatus::ABORTED            => "Aborted",
+      DHashcatStatus::QUIT               => "Quit",
+      DHashcatStatus::BYPASS             => "Bypass",
+      DHashcatStatus::ABORTED_CHECKPOINT => "Aborted at checkpoint",
+      DHashcatStatus::ABORTED_RUNTIME    => "Aborted at runtime",
+      DHashcatStatus::ERROR              => "Error",
+      DHashcatStatus::ABORTED_FINISH     => "Aborted at finish",
+      DHashcatStatus::AUTODETECT          => "Autodetect"
     );
     switch ($id) {
       case 'os':
@@ -1065,7 +1074,7 @@ class Util {
         }
         return $oses[$val];
       case 'states':
-        return $states[$val];
+        return $states[$val] ?? "Unknown";
       case 'formats':
         return $formats[$val];
       case 'formattables':

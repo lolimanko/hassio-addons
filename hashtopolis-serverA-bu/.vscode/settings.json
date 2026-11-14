@@ -1,0 +1,35 @@
+{
+    "python.testing.unittestArgs": [
+        "-v",
+        "-s",
+        "./ci",
+        "-p",
+        "test_*.py"
+    ],
+    "python.testing.pytestEnabled": true,
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestArgs": [
+        "ci"
+    ],
+    "intelephense.environment.includePaths": [
+        "../vendor"
+    ],
+    "flake8.args": [
+      "--max-line-length=120"
+],
+"cSpell.words": [
+    "Hashcat",
+    "hashlist",
+    "hashlists",
+    "Hashtopolis",
+    "Hashtype",
+    "keyspace",
+    "preconfigured",
+    "superhashlist",
+    "superhashlists",
+    "supertask",
+    "Supertasks",
+    "wordlist",
+    "wordlists"
+],
+}

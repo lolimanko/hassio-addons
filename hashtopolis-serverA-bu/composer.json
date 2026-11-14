@@ -1,0 +1,70 @@
+{
+    "name": "hashtopolis/hashtopolis-skeleton",
+    "description": "A Hashtopolis API skeleton application",
+    "keywords": [
+        "microframework",
+        "rest",
+        "router",
+        "psr7"
+    ],
+    "homepage": "https://github.com/hashtopolis/server",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Various Authors",
+            "email": "noreply@example.org",
+            "homepage": "https://example.org"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "ext-curl": "*",
+        "ext-gd": "*",
+        "ext-json": "*",
+        "ext-mbstring": "*",
+        "ext-pdo": "*",
+        "composer/semver": "^3.4",
+        "crell/api-problem": "^3.6",
+        "firebase/php-jwt": "7.0.2",
+        "jimtools/basic-auth": "^1.0",
+        "jimtools/jwt-auth": "^3.0",
+        "middlewares/encoder": "^2.1",
+        "middlewares/negotiation": "^2.1",
+        "monolog/monolog": "^2.8",
+        "php-di/php-di": "7.0.7",
+        "slim/psr7": "^1.5",
+        "slim/slim": "^4.10"
+    },
+    "require-dev": {
+        "phpspec/prophecy-phpunit": "^2.0",
+        "phpstan/extension-installer": "^1.1.0",
+        "phpstan/phpstan": "^2.2",
+        "phpunit/phpunit": "^12.5.7",
+        "squizlabs/php_codesniffer": "^3.13.6"
+    },
+    "config": {
+        "allow-plugins": {
+            "phpstan/extension-installer": true
+        },
+        "process-timeout": 0,
+        "sort-packages": true,
+        "audit": {
+          "block-insecure": false
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Hashtopolis\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Hashtopolis\\": "ci/phpunit/"
+        }
+    },
+    "scripts": {
+        "start": "php -S localhost:8080 -t src",
+        "test": "phpunit",
+        "openapi": "php ci/tools/generate-openapi.php"
+    }
+}

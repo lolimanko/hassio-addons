@@ -1,0 +1,2108 @@
+<?php
+
+namespace Hashtopolis\inc\apiv2\common;
+
+use Exception;
+use Hashtopolis\dba\AbstractModel;
+use Hashtopolis\dba\MassUpdateSet;
+use Hashtopolis\dba\models\User;
+use Hashtopolis\inc\apiv2\error\ErrorHandler;
+use Hashtopolis\inc\apiv2\error\HttpConflict;
+use Hashtopolis\inc\apiv2\error\HttpError;
+use Hashtopolis\inc\apiv2\error\HttpForbidden;
+use Hashtopolis\inc\apiv2\error\InternalError;
+use Hashtopolis\inc\apiv2\error\ResourceNotFoundError;
+use Hashtopolis\inc\HTException;
+use JsonException;
+use PDOException;
+use Psr\Container\ContainerExceptionInterface;
+use Psr\Container\NotFoundExceptionInterface;
+use Psr\Http\Message\ResponseInterface as Response;
+use Psr\Http\Message\ServerRequestInterface as Request;
+use Slim\App;
+use Hashtopolis\dba\AbstractModelFactory;
+use Hashtopolis\dba\JoinFilter;
+use Hashtopolis\dba\Factory;
+use Hashtopolis\dba\ContainFilter;
+use Hashtopolis\dba\LimitFilter;
+use Hashtopolis\dba\OrderFilter;
+use Hashtopolis\dba\PaginationFilter;
+use Hashtopolis\dba\QueryFilter;
+use Hashtopolis\inc\Util;
+use Hashtopolis\inc\SConfig;
+use Hashtopolis\inc\defines\DConfig;
+
+/**
+ * @template TModel of AbstractModel
+ */
+abstract class AbstractModelAPI extends AbstractBaseAPI {
+  /**
+   * @return class-string<TModel>
+   */
+  abstract static public function getDBAClass(): string;
+  
+  abstract protected function createObject(array $data): int;
+  
+  /**
+   * @param TModel $object
+   */
+  abstract protected function deleteObject(AbstractModel $object): void;
+  
+  /**
+   * Available 'expand' parameters on $object
+   */
+  public static function getExpandables(): array {
+    return array_merge(array_keys(static::getToOneRelationships()), array_keys(static::getToManyRelationships()));
+  }
+  
+  /**
+   * Fetch objects for  $expand on $objects
+   * @throws InternalError
+   * @throws HttpError
+   * @throws Exception
+   */
+  protected static function fetchExpandObjects(array $objects, string $expand, array $relationFilters = []): array {
+    //disabled the check because with intermediate objects its possible to fetch a different model
+    /* Ensure we receive the proper type */
+    // $baseModel = static::getDBAClass();
+    // array_walk($objects, function ($obj) use ($baseModel) {
+    //   assert($obj instanceof $baseModel);
+    // });
+    
+    $toOneRelationships = static::getToOneRelationships();
+    if (array_key_exists($expand, $toOneRelationships)) {
+      $relationFactory = self::getModelFactory($toOneRelationships[$expand]['relationType']);
+      
+      if (array_key_exists('junctionTableType', $toOneRelationships[$expand])) {
+        $junctionTableFactory = self::getModelFactory($toOneRelationships[$expand]['junctionTableType']);
+        return self::getManyToOneRelationViaIntermediate(
+          $objects,
+          $toOneRelationships[$expand]['junctionTableJoinField'],
+          $junctionTableFactory,
+          $relationFactory,
+          $toOneRelationships[$expand]['relationKey'],
+          $toOneRelationships[$expand]['parentKey'],
+          $relationFilters,
+        );
+      }
+      
+      return self::getForeignKeyRelation(
+        $objects,
+        $toOneRelationships[$expand]['key'],
+        $relationFactory,
+        $toOneRelationships[$expand]['relationKey'],
+        $relationFilters,
+      );
+    }
+    
+    $toManyRelationships = static::getToManyRelationships();
+    if (array_key_exists($expand, $toManyRelationships)) {
+      $relationFactory = self::getModelFactory($toManyRelationships[$expand]['relationType']);
+      
+      /* Associative entity */
+      if (array_key_exists('junctionTableType', $toManyRelationships[$expand])) {
+        $junctionTableFactory = self::getModelFactory($toManyRelationships[$expand]['junctionTableType']);
+        return self::getManyToManyRelationViaIntermediate(
+          $objects,
+          $toManyRelationships[$expand]['key'],
+          $junctionTableFactory,
+          $toManyRelationships[$expand]['junctionTableFilterField'],
+          $relationFactory,
+          $toManyRelationships[$expand]['relationKey'],
+          $relationFilters,
+        );
+      }
+      
+      return self::getManyToOneRelation(
+        $objects,
+        $toManyRelationships[$expand]['key'],
+        $relationFactory,
+        $toManyRelationships[$expand]['relationKey'],
+        $relationFilters,
+      );
+    }
+    
+    throw new InternalError("Internal error: Expansion '$expand' not implemented!");
+  }
+
+  /**
+   * Fetch related objects, optionally applying the related API's list ACL.
+   *
+   * @throws ContainerExceptionInterface
+   * @throws NotFoundExceptionInterface
+   * @throws HttpError
+   * @throws Exception
+   */
+  final protected function fetchVisibleExpandObjects(array $objects, string $expand): array {
+    $relationships = array_merge(static::getToOneRelationships(), static::getToManyRelationships());
+    $relationship = $relationships[$expand];
+    $relationFilters = [];
+    if ($relationship['filterACL'] ?? false) {
+      $relationClass = $relationship['relationType'];
+      $relationApiClass = new ($this->container->get('classMapper')->get($relationClass))($this->container);
+      $relationApiClass->setCurrentUser($this->getCurrentUser());
+      $relationFilters = $relationApiClass->getFilterACL();
+    }
+
+    return static::fetchExpandObjects($objects, $expand, $relationFilters);
+  }
+  
+  
+  /**
+   * @return AbstractModelFactory<TModel>
+   * @throws HttpError
+   */
+  final protected static function getFactory(): object {
+    return self::getModelFactory(static::getDBAclass());
+  }
+  
+  /**
+   * Get features based on form fields and DBA model features
+   */
+  final protected function getFeatures(): array {
+    return array_merge(
+      parent::getFeatures(),
+      call_user_func($this->getDBAclass() . '::getFeatures'),
+    );
+  }
+  
+  /**
+   * Separate get features function to get features without the form fields. This is needed to generate the openAPI documentation
+   * TODO: This function could probably be used in the patch endpoints as well, since form fields are not relevant there.
+   */
+  public function getFeaturesWithoutFormfields(): array {
+    $features = call_user_func($this->getDBAclass() . '::getFeatures');
+    return $this->mapFeatures($features);
+  }
+  
+  /**
+   * Find primary key for  another DBA object
+   * A little bit hacky because the getPrimaryKey function in dbaClass is not static
+   *
+   * @param string $dbaClass is the dba class to get the primary key from
+   * @throws InternalError
+   */
+  protected function getPrimaryKeyOther(string $dbaClass): string {
+    $features = $this->getFeaturesOther($dbaClass);
+    # Work-around required since getPrimaryKey is not static in dba/models/*.php
+    foreach ($features as $key => $value) {
+      if ($value['pk']) {
+        return $key;
+      }
+    }
+    throw new InternalError("Internal error: no primary key found");
+  }
+  
+  /**
+   * Retrieve ManyToOne relation for $objects ('parents') of type $targetFactory via 'intermediate'
+   * of $intermediateFactory joining on $joinField (between 'intermediate' and 'target'). Filtered by
+   * $filterField at $intermediateFactory.
+   *
+   * A bit hacky solution to get a to one through an intermediate table, currently only used by tasks to include a hashlist through the taskwrapper
+   * another solution can be to overwrite fetchExpandObjects() in tasks.routes
+   *
+   * @param array $objects Objects Fetch relation for selected Objects
+   * @param string $objectField Field to use as base for $objects
+   * @param object $intermediateFactory Factory used as intermediate between parentObject and targetObject
+   * @param object $targetFactory Object properties of objects returned
+   * @param string $joinField Field to connect 'intermediate' to 'target'
+   * @param string $parentKey
+   * @param array $relationFilters Additional filters on the target objects, e.g. the list ACL of the related API
+   * @return array $many2One which is a map where the key is the id of the parent object and the value is an array of the included
+   *                objects that are included for this parent object
+   * @throws HttpError
+   * @throws Exception
+   */
+  final protected static function getManyToOneRelationViaIntermediate(
+    array $objects,
+    string $objectField,
+    object $intermediateFactory,
+    object $targetFactory,
+    string $joinField,
+    string $parentKey,
+    array $relationFilters = [],
+  ): array {
+    assert($intermediateFactory instanceof AbstractModelFactory);
+    assert($targetFactory instanceof AbstractModelFactory);
+    $many2One = array();
+    
+    /* Retrieve Parent -> Intermediate -> Target objects */
+    $objectIds = [];
+    foreach ($objects as $object) {
+      $kv = $object->getKeyValueDict();
+      $objectIds[] = $kv[$objectField];
+    }
+    $baseFactory = self::getModelFactory(static::getDBAClass());
+    $qF = new ContainFilter($objectField, $objectIds, $intermediateFactory);
+    $jF = new JoinFilter($intermediateFactory, $joinField, $joinField);
+    $jF2 = new JoinFilter($baseFactory, $objectField, $objectField, $intermediateFactory);
+    $relationFilters[Factory::FILTER] = array_merge(
+      [$qF],
+      $relationFilters[Factory::FILTER] ?? []
+    );
+    $relationFilters[Factory::JOIN] = array_merge(
+      [$jF, $jF2],
+      $relationFilters[Factory::JOIN] ?? []
+    );
+    $hO = $targetFactory->filter($relationFilters);
+    
+    $intermediateObjectList = $hO[$intermediateFactory->getModelName()];
+    $targetObjectList = $hO[$targetFactory->getModelName()];
+    $baseObjectList = $hO[$baseFactory->getModelName()];
+    
+    $intermediateObject = current($intermediateObjectList);
+    $targetObject = current($targetObjectList);
+    $baseObject = current($baseObjectList);
+    
+    while ($intermediateObject && $targetObject && $baseObject) {
+      $kv = $baseObject->getKeyValueDict();
+      $many2One[$kv[$parentKey]] = $targetObject;
+      
+      $intermediateObject = next($intermediateObjectList);
+      $targetObject = next($targetObjectList);
+      $baseObject = next($baseObjectList);
+    }
+    return $many2One;
+  }
+  
+  /**
+   * Retrieve ForeignKey Relation
+   *
+   * @param array $objects Objects Fetch relation for selected Objects
+   * @param string $objectField Field to use as base for $objects
+   * @param AbstractModelFactory $factory Factory used to retrieve objects
+   * @param string $filterField Filter field of $field to filter against $objects field
+   *
+   * @return array
+   * @throws Exception
+   */
+  final protected static function getForeignKeyRelation(
+    array $objects,
+    string $objectField,
+    AbstractModelFactory $factory,
+    string $filterField,
+    array $relationFilters = [],
+  ): array {
+    $retval = array();
+    
+    /* Fetch required objects */
+    $objectIds = [];
+    foreach ($objects as $object) {
+      $kv = $object->getKeyValueDict();
+      $objectIds[] = $kv[$objectField];
+    }
+    $qF = new ContainFilter($filterField, $objectIds, $factory);
+    $relationFilters[Factory::FILTER] = array_merge(
+      [$qF],
+      $relationFilters[Factory::FILTER] ?? []
+    );
+    $hO = $factory->filter($relationFilters);
+    if (isset($relationFilters[Factory::JOIN])) {
+      $hO = $hO[$factory->getModelName()];
+    }
+    
+    /* Objects are uniquely identified by fields, create mapping to speed-up further processing */
+    $f2o = [];
+    foreach ($hO as $relationObject) {
+      $f2o[$relationObject->getKeyValueDict()[$filterField]] = $relationObject;
+    }
+    
+    /* Map objects */
+    foreach ($objects as $object) {
+      $fieldId = $object->getKeyValueDict()[$objectField];
+      if (array_key_exists($fieldId, $f2o)) {
+        $retval[$object->getId()] = $f2o[$fieldId];
+      }
+    }
+    
+    return $retval;
+  }
+  
+  /**
+   * Retrieve ManyToOneRelation (reverse ForeignKey)
+   *
+   * @param array $objects Objects Fetch relation for selected Objects
+   * @param string $objectField Field to use as base for $objects
+   * @param object $factory Factory used to retrieve objects
+   * @param string $filterField Filter field of $field to filter against $objects field
+   *
+   * @return array
+   * @throws Exception
+   */
+  final protected static function getManyToOneRelation(
+    array $objects,
+    string $objectField,
+    object $factory,
+    string $filterField,
+    array $relationFilters = [],
+  ): array {
+    assert($factory instanceof AbstractModelFactory);
+    $retval = array();
+    
+    /* Fetch required objects */
+    $objectIds = [];
+    foreach ($objects as $object) {
+      $kv = $object->getKeyValueDict();
+      $objectIds[] = $kv[$objectField];
+    }
+    $qF = new ContainFilter($filterField, $objectIds, $factory);
+    $relationFilters[Factory::FILTER] = array_merge(
+      [$qF],
+      $relationFilters[Factory::FILTER] ?? []
+    );
+    $hO = $factory->filter($relationFilters);
+    if (isset($relationFilters[Factory::JOIN])) {
+      $hO = $hO[$factory->getModelName()];
+    }
+    
+    /* Map (multiple) objects to base objects */
+    foreach ($hO as $relationObject) {
+      $kv = $relationObject->getKeyValueDict();
+      $retval[$kv[$filterField]][] = $relationObject;
+    }
+    
+    return $retval;
+  }
+  
+  
+  /**
+   * Retrieve ManyToOne relation for $objects ('parents') of type $targetFactory via 'intermediate'
+   * of $intermediateFactory joining on $joinField (between 'intermediate' and 'target'). Filtered by
+   * $filterField at $intermediateFactory. Optional $relationFilters restrict the returned target
+   * objects, e.g. to those visible to the current user.
+   *
+   * @param array $objects Objects Fetch relation for selected Objects
+   * @param string $objectField Field to use as base for $objects
+   * @param object $intermediateFactory Factory used as intermediate between parentObject and targetObject
+   * @param string $filterField Field of intermediateObject to filter against $objects field
+   * @param object $targetFactory Object properties of objects returned
+   * @param string $joinField Field to connect 'intermediate' to 'target'
+   * @param array $relationFilters Additional filters on the target objects, e.g. the list ACL of the related API
+   * @return array $many2many which is a map where the key is the id of the parent object and the value is an array of the included
+   *                objects that are included for this parent object
+   * @throws Exception
+   */
+  final protected static function getManyToManyRelationViaIntermediate(
+    array $objects,
+    string $objectField,
+    object $intermediateFactory,
+    string $filterField,
+    object $targetFactory,
+    string $joinField,
+    array $relationFilters = [],
+  ): array {
+    assert($intermediateFactory instanceof AbstractModelFactory);
+    assert($targetFactory instanceof AbstractModelFactory);
+    $many2Many = array();
+    
+    /* Retrieve Parent -> Intermediate -> Target objects */
+    $objectIds = [];
+    foreach ($objects as $object) {
+      $kv = $object->getKeyValueDict();
+      $objectIds[] = $kv[$objectField];
+    }
+    $qF = new ContainFilter($filterField, $objectIds, $intermediateFactory);
+    $jF = new JoinFilter($intermediateFactory, $joinField, $joinField);
+    $relationFilters[Factory::FILTER] = array_merge(
+      [$qF],
+      $relationFilters[Factory::FILTER] ?? []
+    );
+    $relationFilters[Factory::JOIN] = array_merge(
+      [$jF],
+      $relationFilters[Factory::JOIN] ?? []
+    );
+    $hO = $targetFactory->filter($relationFilters);
+    
+    $intermediateObjectList = $hO[$intermediateFactory->getModelName()];
+    $targetObjectList = $hO[$targetFactory->getModelName()];
+    
+    $intermediateObject = current($intermediateObjectList);
+    $targetObject = current($targetObjectList);
+    
+    while ($intermediateObject && $targetObject) {
+      $kv = $intermediateObject->getKeyValueDict();
+      $many2Many[$kv[$filterField]][] = $targetObject;
+      
+      $intermediateObject = next($intermediateObjectList);
+      $targetObject = next($targetObjectList);
+    }
+    return $many2Many;
+  }
+  
+  /**
+   * Retrieve  permissions based on class and method requested
+   * @throws HttpForbidden
+   */
+  public function getRequiredPermissions(string $method): array {
+    $model = $this->getDBAclass();
+    # Get required permission based on API method type
+    $required_perm = match (strtoupper($method)) {
+      "GET" => $model::PERM_READ,
+      "POST" => $model::PERM_CREATE,
+      "PATCH" => $model::PERM_UPDATE,
+      "DELETE" => $model::PERM_DELETE,
+      default => throw new HttpForbidden("Method '" . $method . "' is not allowed "),
+    };
+    return array($required_perm);
+  }
+  
+  /**
+   * API entry point for deletion of single object
+   * @param Request $request
+   * @param Response $response
+   * @param array $args
+   * @return Response
+   * @throws HTException
+   * @throws HttpForbidden
+   * @throws ResourceNotFoundError
+   * @throws HttpError
+   */
+  public function deleteOne(Request $request, Response $response, array $args): Response
+    // TODO how to handle cascading deletes?
+    // ex. Hash foreignkey to hashlist can't be null, but hashlist delete doesnt cascade to Hash
+    // Which effectively means that we cant delete a hashlist because of foreign key constraints
+    // Solution 1: make cascading rules in Database
+    // Solution 2: implement delete logic in every api model
+  {
+    $this->preCommon($request);
+    $object = $this->doFetch($args['id']);
+    
+    /* Actually delete object */
+    $this->deleteObject($object);
+    
+    return $response->withStatus(204)
+      ->withHeader("Content-Type", "application/json");
+  }
+  
+  /**
+   * Checks if a user has access to the given single element retrieved
+   * @param User $user
+   * @param AbstractModel $object
+   * @return bool true if the access is allowed
+   */
+  protected function getSingleACL(User $user, AbstractModel $object): bool {
+    return true;
+  }
+  
+  /**
+   * Request single object from database & validate permissions
+   * @return TModel
+   * @throws ResourceNotFoundError
+   * @throws HttpForbidden
+   * @throws HttpError
+   * @throws Exception
+   */
+  protected function doFetch(string $pk, ?AbstractModelFactory $otherFactory = null): mixed {
+    if ($otherFactory != null) {
+      $object = $otherFactory->get($pk);
+    }
+    else {
+      $object = $this->getFactory()->get($pk);
+    }
+    
+    if ($object === null) {
+      throw new ResourceNotFoundError();
+    }
+    $group = Factory::getRightGroupFactory()->get($this->getCurrentUser()->getRightGroupId());
+    if ($group->getPermissions() !== 'ALL' && $otherFactory == null && $this->getSingleACL($this->getCurrentUser(),
+        $object
+      ) === false) {
+      throw new HttpForbidden("No access to this object!", 403);
+    }
+    
+    return $object;
+  }
+  
+  /**
+   * Additional filtering required for limiting access to objects
+   */
+  protected function getFilterACL(): array {
+    return [];
+  }
+  
+  /**
+   * Helper function to determine if $resourceRecord is a valid resource record
+   * returns true if it is a valid resource record and false if it is an invalid resource record
+   */
+  final protected function validateResourceRecord(mixed $resourceRecord): bool {
+    return (isset($resourceRecord['type']) && is_numeric($resourceRecord['id']));
+  }
+  
+  /**
+   * @throws HttpError
+   */
+  final protected function ResourceRecordArrayToUpdateArray($data, $parentId): array {
+    $updates = [];
+    foreach ($data as $item) {
+      if (!$this->validateResourceRecord($item)) {
+        $encoded_item = json_encode($item);
+        throw new HttpError('Invalid resource record given in list! invalid resource record: ' . $encoded_item);
+      }
+      $updates[] = new MassUpdateSet($item["id"], $parentId);
+    }
+    return $updates;
+  }
+  
+  /**
+   * @throws HttpError
+   */
+  protected static function calculate_next_cursor(string|int $cursor, bool $ascending = true): int|string {
+    if (is_int($cursor)) {
+      if ($ascending) {
+        return $cursor + 1;
+      }
+      else {
+        return $cursor - 1;
+      }
+    }
+    elseif (is_string($cursor)) {
+      $len = strlen($cursor);
+      $lastChar = $cursor[$len - 1];
+      $ord = ord($lastChar);
+      if ($ascending) {
+        if ($len == 0) {
+          return '~';
+        }
+        
+        if ($ord < 126) {
+          return substr($cursor, 0, $len - 1) . chr($ord + 1);
+        }
+        else {
+          return $cursor . '!'; // '!' is lowest printable ascii
+        }
+      }
+      else {
+        if ($len == 0) {
+          return "";
+        }
+        if ($ord > 33) {
+          return substr($cursor, 0, $len - 1) . chr($ord - 1);
+        }
+        else {
+          return substr($cursor, 0, $len - 1);
+        }
+      }
+    }
+    else {
+      throw new HttpError("Internal error", 500);
+    }
+  }
+  
+  /**
+   * The cursor is base64 encoded in the following json format:
+   * {"primary":{"isSlowHash":0},"secondary":{"hashTypeId":10810}}
+   * This contains a primary filter which is the main sorting filter, but to handle duplicates, it has an optional
+   * secondary filter for when the primary filter is not unique. This way there is an unique secondary filter to
+   * handle tie breaks.
+   *
+   * @param mixed $primaryFilter The main filter that is sorted on
+   * @param mixed $primaryId the value of the primaryFilter
+   * @param bool $hasSecondaryFilter This is a boolean to set whether there is a secondary filter
+   * @param mixed $secondaryFilter An unique secondary filter to use as a tiebreaker when the main filter is not unique
+   * @param object $secondaryId The value of the secondary filter
+   * @return string a base64 encoded json string that contains the filters.
+   */
+  protected static function build_cursor($primaryFilter, $primaryId, $hasSecondaryFilter = false, $secondaryFilter = null, $secondaryId = null): string {
+    $cursor = ["primary" => [$primaryFilter => $primaryId]];
+    if ($hasSecondaryFilter) {
+      assert($secondaryId !== null && $secondaryFilter !== null,
+        "Secondary id and filter should be set"
+      );
+      //Add the primary key as a secondary cursor to guarantee the cursor is unique
+      $cursor["secondary"] = [$secondaryFilter => $secondaryId];
+    }
+    $json = json_encode($cursor);
+    return urlencode(base64_encode($json));
+  }
+  
+  /**
+   * Function to decode the cursor from base64 format
+   *
+   * @param string $encoded_cursor in base64 format
+   *
+   * @return array the decoded cursor in a json string format
+   * @throws HttpError
+   */
+  protected static function decode_cursor(string $encoded_cursor): array {
+    $json = base64_decode($encoded_cursor);
+    if (!$json) {
+      throw new HttpError("Invalid pagination cursor, cursor has to be base64 encoded");
+    }
+    $cursor = json_decode($json, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+      throw new HttpError("Invalid pagination cursor, it has to be a valid json string");
+    }
+    return $cursor;
+  }
+  
+  protected static function compare_keys($key1, $key2, $isNegativeSort): bool|int {
+    if (is_string($key1) && is_string($key2)) {
+      if ($isNegativeSort) {
+        return strcmp($key2, $key1);
+      }
+      else {
+        return strcmp($key1, $key2);
+      }
+    }
+    else {
+      if ($isNegativeSort) {
+        return $key2 > $key1;
+      }
+      else {
+        return $key1 > $key2;
+      }
+    }
+  }
+  
+  protected static function getMinMaxCursor($apiClass, string $sort, array $filters, $request, $aliasedfeatures, bool $reverseSort) {
+    $filters[Factory::LIMIT] = new LimitFilter(1);
+    // Descending queries are used to retrieve the last element. For this all sorts have to be reversed, since
+    // if all order queries are reversed and limit to 1, you will retrieve the last element.
+    $orderTemplates = $apiClass->makeOrderFilterTemplates($request, $aliasedfeatures, $sort, $reverseSort);
+    $orderFilters = [];
+    // TODO this logic is now done twice, once for the max and once for the min, this should be moved outside this function
+    // and given as an argument
+    foreach ($orderTemplates as $orderTemplate) {
+      $orderFilters[] = new OrderFilter($orderTemplate['by'], $orderTemplate['type'], $orderTemplate['factory']);
+      if ($orderTemplate['factory'] !== null) {
+        // if factory of orderTemplate is not null, sort is happening on joined table
+        $otherFactory = $orderTemplate['factory'];
+        if (!$apiClass::checkJoinExists($filters[Factory::JOIN], $otherFactory->getModelName())) {
+          $filters[Factory::JOIN][] = new JoinFilter($otherFactory, $orderTemplate['joinKey'], $apiClass->getPrimaryKeyOther($otherFactory->getNullObject()::class));
+        }
+      }
+    }
+    $filters[Factory::ORDER] = $orderFilters;
+    $factory = $apiClass->getFactory();
+    $result = $factory->filter($filters);
+    //handle joined queries
+    if (array_key_exists(Factory::JOIN, $filters)) {
+      $result = $result[$factory->getModelname()];
+    }
+    if (sizeof($result) == 0) {
+      return null;
+    }
+    return $result[0];
+  }
+  
+  /**
+   * API entry point for requesting multiple objects
+   * @throws HttpError
+   * @throws Exception
+   */
+  public static function getManyResources(object $apiClass, Request $request, Response $response, array $relationFs = []): Response {
+    /* Only prepare the request here, no permission check. The action that
+       called us has already done that. */
+    $apiClass->bootRequest($request);
+    
+    $aliasedfeatures = $apiClass->getAliasedFeatures();
+    $factory = $apiClass->getFactory();
+    
+    $defaultPageSize = SConfig::getInstance()->getVal(DConfig::DEFAULT_PAGE_SIZE);
+    $maxPageSize = SConfig::getInstance()->getVal(DConfig::MAX_PAGE_SIZE);
+
+    $pageAfter = $apiClass->getQueryParameterFamilyMember($request, 'page', 'after');
+    $pageBefore = $apiClass->getQueryParameterFamilyMember($request, 'page', 'before');
+    $pageSize = $apiClass->getQueryParameterFamilyMember($request, 'page', 'size') ?? $defaultPageSize;
+    if (!is_numeric($pageSize) || $pageSize < 0) {
+      throw new HttpError("Invalid parameter, page[size] must be a positive integer");
+    }
+    elseif ($pageSize > $maxPageSize) {
+      throw new HttpError(sprintf("You requested a size of %d, but %d is the maximum.", $pageSize, $maxPageSize));
+    }
+    
+    $validExpandables = $apiClass::getExpandables();
+    $expands = $apiClass->makeExpandables($request, $validExpandables);
+    
+    /* Object filter definition */
+    $aFs = [];
+    $joinFilters = [];
+
+    /* Generate filters */
+    $filters = $apiClass->getFilters($request);
+    $qFs_Filter = $apiClass->makeFilter($filters, $apiClass, $joinFilters);
+
+    $aFs_ACL = $apiClass->getFilterACL();
+    if (isset($aFs_ACL[Factory::FILTER])) {
+      $qFs_Filter = array_merge($aFs_ACL[Factory::FILTER], $qFs_Filter);
+    }
+    if (isset($aFs_ACL[Factory::JOIN])) {
+      foreach($aFs_ACL[Factory::JOIN] as $filter) {
+        if(!$apiClass::checkJoinExists($joinFilters, $filter->getOtherFactory()->getModelName())) {
+          $joinFilters[] = $filter;
+        }
+      }
+    }
+    
+    if (count($qFs_Filter) > 0) {
+      $aFs[Factory::FILTER] = $qFs_Filter;
+    }
+    
+    /**
+     * Create pagination
+     *
+     * TODO: Deny pagination with un-stable sorting
+     */
+    $sortList = $apiClass->getQueryParameterAsList($request, 'sort');
+    $isNegativeSort = $sortList != null && $sortList[0][0] == '-';
+    //this is used to reverse the array to show the data correctly for the user
+
+    if ($isNegativeSort) {
+      $firstCursorSort = "DESC";
+      $lastCursorSort = "ASC";
+    } else {
+      $firstCursorSort = "ASC";
+      $lastCursorSort = "DESC";
+    }
+
+    $aFs[Factory::JOIN] = $joinFilters;
+    $firstCursorObject = $apiClass->getMinMaxCursor($apiClass, $firstCursorSort, $aFs, $request, $aliasedfeatures, false);
+    $lastCursorObject = $apiClass->getMinMaxCursor($apiClass, $lastCursorSort, $aFs, $request, $aliasedfeatures, true);
+
+    if (!$isNegativeSort && !isset($pageBefore) && isset($pageAfter)) {
+      // this happens when going to the next page while having an ascending sort
+      $defaultSort = "ASC";
+      $reverseArray = false;
+      $operator = ">";
+      $paginationCursor = $pageAfter;
+    }
+    else if (!$isNegativeSort && isset($pageBefore) && !isset($pageAfter)) {
+      // this happens when going to the previous page while having an ascending sort
+      $defaultSort = "DESC";
+      $reverseArray = true;
+      $operator = "<";
+      $paginationCursor = $pageBefore;
+    }
+    else if ($isNegativeSort && (isset($pageBefore) && !isset($pageAfter))) {
+      // this happens when going to the previous page while having a descending sort
+      $defaultSort = "ASC";
+      $reverseArray = true;
+      $operator = ">";
+      $paginationCursor = $pageBefore;
+    }
+    else if ($isNegativeSort && isset($pageAfter) && !isset($pageBefore)) {
+      // this happens when going to the next page while having an ascending sort
+      $defaultSort = "DESC";
+      $reverseArray = false;
+      $operator = "<";
+      $paginationCursor = $pageAfter;
+    }
+    else if ($isNegativeSort) {
+      //the default negative case to retrieve the first elements in a descending way
+      $defaultSort = "DESC";
+      $reverseArray = false;
+    }
+    else {
+      $defaultSort = "ASC";
+      $reverseArray = false;
+    }
+    $primaryKey = $apiClass->getPrimaryKey();
+    
+    $orderTemplates = $apiClass->makeOrderFilterTemplates($request, $aliasedfeatures, $defaultSort, $reverseArray);
+    $orderTemplates[0]["type"] = $defaultSort;
+    $primaryFilter = $orderTemplates[0]['by'];
+    $orderFilters = [];
+
+    // Build actual order filters
+    foreach ($orderTemplates as $orderTemplate) {
+      // $aFs[Factory::ORDER][] = new OrderFilter($orderTemplate['by'], $orderTemplate['type']);
+      $orderFilters[] = new OrderFilter($orderTemplate['by'], $orderTemplate['type'], $orderTemplate['factory']);
+      if ($orderTemplate['factory'] !== null) {
+        // if factory of ordertemplate is not null, sort is happening on joined table
+        $otherFactory = $orderTemplate['factory'];
+        if (!$apiClass::checkJoinExists($joinFilters, $otherFactory->getModelName())) {
+          $joinFilters[] = new JoinFilter($otherFactory, $orderTemplate['joinKey'], $orderTemplate['key']);
+        }
+      }
+    }
+    
+    $aFs[Factory::ORDER] = $orderFilters;
+    $aFs[Factory::JOIN] = $joinFilters;
+    
+    /* Include relation filters. The filter and join lists are merged instead of
+       overwritten, so the ACL filters of the related API stay effective when
+       the relation provides its own filters and joins. */
+    $finalFs = $aFs;
+    foreach ($relationFs as $relationKey => $relationValue) {
+      if ($relationKey == Factory::FILTER) {
+        $finalFs[$relationKey] = array_merge($finalFs[$relationKey] ?? [], $relationValue);
+      }
+      elseif ($relationKey == Factory::JOIN) {
+        $mergedJoins = $finalFs[$relationKey] ?? [];
+        foreach ($relationValue as $join) {
+          if (!$apiClass::checkJoinExists($mergedJoins, $join->getOtherFactory()->getModelName())) {
+            $mergedJoins[] = $join;
+          }
+        }
+        $finalFs[$relationKey] = $mergedJoins;
+      }
+      else {
+        $finalFs[$relationKey] = $relationValue;
+      }
+    }
+    
+    //TODO it would be even better if its possible to see if the primary filter is unique, instead of primary key.
+    //But this probably needs to be added in getFeatures() then.
+    $primaryKeyIsNotPrimaryFilter = $primaryFilter != $primaryKey;
+    $total = $factory->countFilter($finalFs);
+    
+    //pagination filters need to be added after max has been calculated
+    $finalFs[Factory::LIMIT] = new LimitFilter($pageSize);
+    
+    if (isset($paginationCursor) && isset($operator)) {
+      $decoded_cursor = $apiClass->decode_cursor($paginationCursor);
+      $primary_cursor = $decoded_cursor["primary"];
+      $primary_cursor_key = key($primary_cursor);
+      // Special filtering of id to use for uniform access to model primary key
+      $primary_cursor_key = $primary_cursor_key == 'id' ? array_column($aliasedfeatures, 'alias', 'dbname')[$apiClass->getPrimaryKey()] : $primary_cursor_key;
+      $secondary_cursor = array_key_exists("secondary", $decoded_cursor) ? $decoded_cursor["secondary"] : null;
+      if ($secondary_cursor) {
+        $secondary_cursor_key = key($secondary_cursor);
+        $secondary_cursor_key = $secondary_cursor_key == '_id' ? array_column($aliasedfeatures, 'alias', 'dbname')[$apiClass->getPrimaryKey()] : $secondary_cursor_key;
+        $secondaryOperator = $reverseArray ? "<" : ">";
+        $finalFs[Factory::FILTER][] = new PaginationFilter($primary_cursor_key, current($primary_cursor),
+          $operator, $secondary_cursor_key, current($secondary_cursor), null, $secondaryOperator
+        );
+      }
+      else {
+        $finalFs[Factory::FILTER][] = new QueryFilter($primary_cursor_key, current($primary_cursor), $operator, $factory);
+      }
+    }
+    
+    /* Request objects */
+    $filterObjects = $factory->filter($finalFs);
+    /* JOIN statements will return related modules as well, discard for now */
+    $objects = $filterObjects[$factory->getModelname()];
+    if ($reverseArray) {
+      $objects = array_reverse($objects);
+    }
+    
+    /* Resolve all expandables */
+    $expandResult = [];
+    foreach ($expands as $expand) {
+      // mapping from $objectId -> result objects in
+      $expandResult[$expand] = $apiClass->fetchVisibleExpandObjects($objects, $expand);
+    }
+    
+    /* Convert objects to JSON:API */
+    $dataResources = [];
+    $includedResources = [];
+    
+    // Convert objects to data resources 
+    foreach ($objects as $object) {
+      // Create object
+      $newObject = $apiClass->obj2Resource($object, $expandResult, $request->getQueryParams()['fields'] ?? null, $request->getQueryParams()['aggregate'] ?? null);
+      $includedResources = $apiClass->processExpands($apiClass, $expands, $object, $expandResult, $includedResources, $request->getQueryParams()['fields'] ?? null, $request->getQueryParams()['aggregate'] ?? null);
+      
+      // Add to result output
+      $dataResources[] = $newObject;
+    }
+    
+    $baseUrl = Util::buildServerUrl();
+    //build last link
+    $lastParams = $request->getQueryParams();
+    unset($lastParams['page']['after']);
+    $lastParams['page']['size'] = $pageSize;
+    // $next_cursor = $apiClass::build_cursor($primaryFilter, $nextId, $primaryKeyIsNotPrimaryFilter, $primaryKey, $nextPrimaryKey);
+    // $lastParams['page']['before'] = $apiClass::encode_cursor(self::calculate_next_cursor($max));
+    if ($primaryKeyIsNotPrimaryFilter && isset($lastCursorObject)) {
+      $new_secondary_cursor = $apiClass::calculate_next_cursor($lastCursorObject->getId(), !$isNegativeSort);
+      $last_cursor = $apiClass::build_cursor($primaryFilter, $lastCursorObject->expose()[$primaryFilter], true, $primaryKey, $new_secondary_cursor);
+    }
+    else if (isset($lastCursorObject)) {
+      $new_cursor = $apiClass::calculate_next_cursor($lastCursorObject->getId(), !$isNegativeSort);
+      $last_cursor = $apiClass::build_cursor($primaryFilter, $new_cursor);
+    }
+    else {
+      $last_cursor = null;
+    }
+    $lastParams['page']['before'] = $last_cursor;
+    $linksLast = $baseUrl . $request->getUri()->getPath() . '?' . urldecode(http_build_query($lastParams));
+    
+    // Build self link
+    $selfParams = $request->getQueryParams();
+    
+    if (isset($selfParams['page']['after'])) {
+      $selfParams['page']['after'] = urlencode($selfParams['page']['after']);
+    }
+    if (isset($selfParams['page']['before'])) {
+      $selfParams['page']['before'] = urlencode($selfParams['page']['before']);
+    }
+    
+    $selfParams['page']['size'] = $pageSize;
+    $linksSelf = $baseUrl . $request->getUri()->getPath() . '?' . urldecode(http_build_query($selfParams));
+    
+    $linksNext = null;
+    $linksPrev = null;
+    
+    if (!empty($objects)) {
+      // retrieve last object in page and retrieve the attribute based on the filter
+      $firstObject = $objects[0]->expose();
+      $lastObject = end($objects)->expose();
+      $prevId = $firstObject[$primaryFilter];
+      $nextId = $lastObject[$primaryFilter];
+      $nextPrimaryKey = $lastObject[$primaryKey];
+      $previousPrimaryKey = $firstObject[$primaryKey];
+      
+      //only set next page when its not the last page
+      if (isset($lastCursorObject) && $nextPrimaryKey !== $lastCursorObject->getId()) {
+        $nextParams = $selfParams;
+        // $nextParams['page']['after'] = urlencode($nextId);
+        $next_cursor = $apiClass::build_cursor($primaryFilter, $nextId, $primaryKeyIsNotPrimaryFilter, $primaryKey, $nextPrimaryKey);
+        $nextParams['page']['after'] = $next_cursor;
+        unset($nextParams['page']['before']);
+        $linksNext = $baseUrl . $request->getUri()->getPath() . '?' . urldecode(http_build_query($nextParams));
+      }
+      // Build prev link 
+      //only set previous page when its not the first page
+      if (isset($firstCursorObject) && $previousPrimaryKey !== $firstCursorObject->getId()) {
+        //build page before
+        $prevParams = $selfParams;
+        $previous_cursor = $apiClass::build_cursor($primaryFilter, $prevId, $primaryKeyIsNotPrimaryFilter, $primaryKey, $previousPrimaryKey);
+        $prevParams['page']['before'] = $previous_cursor;
+        unset($prevParams['page']['after']);
+        $linksPrev = $baseUrl . $request->getUri()->getPath() . '?' . urldecode(http_build_query($prevParams));
+      }
+    }
+    
+    //build first link
+    $firstParams = $request->getQueryParams();
+    unset($firstParams['page']['before']);
+    $firstParams['page']['size'] = $pageSize;
+    // $firstParams['page']['after'] = urlencode($min);
+    unset($firstParams['page']['after']);
+    $linksFirst = $baseUrl . $request->getUri()->getPath() . '?' . urldecode(http_build_query($firstParams));
+    $links = [
+      "self" => $linksSelf,
+      "first" => $linksFirst,
+      "last" => $linksLast,
+      "next" => $linksNext,
+      "prev" => $linksPrev,
+    ];
+    
+    $metadata = ["page" => ["total_elements" => $total]];
+    if ($apiClass->permissionErrors !== null) {
+      $metadata["Include errors"] = $apiClass->permissionErrors;
+    }
+    // Generate JSON:API GET output
+    $ret = self::createJsonResponse($dataResources, $links, $includedResources, $metadata);
+    
+    $body = $response->getBody();
+    $body->write($apiClass->ret2json($ret));
+    
+    return $response->withStatus(200)
+      ->withHeader("Content-Type", 'application/vnd.api+json; ext="https://jsonapi.org/profiles/ethanresnick/cursor-pagination"');
+  }
+  
+  /**
+   * API entry point for requesting multiple objects
+   * @throws HttpError
+   */
+  public function get(Request $request, Response $response, array $args): Response {
+    /* Check permissions here, getManyResources() does not do it anymore. */
+    $this->preCommon($request);
+    return self::getManyResources($this, $request, $response);
+  }
+  
+  /**
+   * Maps filters to the appropriate models based on their features.
+   *
+   * Helper function to get valid filters for the models. This is usefull when multiple objects
+   * have been included and the correct filters need to be mapped to the correct objects.
+   * Currently used to make complex filters for counting objects
+   *
+   * @param array $filters An associative array of filters where the key is the filter
+   *                       name and the value is the filter value. Filters should match
+   *                       the pattern `<field><operator>`, where `<operator>` can be
+   *                       one of the supported suffixes (e.g., `__eq`, `__ne`).
+   * @param array $models An array of model objects. Each model must have a `getFeatures()`
+   *                       method that returns an associative array of model features.
+   *                       The features should map filter keys to their respective
+   *                       attributes or aliases.
+   *
+   * @return array An associative array mapping model classes to their respective valid filters.
+   *               The structure is:
+   *               [
+   *                   ModelClassName => [
+   *                       'filter' => 'value',
+   *                       ...
+   *                   ],
+   *                   ...
+   *               ]
+   *
+   * @throws HttpForbidden If a filter key does not match the expected format or is invalid.
+   * @throws InternalError
+   */
+  public function filterObjectMap(array $filters, array $models): array {
+    $modelFilterMap = [];
+    /*
+     * Filter parameters address fields by their alias, not by their database column name,
+     * so the primary key has to be looked up by alias as well. Same expression as makeFilter().
+     */
+    $primaryKeyAlias = array_column($this->getAliasedFeatures(), 'alias', 'dbname')[$this->getPrimaryKey()];
+    foreach ($filters as $filter => $value) {
+      /* Operator list has to stay in sync with makeFilter(), it resolves the filters mapped here */
+      if (preg_match('/^(?P<key>[_a-zA-Z0-9]+?)(?<operator>|__eq|__ne|__lt|__lte|__gt|__gte|__contains|__startswith|__endswith|__icontains|__istartswith|__iendswith|__in|__nin)$/', $filter, $matches) == 0) {
+        throw new HttpForbidden("Filter parameter '" . $filter . "' is not valid");
+      }
+      
+      $isMapped = false;
+      foreach ($models as $model) {
+        /* Aliased features are keyed by alias, the raw DBA features are keyed by column name */
+        $features = $this->getAliasedFeaturesOther($model::class);
+        // Special filtering of id to use for uniform access to model primary key
+        $cast_key = $matches['key'] == 'id' ? $primaryKeyAlias : $matches['key'];
+        if (!array_key_exists($cast_key, $features)) {
+          continue; //not a valid filter for current model
+        }
+        $modelFilterMap[$model::class][$filter] = $value;
+        $isMapped = true;
+        break; //filter has been found for current model, so break to go to next filter
+      }
+      
+      if (!$isMapped) {
+        /* Dropping the filter here would silently answer the request with an unfiltered result */
+        throw new HttpForbidden("Filter parameter '" . $filter . "' is not valid (key not valid field)");
+      }
+    }
+    return $modelFilterMap;
+  }
+  
+  /**
+   * API entry point for retrieving count information of data
+   * @param Request $request
+   * @param Response $response
+   * @param array $args
+   * @return Response
+   * @throws HTException
+   * @throws HttpError
+   * @throws HttpForbidden
+   * @throws InternalError
+   * @throws JsonException
+   * @throws ContainerExceptionInterface
+   * @throws NotFoundExceptionInterface
+   * @throws Exception
+   */
+  public function count(Request $request, Response $response, array $args): Response {
+    $this->preCommon($request);
+    $factory = $this->getFactory();
+    
+    //resolve all expandables
+    $validExpandables = $this::getExpandables();
+    $expands = $this->makeExpandables($request, $validExpandables);
+    
+    $objects = [$factory->getNullObject()];
+    $aFs = [];
+    //build join filters
+    foreach ($expands as $expand) {
+      $relation = $this->getToManyRelationships()[$expand];
+      $objects[] = $this->getModelFactory($relation["relationType"])->getNullObject();
+      $otherFactory = $this->getModelFactory($relation["relationType"]);
+      $primaryKey = $this->getPrimaryKey();
+      $aFs[Factory::JOIN][] = new JoinFilter($otherFactory, $relation["relationKey"], $primaryKey, $factory);
+    }
+    
+    $filters = $this->getFilters($request);
+    $filterObjectMap = $this->filterObjectMap($filters, $objects);
+    $qFs = [];
+    foreach ($filterObjectMap as $class => $cur_filters) {
+      $relationApiClass = new ($this->container->get('classMapper')->get($class))($this->container);
+      $current_qFs = $this->makeFilter($cur_filters, $relationApiClass);
+      $qFs = array_merge($qFs, $current_qFs);
+    }
+    
+    /*
+     * Restrict the count to the objects the current user is allowed to see, exactly like
+     * getManyResources() does. Without this the endpoint leaks the existence of objects
+     * outside of the user's access groups.
+     */
+    $aFs_ACL = $this->getFilterACL();
+    if (isset($aFs_ACL[Factory::FILTER])) {
+      $qFs = array_merge($aFs_ACL[Factory::FILTER], $qFs);
+    }
+    if (isset($aFs_ACL[Factory::JOIN])) {
+      foreach ($aFs_ACL[Factory::JOIN] as $joinFilter) {
+        if (!$this::checkJoinExists($aFs[Factory::JOIN] ?? [], $joinFilter->getOtherFactory()->getModelName())) {
+          $aFs[Factory::JOIN][] = $joinFilter;
+        }
+      }
+    }
+    
+    if (count($qFs) > 0) {
+      $aFs[Factory::FILTER] = $qFs;
+    }
+    
+    $count = $factory->countFilter($aFs);
+    $meta = ["count" => $count];
+    
+    $include_total = $request->getQueryParams()['include_total'] ?? false;
+    if ($include_total == "true") {
+      /* "Without any filter applied" means without the request's filters, but still within the user's ACL */
+      $meta["total_count"] = $factory->countFilter(array_intersect_key($aFs_ACL, [Factory::FILTER => 1, Factory::JOIN => 1]));
+    }
+    
+    $ret = self::createJsonResponse(meta: $meta);
+    
+    $body = $response->getBody();
+    $body->write($this->ret2json($ret));
+    
+    return $response->withStatus(200)
+      ->withHeader("Content-Type", 'application/vnd.api+json');
+  }
+  
+  /**
+   * API entry point for requests of single object
+   * @param Request $request
+   * @param Response $response
+   * @param array $args
+   * @return Response
+   * @throws ContainerExceptionInterface
+   * @throws HTException
+   * @throws HttpError
+   * @throws HttpForbidden
+   * @throws InternalError
+   * @throws JsonException
+   * @throws NotFoundExceptionInterface
+   * @throws ResourceNotFoundError
+   */
+  public function getOne(Request $request, Response $response, array $args): Response {
+    $this->preCommon($request);
+    $object = $this->doFetch($args['id']);
+    
+    $classMapper = $this->container->get('classMapper');
+    
+    return self::getOneResource($this, $object, $request, $response);
+  }
+  
+  /**
+   * API entry point for modification of single object
+   * @param Request $request
+   * @param Response $response
+   * @param mixed $object
+   * @param mixed $data
+   * @return Response
+   * @throws ContainerExceptionInterface
+   * @throws HTException
+   * @throws HttpError
+   * @throws HttpForbidden
+   * @throws InternalError
+   * @throws JsonException
+   * @throws NotFoundExceptionInterface
+   * @throws ResourceNotFoundError
+   * @throws Exception
+   */
+  public function patchSingleObject(Request $request, Response $response, mixed $object, mixed $data): Response {
+    if (!$this->validateResourceRecord($data)) {
+      return ErrorHandler::errorResponse($response, "No valid resource identifier object was given as data!", 403);
+    }
+    
+    $attributes = $data['attributes'];
+    $aliasedFeatures = $this->getAliasedFeatures();
+    
+    // Validate incoming data
+    foreach (array_keys($attributes) as $key) {
+      // Ensure key can be updated 
+      $this->isAllowedToMutate($aliasedFeatures, $key);
+    }
+    // Validate input data if it matches the correct type or subtype
+    $this->validateData($attributes, $aliasedFeatures);
+    
+    // This does the real things, patch the values that were sent in the data.
+    $mappedData = $this->unaliasData($attributes, $aliasedFeatures);
+    $this->updateObject($object->getId(), $mappedData);
+    
+    // Return updated object
+    $newObject = $this->getFactory()->get($object->getId());
+    return $this->getOneResource($this, $newObject, $request, $response);
+  }
+  
+  /**
+   * API entry point for modification of single object
+   * @param Request $request
+   * @param Response $response
+   * @param array $args
+   * @return Response
+   * @throws ContainerExceptionInterface
+   * @throws HTException
+   * @throws HttpError
+   * @throws HttpForbidden
+   * @throws InternalError
+   * @throws JsonException
+   * @throws NotFoundExceptionInterface
+   * @throws ResourceNotFoundError
+   */
+  public function patchOne(Request $request, Response $response, array $args): Response {
+    $this->preCommon($request);
+    
+    // use doFetch to also have additional checks completed
+    $object = $this->doFetch($args['id']);
+    
+    $data = $request->getParsedBody()['data'];
+    return $this->patchSingleObject($request, $response, $object, $data);
+  }
+  
+  //follows style of bulk methods: https://github.com/json-api/json-api/blob/9c7a03dbc37f80f6ca81b16d444c960e96dd7a57/extensions/bulk/index.md
+  //1. parse into key => value pairs of what is updated or object => key => value dict
+  //2. retrieve object $object = $this->doFetch($request, $args['id']);
+  //3. create updateObjects functions, that in base case will just do updateObject on every element in array
+  //4. overload function in config route
+  /**
+   * {
+   * "data": [{
+   *   "id": "1",
+   *  "type": "articles"
+   *   "attributes": {
+   *     "title": "To TDD or Not"
+   *   }
+   * }, {
+   *   "id": "2",
+   *  "type": "articles"
+   *   "attributes": {
+   *     "title": "LOL Engineering"
+   *   }
+   * }]
+   * @param Request $request
+   * @param Response $response
+   * @param array $args
+   * @return Response
+   * @throws HTException
+   * @throws HttpError
+   * @throws HttpForbidden
+   * @throws ResourceNotFoundError
+   */
+  public function patchMultiple(Request $request, Response $response, array $args): Response {
+    $this->preCommon($request);
+    $data = $request->getParsedBody()['data'];
+    $objects = [];
+    $aliasedfeatures = $this->getAliasedFeatures();
+    foreach ($data as $resourceRecord) {
+      if (!$this->validateResourceRecord($resourceRecord)) {
+        throw new HttpError('No valid resource identifier object was given as data!', 403);
+      }
+      $attributes = $resourceRecord["attributes"];
+      foreach (array_keys($attributes) as $key) {
+        // Ensure key can be updated 
+        $this->isAllowedToMutate($aliasedfeatures, $key);
+      }
+      $mappedData = $this->unaliasData($attributes, $aliasedfeatures);
+      $objects[$resourceRecord["id"]] = $mappedData;
+      
+    }
+    $this->updateObjects($objects);
+    
+    // $newObject = $this->getFactory()->get($object->getId());
+    // return self::getOneResource($this, $newObject, $request, $response, 200);
+    //TODO maybe nicer to return all changed objects
+    return $response->withStatus(204)
+      ->withHeader("Content-Type", "application/json");
+  }
+  
+  /**
+   * @param Request $request
+   * @param Response $response
+   * @param array $args
+   * @return Response
+   * @throws HTException
+   * @throws HttpError
+   * @throws HttpForbidden
+   * @throws ResourceNotFoundError
+   */
+  public function deleteMultiple(Request $request, Response $response, array $args): Response {
+    $this->preCommon($request);
+    $data = $request->getParsedBody()['data'];
+    
+    foreach ($data as $resourceRecord) {
+      if (!$this->validateResourceRecord($resourceRecord)) {
+        throw new HttpError('No valid resource identifier object was given as data!', 403);
+      }
+      $object = $this->doFetch($resourceRecord['id']);
+      $this->deleteObject($object);
+    }
+    return $response->withStatus(204)
+      ->withHeader("Content-Type", "application/json");
+  }
+  
+  /**
+   * Overridable function to update multiple objects
+   * @objects ia an array where id is the key and the values are the attributes that need to be patched
+   * @param array $objects
+   *
+   * @return void
+   * @throws HttpError
+   * @throws HttpForbidden
+   * @throws ResourceNotFoundError
+   */
+  protected function updateObjects(array $objects): void {
+    foreach ($objects as $objectId => $attributes) {
+      $this->updateObject($objectId, $attributes);
+    }
+  }
+  
+  /**
+   * API entry point creation of new object
+   * @param Request $request
+   * @param Response $response
+   * @param array $args
+   * @return Response
+   * @throws ContainerExceptionInterface
+   * @throws HTException
+   * @throws HttpError
+   * @throws HttpForbidden
+   * @throws InternalError
+   * @throws JsonException
+   * @throws NotFoundExceptionInterface
+   * @throws Exception
+   */
+  public function post(Request $request, Response $response, array $args): Response {
+    $this->preCommon($request);
+    
+    $data = $request->getParsedBody()["data"];
+    if ($data == null) {
+      throw new HttpError("POST request requires data to be present", 403);
+    }
+    //POST request RR only needs type, no ID
+    if (!isset($data['type'])) {
+      throw new HttpError('No valid resource identifier object with type was given as data!', 403);
+    }
+    $attributes = $data["attributes"];
+    
+    $allFeatures = $this->getAliasedFeatures();
+    
+    // Validate incoming parameters
+    $this->validateParameters($attributes, $allFeatures);
+    
+    // Validate incoming data by value
+    $this->validateData($attributes, $allFeatures);
+    
+    // Remove key aliases and sanitize to 'db values and request creation
+    $mappedData = $this->unaliasData($attributes, $allFeatures);
+    $pk = $this->createObject($mappedData);
+    
+    // Request object again, since post-modified entries are not reflected into object.
+    $object = $this->getFactory()->get($pk);
+    return self::getOneResource($this, $object, $request, $response, 201);
+  }
+  
+  
+  /**
+   * API endpoint to get a to one related resource record
+   * @param Request $request
+   * @param Response $response
+   * @param array $args
+   * @return Response
+   * @throws ContainerExceptionInterface
+   * @throws HTException
+   * @throws HttpForbidden
+   * @throws InternalError
+   * @throws NotFoundExceptionInterface
+   * @throws ResourceNotFoundError
+   * @throws HttpError
+   * @throws Exception
+   */
+  public function getToOneRelatedResource(Request $request, Response $response, array $args): Response {
+    $this->preCommon($request);
+    
+    $relation = $args['relation'];
+    $id = $args['id'];
+    
+    /* Validate the base object, also when the relation goes through an
+       intermediate table. Otherwise the relation of an object outside the
+       caller's access groups could be read. */
+    $object = $this->doFetch($id);
+    
+    // Relation object
+    $relationObjects = $this->fetchVisibleExpandObjects([$object], $relation);
+    if (!array_key_exists($id, $relationObjects)) {
+      throw new HttpForbidden("No access to this object!", 403);
+    }
+    $relationObject = $relationObjects[$id];
+    
+    $relationClass = $this->getToOneRelationships()[$relation]['relationType'];
+    $relationApiClass = new ($this->container->get('classMapper')->get($relationClass))($this->container);
+
+    /* Check the read permission for the related resource ourselves. getOneResource()
+       used to do this based on the request method, now it only serializes. */
+    $relationApiClass->bootRequest($request);
+    $relationApiClass->authorize($request, $relationApiClass->getRequiredPermissions($request->getMethod()));
+
+    return self::getOneResource($relationApiClass, $relationObject, $request, $response);
+  }
+  
+  /**
+   * API endpoint to get a to one relationship link
+   * @param Request $request
+   * @param Response $response
+   * @param array $args
+   * @return Response
+   * @throws ContainerExceptionInterface
+   * @throws HTException
+   * @throws HttpForbidden
+   * @throws JsonException
+   * @throws NotFoundExceptionInterface
+   * @throws ResourceNotFoundError
+   * @throws HttpError
+   * @throws Exception
+   */
+  public function getToOneRelationshipLink(Request $request, Response $response, array $args): Response {
+    $this->preCommon($request);
+    
+    $relation = $this->getToOneRelationships()[$args['relation']];
+    
+    /* Prepare filter for to-one relations */
+    
+    // Example for Task:
+    // 'Hashlist' => [
+    //     'intermediateType' => TaskWrapper::class,
+    //     'joinField' => Task::TASK_WRAPPER_ID,
+    //     'joinFieldRelation' => TaskWrapper::TASK_WRAPPER_ID,
+    // ],
+    if (array_key_exists('intermediateType', $relation)) {
+      /* Resolve the relation through the base object, which is also validated
+         with doFetch. The link only exposes the id of the related resource,
+         so the related resource itself is deliberately not ACL filtered. */
+      $object = $this->doFetch($args['id']);
+      $relationObjects = static::fetchExpandObjects([$object], $args['relation']);
+      $id = array_key_exists($object->getId(), $relationObjects)
+        ? $relationObjects[$object->getId()]->getId()
+        : null;
+    }
+    else {
+      $object = $this->doFetch($args['id']);
+      $id = $object->getKeyValueDict()[$relation['key']];
+    }
+    
+    if (is_null($id)) {
+      $dataResource = null;
+    }
+    else {
+      $dataResource = [
+        'type' => $this->getObjectTypeName($relation['relationType']),
+        'id' => $id,
+      ];
+    }
+    
+    $selfParams = $request->getQueryParams();
+    $linksQuery = urldecode(http_build_query($selfParams));
+    $linksSelf = $request->getUri()->getPath() . ((!empty($linksQuery)) ? '?' . $linksQuery : '');
+    
+    $apiClass = $this->container->get('classMapper')->get(get_class($object));
+    $linksRelated = $this->routeParser->urlFor($apiClass . ':getToOneRelatedResource', $args);
+    
+    $links = [
+      "self" => $linksSelf,
+      "related" => $linksRelated,
+    ];
+    
+    // Generate JSON:API GET output
+    $ret = self::createJsonResponse($dataResource, $links);
+    
+    $body = $response->getBody();
+    $body->write($this->ret2json($ret));
+    
+    return $response->withStatus(200)
+      ->withHeader("Content-Type", 'application/vnd.api+json');
+  }
+  
+  /**
+   * API endpoint to patch a to one relationship link
+   * @param Request $request
+   * @param Response $response
+   * @param array $args
+   * @return Response
+   * @throws HTException
+   * @throws HttpError
+   * @throws HttpForbidden
+   * @throws ResourceNotFoundError
+   * @throws Exception
+   */
+  public function patchToOneRelationshipLink(Request $request, Response $response, array $args): Response {
+    $this->preCommon($request);
+    $jsonBody = $request->getParsedBody();
+    
+    if ($jsonBody === null || !array_key_exists('data', $jsonBody)) {
+      throw new HttpError('No data was sent! Send the json data in the following format: {"data": {"type": "foo", "id": 1}}');
+    }
+    $data = $jsonBody['data'];
+    
+    $relation = $this->getToOneRelationships()[$args['relation']];
+    if ($relation == null) {
+      throw new HttpError("Relation does not exist!");
+    }
+    if (isset($relation["readonly"]) && $relation['readonly'] === true) {
+      throw new HttpError('This relationship is readonly');
+    }
+    $relationKey = $relation['relationKey'];
+    $relationType = $relation['relationType'];
+    
+    $features = $this->getFeatures();
+    $this->isAllowedToMutate($features, $relationKey, $data == null);
+    
+    $object = $this->doFetch(intval($args['id']));
+    if ($data == null) {
+      $this->DatabaseSet($object, $relationKey, null);
+    }
+    elseif (!$this->validateResourceRecord($data)) {
+      throw new HttpError('No valid resource identifier object was given as data!');
+    }
+    else {
+      // check if foreign key exists before inserting
+      $otherFactory = self::getModelFactory($relationType);
+      $check = $otherFactory->get($data["id"]);
+      if ($check == null) {
+        throw new HttpError("Provided foreign key to patch to does not exist!");
+      }
+      $this->DatabaseSet($object, $relationKey, $check->getId());
+    }
+    
+    return $response->withStatus(201)
+      ->withHeader("Content-Type", "application/vnd.api+json");
+  }
+  
+  
+  /**
+   * API endpoint for retrieving to many relationship resource records
+   * @param Request $request
+   * @param Response $response
+   * @param array $args
+   * @return Response
+   * @throws ContainerExceptionInterface
+   * @throws HTException
+   * @throws HttpError
+   * @throws HttpForbidden
+   * @throws NotFoundExceptionInterface
+   */
+  public function getToManyRelatedResource(Request $request, Response $response, array $args): Response {
+    $this->preCommon($request);
+    
+    /* Validate that the caller has access to the base object, otherwise the
+       relation of an object outside the caller's access groups could be read. */
+    $this->doFetch($args['id']);
+    
+    // Base object -> Relation objects
+    
+    $toManyRelation = $this->getToManyRelationships()[$args['relation']];
+    $relationClass = $toManyRelation['relationType'];
+    $relationApiClass = new ($this->container->get('classMapper')->get($relationClass))($this->container);
+    
+    $aFs = [];
+    $filterField = $toManyRelation['relationKey'];
+    $filterFactory = null;
+    
+    if (array_key_exists('junctionTableType', $toManyRelation)) {
+      $filterField = $toManyRelation['junctionTableFilterField'];
+      $filterFactory = self::getModelFactory($toManyRelation['junctionTableType']);
+      
+      $aFs[Factory::JOIN][] = new JoinFilter(
+        self::getModelFactory($toManyRelation['junctionTableType']),
+        $toManyRelation['junctionTableJoinField'],
+        $toManyRelation['relationKey'],
+      );
+    }
+    
+    $aFs[Factory::FILTER][] = new QueryFilter(
+      $filterField,
+      $args['id'],
+      '=',
+      $filterFactory
+    );
+
+    /* Check the read permission for the related resources ourselves. getManyResources()
+       used to do this based on the request method, now it only serializes. */
+    $relationApiClass->bootRequest($request);
+    $relationApiClass->authorize($request, $relationApiClass->getRequiredPermissions($request->getMethod()));
+
+    return self::getManyResources($relationApiClass, $request, $response, $aFs);
+  }
+  
+  
+  /**
+   * API get request to retrieve the to many relationship links
+   * @param Request $request
+   * @param Response $response
+   * @param array $args
+   * @return Response
+   * @throws ContainerExceptionInterface
+   * @throws HTException
+   * @throws HttpForbidden
+   * @throws InternalError
+   * @throws JsonException
+   * @throws NotFoundExceptionInterface
+   * @throws ResourceNotFoundError
+   * @throws HttpError
+   */
+  public function getToManyRelationshipLink(Request $request, Response $response, array $args): Response {
+    $this->preCommon($request);
+    
+    // Base object -> Relationship objects
+    $object = $this->doFetch($args['id']);
+    $expandObjects = $this->fetchVisibleExpandObjects([$object], $args['relation']);
+    
+    $dataResources = [];
+    if (array_key_exists($object->getId(), $expandObjects)) {
+      foreach ($expandObjects[$object->getId()] as $relationshipObject) {
+        $dataResources[] = [
+          'type' => $this->getObjectTypeName($relationshipObject),
+          'id' => $relationshipObject->getId(),
+        ];
+      }
+    }
+    
+    $selfParams = $request->getQueryParams();
+    $linksQuery = urldecode(http_build_query($selfParams));
+    $linksSelf = $request->getUri()->getPath() . ((!empty($linksQuery)) ? '?' . $linksQuery : '');
+    
+    $apiClass = $this->container->get('classMapper')->get(get_class($object));
+    $linksRelated = $this->routeParser->urlFor($apiClass . ':getToManyRelatedResource', $args);
+    
+    
+    // TODO implement pagination support
+    $linksNext = null;
+    
+    // Generate JSON:API GET output
+    $links = [
+      "self" => $linksSelf,
+      "related" => $linksRelated,
+      "next" => $linksNext,
+    ];
+    $ret = self::createJsonResponse($dataResources, $links);
+    
+    $body = $response->getBody();
+    $body->write($this->ret2json($ret));
+    
+    return $response->withStatus(200)
+      ->withHeader("Content-Type", 'application/vnd.api+json; ext="https://jsonapi.org/profiles/ethanresnick/cursor-pagination"');
+  }
+  
+  /**
+   * PATCH request to patch the to many relationship link
+   * TODO: handle intermediate tables
+   * @param Request $request
+   * @param Response $response
+   * @param array $args
+   * @return Response
+   * @throws HTException
+   * @throws HttpError
+   * @throws HttpForbidden
+   * @throws InternalError
+   */
+  public function patchToManyRelationshipLink(Request $request, Response $response, array $args): Response {
+    $this->preCommon($request);
+    $jsonBody = $request->getParsedBody();
+    
+    if ($jsonBody === null || !array_key_exists('data', $jsonBody) || !is_array($jsonBody['data'])) {
+      throw new HttpError('No data was sent! Send the json data in the following format: {"data":[{"type": "foo", "id": 1}}]');
+    }
+    
+    $data = $jsonBody['data'];
+    
+    /* Validate the base object here, so every implementation of
+       updateToManyRelationship() is covered, including overrides in subclasses. */
+    $this->doFetch($args['id']);
+    
+    $this->updateToManyRelationship($request, $data, $args);
+    
+    return $response->withStatus(204)
+      ->withHeader("Content-Type", "application/vnd.api+json");
+  }
+  
+  /**
+   * Overridable function to update the to many relationship
+   * @param Request $request
+   * @param array $data
+   * @param array $args
+   * @throws HttpError
+   * @throws HttpForbidden
+   * @throws InternalError
+   * @throws Exception
+   */
+  protected function updateToManyRelationship(Request $request, array $data, array $args): void {
+    $relation = $this->getToManyRelationships()[$args['relation']];
+    $primaryKey = $this->getPrimaryKeyOther($relation['relationType']);
+    $relationKey = $relation['relationKey'];
+    if ($relationKey == null) {
+      throw new HttpError("Relation does not exist!");
+    }
+    if (isset($relation["readonly"]) && $relation["readonly"] === true) {
+      throw new HttpError("This relationship is readonly");
+    }
+    
+    $relationType = $relation['relationType'];
+    $features = $this->getFeaturesOther($relationType);
+    $this->isAllowedToMutate($features, $relationKey);
+    
+    $factory = self::getModelFactory($relationType);
+    
+    $qF = new QueryFilter($relationKey, $args['id'], "=");
+    $models = $factory->filter([Factory::FILTER => $qF]);
+    //TODO Would be nicer if filter/factory could return a dict based on primarykeys directly
+    $modelsDict = array();
+    foreach ($models as $item) {
+      $modelsDict[$item->getPrimaryKeyValue()] = $item;
+    }
+    
+    $updates = [];
+    foreach ($data as $item) {
+      if (!$this->validateResourceRecord($item)) {
+        $encoded_item = json_encode($item);
+        throw new HttpError('Invalid resource record given in list! invalid resource record: ' . $encoded_item);
+      }
+      $updates[] = new MassUpdateSet($item["id"], $args["id"]);
+      unset($modelsDict[$item["id"]]);
+    }
+    
+    $leftover_primary_keys = array_keys($modelsDict);
+    if (!$features[$relationKey]["null"] && count($leftover_primary_keys) > 0) {
+      throw new HttpError("Not all current relationship objects have been included,
+       but the foreignkey can't be set to null. Either add all objects or delete the not needed objects"
+      );
+    }
+    foreach ($leftover_primary_keys as $key) {
+      //set all foreign keys of current relationships to null that have not been included
+      $updates[] = new MassUpdateSet($key, null);
+    }
+    $factory->getDB()->beginTransaction(); //start transaction to be able roll back
+    $factory->massSingleUpdate($primaryKey, $relationKey, $updates);
+    if (!$factory->getDB()->commit()) {
+      throw new HttpError("Was not able to update to many relationship");
+    }
+  }
+  
+  /**
+   * POST request for the to many relationship link
+   * @param Request $request
+   * @param Response $response
+   * @param array $args
+   * @return Response
+   * @throws HTException
+   * @throws HttpError
+   * @throws HttpForbidden
+   * @throws InternalError
+   * @throws ResourceNotFoundError
+   * @throws HttpConflict
+   * @throws Exception
+   */
+  public function postToManyRelationshipLink(Request $request, Response $response, array $args): Response {
+    $this->preCommon($request);
+    
+    $jsonBody = $request->getParsedBody();
+    if ($jsonBody === null || !array_key_exists('data', $jsonBody) || !is_array($jsonBody['data'])) {
+      throw new HttpError('No data was sent! Send the json data in the following format: {"data":[{"type": "foo", "id": 1}}]');
+    }
+    $data = $jsonBody['data'];
+    
+    $relation = $this->getToManyRelationships()[$args['relation']];
+    $relationKey = $relation['relationKey'];
+    if ($relationKey == null) {
+      throw new HttpError('Relation does not exist!');
+    }
+    if (isset($relation["readonly"]) && $relation['readonly'] === true) {
+      throw new HttpError('This relationship is readonly');
+    }
+    
+    // check if the object queried exists
+    $baseItem = $this->doFetch($args["id"]);
+    
+    // TODO this ia an abstract way of adding to junction tables. This only works for intermediate tables
+    // that have 3 fields (1 primary key and 2 foreign keys to link the tables) for models that have intermediate
+    // tables with more than 3 fields, the postToManyRelationshipLink() function should be overridden.
+    if (array_key_exists("junctionTableType", $relation)) {
+      $relationType = $relation['junctionTableType'];
+      $primaryKey = $this->getPrimaryKeyOther($relationType);
+      //Add to junction table if not exist.
+      $factory = self::getModelFactory($relationType);
+      $factory->getDB()->beginTransaction();
+      foreach ($data as $item) {
+        if (!$this->validateResourceRecord($item)) {
+          $encoded_item = json_encode($item);
+          throw new HttpError('Invalid resource record given in list! invalid resource record: ' . $encoded_item);
+        }
+        $otherFactory = self::getModelFactory($relation["relationType"]);
+        $relationItem = $this->doFetch($item["id"], $otherFactory);
+        
+        // check if the relation already exists
+        $qF1 = new QueryFilter($relation["junctionTableFilterField"], $baseItem->getId(), "=");
+        $qF2 = new QueryFilter($relation["junctionTableJoinField"], $relationItem->getId(), "=");
+        $check = $factory->filter([Factory::FILTER => [$qF1, $qF2]], true);
+        if ($check != null) {
+          throw new HttpConflict("Relation " . $relation['junctionTableType'] . " of " . $baseItem->getId() . " to " . $relationItem->getId() . " already exists");
+        }
+        
+        $table_entry_dict = [
+          $primaryKey => null,
+          $relation["junctionTableFilterField"] => $baseItem->getId(),
+          $relation["junctionTableJoinField"] => $relationItem->getId(),
+        ];
+        $table_entry = $factory->createObjectFromDict($table_entry_dict);
+        try {
+          $factory->save($table_entry);
+        }
+        catch (PDOException $e) {
+          /* A concurrent request created the same relation in between, a
+             unique key on the junction table (if present) guarantees it
+             exists only once. */
+          if (in_array($e->getCode(), ['23000', '23505'])) {
+            throw new HttpConflict("Relation " . $relation['junctionTableType'] . " of " . $baseItem->getId() . " to " . $relationItem->getId() . " already exists");
+          }
+          throw $e;
+        }
+      }
+    }
+    else {
+      $relationType = $relation['relationType'];
+      $primaryKey = $this->getPrimaryKeyOther($relationType);
+      $features = $this->getFeaturesOther($relationType);
+      $this->isAllowedToMutate($features, $relationKey);
+      $factory = self::getModelFactory($relationType);
+      
+      $factory->getDB()->beginTransaction();
+      $updates = self::ResourceRecordArrayToUpdateArray($data, $baseItem->getId());
+      
+      // check that all the IDs exist
+      $updateIds = [];
+      foreach ($updates as $update) {
+        $updateIds[] = $update->getMatchValue();
+      }
+      $qF = new ContainFilter($primaryKey, $updateIds);
+      $check = $factory->countFilter([Factory::FILTER => $qF]);
+      if ($check != count($updateIds)) {
+        // in order to be efficient we only do a count query, but this has the effect that we cannot
+        // exactly tell which item is missing
+        throw new ResourceNotFoundError("Not all requested items to update exist!");
+      }
+      
+      $factory->massSingleUpdate($primaryKey, $relationKey, $updates);
+    }
+    $factory->getDB()->commit();
+    
+    return $response->withStatus(201)
+      ->withHeader("Content-Type", "application/vnd.api+json");
+  }
+  
+  /**
+   * DELETE request for the to many relationship link
+   * currently there is no object that can be altered this way because of constraints
+   * @param Request $request
+   * @param Response $response
+   * @param array $args
+   * @return Response
+   * @throws HTException
+   * @throws HttpError
+   * @throws HttpForbidden
+   * @throws Exception
+   */
+  public function deleteToManyRelationshipLink(Request $request, Response $response, array $args): Response {
+    $this->preCommon($request);
+    $jsonBody = $request->getParsedBody();
+    
+    if ($jsonBody === null || !array_key_exists('data', $jsonBody) || !is_array($jsonBody['data'])) {
+      throw new HttpError('No data was sent! Send the json data in the following format: {"data":[{"type": "foo", "id": 1}}]');
+    }
+    
+    $relation = $this->getToManyRelationships()[$args['relation']];
+    $primaryKey = $relation['key'];
+    $relationKey = $relation['relationKey'];
+    if ($relationKey == null) {
+      throw new HttpError("Relation does not exist!");
+    }
+    
+    $relationType = $relation['relationType'];
+    if (isset($relation["readonly"]) && $relation['readonly'] === true) {
+      throw new HttpError('This relationship is readonly');
+    }
+    $junction_table = $relation['junctionTableType'];
+    if (!isset($junction_table)) {
+      $features = $this->getFeaturesOther($relationType);
+      $this->isAllowedToMutate($features, $relationKey);
+      if (!$features[$relationKey]['null']) {
+        // In this scenario another solution could be to delete object TODO?
+        throw new HttpForbidden("Key '$relationKey' cant be set to null");
+      }
+    }
+    
+    /* Validate the base object, otherwise associations of an object outside
+       the caller's access groups could be removed. */
+    $this->doFetch($args['id']);
+    
+    $data = $jsonBody['data'];
+    
+    $factory = (isset($junction_table)) ? self::getModelFactory($junction_table) : self::getModelFactory($relationType);
+    if (isset($junction_table)) {
+      $parent_id = $args["id"];
+      $factory->getDB()->beginTransaction(); //start transaction to be able roll back
+      foreach ($data as $item) {
+        $qF = new QueryFilter($relation["junctionTableFilterField"], $parent_id, "=", $factory);
+        $qF2 = new QueryFilter($relation["junctionTableJoinField"], $item['id'], "=", $factory);
+        $object = $factory->filter([Factory::FILTER => [$qF, $qF2]])[0];
+        $factory->delete($object);
+      }
+    }
+    else {
+      $updates = [];
+      foreach ($data as $item) {
+        if (!$this->validateResourceRecord($item)) {
+          $encoded_item = json_encode($item);
+          throw new HttpError('Invalid resource record given in list! invalid resource record: ' . $encoded_item);
+        }
+        $updates[] = new MassUpdateSet($item["id"], null);
+      }
+      $factory->getDB()->beginTransaction(); //start transaction to be able roll back
+      $factory->massSingleUpdate($primaryKey, $relationKey, $updates);
+    }
+    if (!$factory->getDB()->commit()) {
+      throw new HttpError("Some resources failed updating");
+    }
+    
+    return $response->withStatus(201)
+      ->withHeader("Content-Type", "application/vnd.api+json");
+  }
+  
+  /**
+   * Function to update fields in the database
+   * @throws HttpError
+   * @throws Exception
+   */
+  protected function DatabaseSet($object, $key, $value): void {
+    try {
+      $this->getFactory()->set($object, $key, $value);
+    }
+    catch (PDOException $e) {
+      if ($e->getCode() === '23000') {
+        throw new HttpError("Foreign key constraint failed: " . $e->getMessage());
+      }
+      else {
+        throw new HttpError("MYSQL Database error [" . $e->getCode() . "]: " . $e->getMessage());
+      }
+    }
+  }
+  
+  /**
+   * Update object with provided values
+   * @param int $objectId
+   * @param array $data
+   * @throws HttpError
+   * @throws HttpForbidden
+   * @throws ResourceNotFoundError
+   */
+  protected function updateObject(int $objectId, array $data): void {
+    $updateHandlers = $this->getUpdateHandlers($objectId, $this->getCurrentUser());
+    foreach ($data as $key => $value) {
+      if (array_key_exists($key, $updateHandlers)) {
+        $updateHandlers[$key]($value);
+      }
+      else {
+        $object = $this->doFetch($objectId);
+        $this->DatabaseSet($object, $key, $value);
+      }
+    }
+  }
+  
+  /**
+   * Get input field names valid for patching of object
+   */
+  final public function getPatchValidFeatures(): array {
+    $aliasedfeatures = $this->getFeaturesWithoutFormfields();
+    $validFeatures = [];
+    
+    // Generate listing of validFeatures
+    foreach ($aliasedfeatures as $name => $feature) {
+      // Ensure key can be updated 
+      if ($feature['read_only']) {
+        continue;
+      }
+      if ($feature['protected']) {
+        continue;
+      }
+      if ($feature['private']) {
+        continue;
+      }
+      
+      $validFeatures[$name] = $feature;
+    }
+    
+    // Ensure debugging response lists are in sorted order
+    ksort($validFeatures);
+    
+    return $validFeatures;
+  }
+  
+  /**
+   * Override-able registering of options
+   *
+   * @param App $app
+   * @return void
+   * @throws ContainerExceptionInterface
+   * @throws NotFoundExceptionInterface
+   */
+  static public function register(App $app): void {
+    $me = static::class;
+    $baseUri = $me::getBaseUri();
+    $baseUriOne = $baseUri . '/{id:[0-9]+}';
+    $baseUriCount = $baseUri . "/count";
+    
+    $baseUriRelationships = $baseUri . '/{id:[0-9]+}/relationships';
+    $uris = [$baseUri, $baseUriOne, $baseUriCount, $baseUriRelationships];
+    
+    $classMapper = $app->getContainer()->get('classMapper');
+    $classMapper->add($me::getDBAclass(), $me);
+    
+    /* Allow CORS preflight requests */
+    foreach ($uris as $uri) {
+      $app->options($uri, function (Request $request, Response $response): Response {
+        return $response;
+      });
+    }
+    
+    $available_methods = $me::getAvailableMethods();
+    
+    if (in_array("GET", $available_methods)) {
+      $app->get($baseUri, [$me, 'get'])->setname($me . ':get');
+      $app->get($baseUriCount, [$me, 'count'])->setname($me . ':count');
+    }
+
+    foreach ($me::getToOneRelationships() as $name => $relationship) {
+      $relationUri = '{relation:' . $name . '}';
+      $app->get($baseUriOne . '/' . $relationUri, [$me, 'getToOneRelatedResource'])->setname($me . ':getToOneRelatedResource');
+      $app->get($baseUriRelationships . '/' . $relationUri, [$me, 'getToOneRelationshipLink'])->setname($me . ':getToOneRelationshipLink');
+      $app->patch($baseUriRelationships . '/' . $relationUri, [$me, 'patchToOneRelationshipLink'])->setname($me . ':patchToOneRelationshipLink');
+      $app->options($baseUriOne . '/' . $relationUri, function (Request $request, Response $response): Response {
+        return $response;
+      });
+      $app->options($baseUriRelationships . '/' . $relationUri, function (Request $request, Response $response): Response {
+        return $response;
+      });
+    }
+
+    foreach ($me::getToManyRelationships() as $name => $relationship) {
+      $relationUri = '{relation:' . $name . '}';
+      $app->get($baseUriOne . '/' . $relationUri, [$me, 'getToManyRelatedResource'])->setname($me . ':getToManyRelatedResource');
+      $app->get($baseUriRelationships . '/' . $relationUri, [$me, 'getToManyRelationshipLink'])->setname($me . ':getToManyRelationshipLink');
+      $app->patch($baseUriRelationships . '/' . $relationUri, [$me, 'patchToManyRelationshipLink'])->setname($me . ':patchToManyRelationshipLink');
+      $app->post($baseUriRelationships . '/' . $relationUri, [$me, 'postToManyRelationshipLink'])->setname($me . ':postToManyRelationshipLink');
+      $app->delete($baseUriRelationships . '/' . $relationUri, [$me, 'deleteToManyRelationshipLink'])->setname($me . ':deleteToManyRelationshipLink');
+      $app->options($baseUriOne . '/' . $relationUri, function (Request $request, Response $response): Response {
+        return $response;
+      });
+      $app->options($baseUriRelationships . '/' . $relationUri, function (Request $request, Response $response): Response {
+        return $response;
+      });
+    }
+
+    if (in_array("POST", $available_methods)) {
+      $app->post($baseUri, [$me, 'post'])->setname($me . ':post');
+    }
+
+    if (in_array("GET", $available_methods)) {
+      $app->get($baseUriOne, [$me, 'getOne'])->setName($me . ':getOne');
+    }
+
+    if (in_array("PATCH", $available_methods)) {
+      $app->patch($baseUriOne, [$me, 'patchOne'])->setName($me . ':patchOne');
+      $app->patch($baseUri, [$me, 'patchMultiple'])->setName($me . ':patchMultiple');
+    }
+
+    if (in_array("DELETE", $available_methods)) {
+      $app->delete($baseUriOne, [$me, 'deleteOne'])->setName($me . ':deleteOne');
+      $app->delete($baseUri, [$me, 'deleteMultiple'])->setName($me . 'deleteMultiple');
+    }
+  }
+}

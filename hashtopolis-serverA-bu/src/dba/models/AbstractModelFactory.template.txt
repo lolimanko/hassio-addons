@@ -1,0 +1,50 @@
+<?php
+
+namespace Hashtopolis\dba\models;
+
+use Hashtopolis\dba\AbstractModelFactory;
+
+/**
+ * @extends AbstractModelFactory<__MODEL_NAME__>
+ */
+class __MODEL_NAME__Factory extends AbstractModelFactory {
+  function getModelName(): string {
+    return "__MODEL_NAME__";
+  }
+  
+  function getModelTable(): string {
+    return "__MODEL_NAME__";
+  }
+
+  function isMapping(): bool {
+    return __MODEL_DBA_MAPPING__;
+  }
+  
+  function isCachable(): bool {
+    return false;
+  }
+  
+  function getCacheValidTime(): int {
+    return -1;
+  }
+  
+  /**
+   * @return __MODEL_NAME__
+   */
+  function getNullObject(): __MODEL_NAME__ {
+    return new __MODEL_NAME__(__MODEL_DICT__);
+  }
+  
+  /**
+   * @param array $dict
+   * @return __MODEL_NAME__
+   */
+  function createObjectFromDict(array $dict): __MODEL_NAME__ {
+    $conv = [];
+    foreach ($dict as $key => $val) {
+      $conv[strtolower($key)] = $val;
+    }
+    $dict = $conv;__MODEL_MAPPING_DICT____MODEL_STREAMING_DICT__
+    return new __MODEL_NAME__(__MODEL__DICT2__);
+  }
+}

@@ -1,0 +1,578 @@
+# Advanced installation
+
+> [!NOTE]
+> Throughout this page, *docker-compose.yml* refers to the file created during the installation (basic or offline), which is saved under that name whether you chose the MySQL or the PostgreSQL variant. Unless stated otherwise, the modifications described on this page apply identically to both variants.
+
+## Installation in an offline environment
+If you want to run Hashtopolis on a network without internet access, you need a separate machine with internet to either pull the images from Docker Hub or build them yourself (to build the images from source, follow the instructions in the [dedicated section](#build-hashtopolis-images-yourself)).
+
+Hashtopolis supports MySQL and PostgreSQL since v.1.0.0-rainbow5. The procedure is the same for both databases — only the database image and the docker-compose/env files differ — so simply follow the subsection matching your choice. In both cases, make sure the database image version matches the one pinned in the docker-compose file of the release you are installing.
+
+### Offline installation with MySQL
+
+1. On the machine with internet access, pull the images from Docker Hub and save them as .tar archives:
+```
+docker pull hashtopolis/backend:latest
+docker pull hashtopolis/frontend:latest
+docker pull mysql:9.7
+
+docker save hashtopolis/backend:latest --output hashtopolis-backend.tar
+docker save hashtopolis/frontend:latest --output hashtopolis-frontend.tar
+docker save mysql:9.7 --output mysql.tar
+```
+
+2. Download the docker-compose and env files:
+```
+wget https://raw.githubusercontent.com/hashtopolis/server/master/docker-compose.mysql.yml -O docker-compose.yml
+wget https://raw.githubusercontent.com/hashtopolis/server/master/env.mysql.example -O .env
+```
+
+3. Transfer the .tar archives, *docker-compose.yml* and *.env* to your Hashtopolis server and import the images:
+```
+docker load --input hashtopolis-backend.tar
+docker load --input hashtopolis-frontend.tar
+docker load --input mysql.tar
+```
+
+### Offline installation with PostgreSQL
+
+1. On the machine with internet access, pull the images from Docker Hub and save them as .tar archives:
+```
+docker pull hashtopolis/backend:latest
+docker pull hashtopolis/frontend:latest
+docker pull postgres:18
+
+docker save hashtopolis/backend:latest --output hashtopolis-backend.tar
+docker save hashtopolis/frontend:latest --output hashtopolis-frontend.tar
+docker save postgres:18 --output postgres.tar
+```
+
+2. Download the docker-compose and env files:
+```
+wget https://raw.githubusercontent.com/hashtopolis/server/master/docker-compose.postgres.yml -O docker-compose.yml
+wget https://raw.githubusercontent.com/hashtopolis/server/master/env.postgres.example -O .env
+```
+
+3. Transfer the .tar archives, *docker-compose.yml* and *.env* to your Hashtopolis server and import the images:
+```
+docker load --input hashtopolis-backend.tar
+docker load --input hashtopolis-frontend.tar
+docker load --input postgres.tar
+```
+
+### Finalize the installation
+
+Continue with the normal docker installation described in the [basic installation section](basic_install.md#setup-hashtopolis-server).
+
+> [!CAUTION]
+> Hashtopolis is pre-configured with a hashcat cracker. However, the binary package is not loaded within the docker image. A URL is provided so that the agent can download the binary when required. Obviously this does not work in an offline environment. Please check the [binaries cracker section](../user_manual/crackers_binary.md#adding-a-new-version) for details about how to handle such situation. 
+
+## Local webserver for cracker binaries
+
+If you want to use a custom binary or a different version of hashcat (for example with custom modules), you need to supply an URL for a ZIP-file containing that binary, that the agents can reach. You may want to store all your binaries within a local webserver, especially if your environment is offline/air-gapped.
+
+
+If your Hashtopolis-instance is running, stop it, before you make any changes:
+``` shell
+docker compose down
+```
+
+### docker-compose.yml
+
+In your docker-compose.yml-file you have to add an additional container:
+``` docker-compose.yml
+  file-download:
+    container_name: file-download
+    image: nginx
+    restart: always
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./data:/var/www/html
+    ports:
+      - 8081:80
+
+```
+Adapt the configuration as needed. In this example you have to put your binary-ZIP-files in the `./data`-folder, where your docker-compose.yml is located, and the webserver listens on port 8081. Port 8081 is used on purpose: port 8080 is already taken by the Hashtopolis backend, so this dedicated file-download server must use a different one.
+
+> [!NOTE]
+> If your environment is offline, keep in mind that you need to export and import the nginx image first, following a similar process to the one described for the Hashtopolis images [previously](./advanced_install.md#installation-in-an-offline-environment). 
+
+### nginx.conf
+
+For the webserver, which serves the binaries, you need a custom nginx.conf located in the folder, where your docker-compose.yml is located. 
+
+``` nginx.conf
+events {
+    worker_connections 1024;
+}
+
+http {
+	server {
+    		listen       80;
+    		listen  [::]:80;
+    		server_name  localhost;
+
+    		location / {
+        		root   /var/www/html;
+        		index  index.html index.htm;
+    		}
+	}
+}
+```
+
+Adapt this config to your liking and to your setup. You can configure the path to the nginx.conf in the docker-compose.yml.
+
+If you are using a nginx-server for the SSL/TLS Setup, it is recommended  to use a separate nginx.conf for the SSL/TLS Setup and for the local webserver. Change your config-names accordingly and the paths in the docker-compose.yml.
+
+### Usage
+
+The local webserver starts with your regular hashtopolis-instance:
+
+```docker compose up --detach ```
+
+Put the ZIP-file for your custom binary in the `./data`-folder.
+
+When registering a [new binary in the UI](../user_manual/crackers_binary.md#binaries) enter your `Download URL`:
+`http://<hashtopolis-ip>:8081/<filename>.zip`
+
+Your agents should now be able to download the new binary, if you create a task using that binary.
+
+
+## Build Hashtopolis images yourself
+The Docker images can be built from source following these steps.
+
+### Build frontend image
+1. Clone the Hashtopolis web-ui repository and cd into it.
+```
+git clone https://github.com/hashtopolis/web-ui.git
+cd web-ui
+```
+
+2. Build the web-ui repo and tag it
+```
+docker build -t hashtopolis/frontend:latest --target hashtopolis-web-ui-prod .
+```
+
+### Build backend image
+1. Move one directory back, clone the Hashtopolis server repository and cd into it:
+```
+cd ..
+git clone https://github.com/hashtopolis/server.git
+cd server
+```
+
+2. *(Optional)* Check the output of ```file docker-entrypoint.sh```. If it mentions *'with CRLF line terminators'*, your git checkout is converting line-ending on checkout. This is causing issues for files within the docker container. This is common behavior for example within Windows (WSL) instances. To fix this:
+```
+git config core.eol lf
+git config core.autocrlf input
+git rm -rf --cached .
+git reset --hard HEAD
+```
+
+Check that ```file docker-entrypoint.sh``` correctly outputs: *'docker-entrypoint.sh: Bourne-Again shell script, ASCII text executable'*.
+
+3. Copy the env.example file and modify the values as needed.
+```
+cp env.example .env
+nano .env
+```
+
+4. Build the server docker image
+```
+docker build . -t hashtopolis/backend:latest --target hashtopolis-server-prod
+```
+
+## Using Local Folders outside of the Docker Volumes
+
+By default (when you use the default docker-compose) the Hashtopolis folder (import, files and binaries) are in a Docker volume.
+
+You can list this volume via docker volume ls. You can also access the volume directly in the backend, because it is mounted at: ```/usr/local/share/hashtopolis``` inside the container.
+
+However, if you prefer not to use Docker volumes and instead use folders on the host OS, you can update the mount points in the *docker-compose.yml* file. 
+
+> [!NOTE]
+> The example shown below is for MySQL, updating the PostgreSQL docker-compose file is identical.
+
+```
+version: '3.7'
+services:
+  hashtopolis-backend:
+    container_name: hashtopolis-backend
+    image: hashtopolis/backend:latest
+    restart: always
+    volumes:
+      # Where /opt/hashtopolis/<folder> are folders on you host OS.
+      - /opt/hashtopolis/config:/usr/local/share/hashtopolis/config:Z
+      - /opt/hashtopolis/log:/usr/local/share/hashtopolis/log:Z
+      - /opt/hashtopolis/import:/usr/local/share/hashtopolis/import:Z
+      - /opt/hashtopolis/binaries:/usr/local/share/hashtopolis/binaries:Z
+      - /opt/hashtopolis/files:/usr/local/share/hashtopolis/files:Z
+    environment:
+      HASHTOPOLIS_DB_USER: $MYSQL_USER
+      HASHTOPOLIS_DB_PASS: $MYSQL_PASSWORD
+      HASHTOPOLIS_DB_HOST: $HASHTOPOLIS_DB_HOST
+      HASHTOPOLIS_DB_DATABASE: $MYSQL_DATABASE
+      HASHTOPOLIS_ADMIN_USER: $HASHTOPOLIS_ADMIN_USER
+      HASHTOPOLIS_ADMIN_PASSWORD: $HASHTOPOLIS_ADMIN_PASSWORD
+    depends_on:
+      - db
+    ports:
+      - 8080:80
+  db:
+    container_name: db
+    image: mysql:9.7
+    restart: always
+    volumes:
+      - db:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: $MYSQL_ROOT_PASS
+      MYSQL_DATABASE: $MYSQL_DATABASE
+      MYSQL_USER: $MYSQL_USER
+      MYSQL_PASSWORD: $MYSQL_PASSWORD
+  hashtopolis-frontend:
+    container_name: hashtopolis-frontend
+    image: hashtopolis/frontend:latest
+    environment:
+      HASHTOPOLIS_BACKEND_URL: $HASHTOPOLIS_BACKEND_URL
+    restart: always
+    depends_on: 
+      - hashtopolis-backend
+    ports:
+      - 4200:80
+volumes:
+  db:
+  hashtopolis:
+```
+
+Make sure to back up all data from the Docker volume. You can do this using:
+```
+docker cp hashtopolis-backend:/usr/local/share/hashtopolis <directory>
+```
+
+Next, recreate the containers:
+```
+docker compose down
+docker compose up
+```
+
+Finally, copy the data back into the appropriate folders after recreating the containers.
+
+## Serving the frontend on another origin
+
+The browser treats `https://hashtopolis.example.com` and `https://app.example.com:4200` as different
+*origins*. When the frontend is served from a different origin than the API, the API has to say which
+origins it trusts, otherwise the browser refuses to hand the frontend the response.
+
+This matters beyond the odd console error: the login session lives in a cookie the API sets, and a
+browser will not send that cookie cross-origin unless the API names the frontend's origin
+specifically. Get it wrong and the symptom is not an error at all — people log in fine and are
+silently logged out a couple of hours later, when the short-lived access token expires and the
+session cannot be renewed.
+
+### Both served from one origin: nothing to configure
+
+If a reverse proxy serves the frontend at `/` and the API under `/api` on the same hostname (see
+[SSL/TLS Setup](tls.md)), the browser sees a single origin, none of this applies, and you can leave
+all of the settings below unset. This is the simplest deployment and the one to prefer.
+
+### Frontend on a different origin
+
+Set these on the **backend** container:
+
+| Variable | Meaning |
+| --- | --- |
+| `HASHTOPOLIS_BACKEND_URL` | the API's own URL, for example `https://hashtopolis.example.com/api/v2`. The API always trusts its own origin. The path must be empty or end with the API mount `/api/v2`; anything before that mount is the deployment subpath and is put into URLs the server builds to its own download endpoint, e.g. `https://hashtopolis.example.com/hashtopolis/api/v2` serves downloads under `https://hashtopolis.example.com/hashtopolis/api/download.php/...`. |
+| `HASHTOPOLIS_FRONTEND_URLS` | extra origins to trust, comma separated. Use this when the frontend is on a different **host**. |
+| `HASHTOPOLIS_FRONTEND_PORT` | shorthand for "the API's own host and scheme, on this port". Enough when the frontend differs only by **port**, which is what the bundled `docker-compose.yml` does with port 4200. |
+
+An origin is trusted when it matches one of these exactly — scheme, host and port all three. There
+are no wildcards: `https://*.example.com` is not a pattern, and `https://app.example.com` does not
+admit `https://app.example.com.somewhere-else.test`. A trusted origin is handed the session cookie,
+so list only origins you control.
+
+A frontend at `https://app.example.com` talking to an API at `https://hashtopolis.example.com`:
+
+```
+HASHTOPOLIS_BACKEND_URL=https://hashtopolis.example.com/api/v2
+HASHTOPOLIS_FRONTEND_URLS=https://app.example.com
+```
+
+Entries may carry a path, which is ignored for the origin comparison — only scheme, host and
+port are matched. The path of `HASHTOPOLIS_BACKEND_URL` additionally configures the deployment
+subpath used for the download URLs described above. `localhost`, `127.0.0.1` and `[::1]` are
+treated as the same host, so a development setup can mix them freely.
+
+All of these go in the `.env` file next to the bundled `docker-compose.yml`, which passes them to the
+backend container.
+
+If you have enumerated every origin in `HASHTOPOLIS_FRONTEND_URLS` and do not want the frontend port
+adding one more, switch it off with an empty value:
+
+```
+HASHTOPOLIS_FRONTEND_PORT=
+```
+
+The bundled compose file defaults this to 4200, so a deployment that never touches it keeps trusting
+the frontend on that port. Leaving it switched on is the common case; switching it off is worth doing
+once your list is exact, because every origin on the list is trusted with the session cookie.
+
+> [!WARNING]
+> Set `HASHTOPOLIS_BACKEND_URL` together with one of the other two, or set none of them. On its own
+> it tells the API to trust exactly one origin — its own — and every request from the frontend is
+> then rejected with a CORS error.
+
+### When the frontend is on a different domain entirely
+
+`app.example.com` and `hashtopolis.example.com` are different origins but the same *site*, and the
+session cookie works across them with no further configuration.
+
+A frontend on a genuinely different domain — `app.example.net` against an API at
+`hashtopolis.example.com` — is a different case. Naming it in `HASHTOPOLIS_FRONTEND_URLS` gets the
+requests through, but the browser still refuses to send the session cookie, because the cookie
+defaults to `SameSite=Strict`. Such a deployment additionally needs
+`HASHTOPOLIS_REFRESH_COOKIE_SAMESITE=None`, which browsers only honour over HTTPS end to end:
+
+```
+HASHTOPOLIS_FRONTEND_URLS=https://app.example.net
+HASHTOPOLIS_REFRESH_COOKIE_SAMESITE=None
+```
+
+Without the second line the first one is not enough, and the failure is quiet rather than loud: the
+login succeeds, because that request carries no cookie, and the session then ends the first time it
+needs renewing. There is one more related setting, `HASHTOPOLIS_REFRESH_COOKIE_SECURE`, which forces
+the Secure flag on the cookie. It is normally unnecessary, since the flag follows the scheme the
+request arrived over; set it behind a proxy that terminates TLS without passing `X-Forwarded-Proto`.
+
+### Upgrading from an older version
+
+`HASHTOPOLIS_FRONTEND_URLS` existed in earlier releases, stopped being read for a while, and is read
+again from this release on. Its meaning has changed: it used to be the entire policy, and it now
+*adds to* the origins named by `HASHTOPOLIS_BACKEND_URL` and `HASHTOPOLIS_FRONTEND_PORT`.
+
+If your `.env` still carries a value from back then, review it before upgrading. Anything listed is
+trusted with the session cookie, and a hostname you no longer control should not be on that list.
+
+### When it does not work
+
+The API logs the origin it rejected and the full list it would have accepted. Look there first:
+
+```
+docker logs hashtopolis-backend
+```
+
+## Backup and Restore
+
+The best way to back up and restore your Hashtopolis instance depends heavily on the way the instance is set up and what configurations are made.
+Therefore, there is no guide available for backing up / restoring which works for everyone, but some considerations which need to be taken into account:
+
+- Depending on the amount of data (files, database size, etc.) in the hashtopolis instance, a complete backup can become quite large. If it is needed to just be able to restore information about executed tasks, progress etc. (e.g. in case of a fatal failure of the system) it is enough to just back up the database, but of course this would not allow a easy restore to a previous state.
+- If you plan to do a backup in a way to be able to completely restore it to the previous state (files, logs, database, users, etc.), you need to be careful to include all required items into your backup and when restoring make sure that nothing gets left out during that process, otherwise you may end up with a semi-broken or non-functional hashtopolis instance.
+- In case you have set up your hashtopolis instance only using volumes (one for the database, one for all the hashtopolis data), backing up the complete content of these volumes is enough to have all data backed up.
+- Restoring only parts (some tasks, only users, other database parts) from a backup is very tricky and should only be done by experts and very easily goes wrong when primary keys are not sequential and not updated for auto increment in the database.
+
+## Set up a fresh and clean instance
+
+When there is the need for a complete reset/clean setup (e.g. for testing), you can do following steps to completely remove all data.
+
+> [!CAUTION]
+> The following steps will delete all data in your hashtopolis instance (including the database, users, tasks, agents, etc.)!
+
+These steps assume that you have set up your hashtopolis instance using a `docker-compose.yml` file (either MySQL or PostgreSQL).
+
+First stop all running containers and clean them up:
+
+```
+cd <directory-containing-docker-compose.yml>
+docker compose down
+```
+
+In case you have mounted directories for files and other data instead of using a docker volume, clean these directories by removing all files within (wordlists, rules, etc.).
+
+Delete the docker volumes for the database and hashtopolis data (if you don't have the folders mounted otherwise).
+Use `docker volume ls` to determine which volumes exist (typically they are prefixed with the name of the folder containing the `docker-compose.yml`).
+
+For each of the relevant volume, delete it by using `docker volume rm <volume-name>`.
+
+Afterwards, you can start up the containers again which should then be in a complete clean state and a freshly set up instance:
+
+```
+docker compose up -d
+```
+
+## Hashtopolis Mail Setup (Sendmail or Postfix)
+
+This guide gives the fastest ways to make mail sending work in Hashtopolis to be used for sending notifications
+
+### Important Hashtopolis-specific requirement
+
+Current backend logic considers mail "configured" only if this file exists:
+
+- /etc/ssmtp/ssmtp.conf
+
+Even when using sendmail or postfix, you should still provide this file (it can be minimal) so Hashtopolis enables email sending.
+
+### Recommended easiest path: Postfix relay + existing backend image
+
+This is the easiest because the backend image already supports an ssmtp config mount.
+
+#### 1. Prepare a postfix relay (host or separate container)
+
+Configure postfix as a null client / relay host. Typical key setting in postfix main.cf:
+
+- relayhost = [smtp.your-provider.tld]:587
+
+Also configure SASL and TLS as needed by your provider.
+
+#### 2. Create ssmtp.conf in your project root
+
+Use the provided template as base:
+
+- copy ssmtp.conf.example to ssmtp.conf
+
+Example values:
+
+- root=admin@your-domain.tld
+- mailhub=host.docker.internal:25
+- rewriteDomain=your-domain.tld
+- UseTLS=No
+- UseSTARTTLS=No
+- FromLineOverride=yes
+
+If your postfix relay requires auth/TLS on another port, set mailhub and TLS/auth values accordingly.
+
+#### 3. Mount ssmtp.conf into Hashtopolis backend container
+
+In docker-compose.mysql.yml or docker-compose.postgres.yml, enable this volume:
+
+```yaml
+services:
+  hashtopolis-backend:
+    volumes:
+      - hashtopolis:/usr/local/share/hashtopolis:Z
+      - ./ssmtp.conf:/etc/ssmtp/ssmtp.conf
+```
+
+#### 4. Configure sender identity in Hashtopolis
+
+In Hashtopolis Config - Notifications / Sender Settings, set:
+
+- emailSender
+- emailSenderName
+
+These values are used in From headers.
+
+#### 5. Restart and test
+
+- Restart backend container.
+- Create a 'New Notification' in your user notification page (see [Notifications page](../user_manual/user-settings.md#notifications) for more details) for example for a 'newTask'. 
+- Trigger the notification accordingly, e.g. by creating a new task.
+- If it fails, inspect backend logs and postfix logs.
+
+---
+
+### Alternative path: direct sendmail/postfix inside backend container
+
+Use this only if you specifically need local MTA delivery from the backend container.
+
+#### 1. Build a custom backend image
+
+Install postfix or sendmail package and ensure /usr/sbin/sendmail exists.
+
+#### 2. Keep Hashtopolis mail gate satisfied
+
+Create the file below inside the container (even if unused by your MTA logic):
+
+- /etc/ssmtp/ssmtp.conf
+
+A minimal placeholder is enough:
+
+```conf
+root=postmaster@localhost
+mailhub=localhost
+FromLineOverride=yes
+```
+
+#### 3. Ensure PHP uses sendmail interface
+
+Set php sendmail_path appropriately (commonly default is already fine):
+
+- sendmail_path = "/usr/sbin/sendmail -t -i"
+
+#### 4. Test sendmail manually, then from Hashtopolis
+
+Manual test example:
+
+```bash
+printf "Subject: test\n\nhello" | /usr/sbin/sendmail you@example.com
+```
+
+Then test Hashtopolis-triggered mail events.
+
+---
+
+### Troubleshooting checklist
+
+- /etc/ssmtp/ssmtp.conf exists inside backend container.
+- emailSender and emailSenderName are set in Hashtopolis config.
+- DNS/network from backend to relay is reachable.
+- Relay accepts sender domain and authentication method.
+- PHP can execute /usr/sbin/sendmail successfully.
+
+---
+
+### Gmail quick test example (no own SMTP server)
+
+Use this section to test mail locally with a Gmail account.
+
+#### Prerequisites
+
+- Enable 2-Step Verification on your Google account.
+- Create a Google App Password (do not use your normal Gmail password).
+
+#### Example ssmtp.conf for Gmail
+
+Create or update ssmtp.conf in your project root with values like:
+
+```conf
+root=youraddress@gmail.com
+mailhub=smtp.gmail.com:587
+rewriteDomain=gmail.com
+UseTLS=Yes
+UseSTARTTLS=Yes
+AuthUser=youraddress@gmail.com
+AuthPass=your_16_char_google_app_password
+AuthMethod=LOGIN
+FromLineOverride=yes
+```
+
+#### Mount the file in Docker Compose
+
+Make sure the backend service has this volume enabled:
+
+```yaml
+services:
+  hashtopolis-backend:
+    volumes:
+      - hashtopolis:/usr/local/share/hashtopolis:Z
+      - ./ssmtp.conf:/etc/ssmtp/ssmtp.conf
+```
+
+#### Hashtopolis sender settings
+
+In Hashtopolis server config:
+
+- emailSender = youraddress@gmail.com
+- emailSenderName = Hashtopolis Local Test
+
+#### Local test flow
+
+1. Restart the backend container.
+2. Trigger a password reset email for a user with your Gmail address.
+3. Check your inbox (and spam folder).
+
+#### If Gmail test fails
+
+- Verify AuthPass is an App Password, not your account password.
+- Verify port 587 outbound is allowed from your Docker environment.
+- Check backend container logs for mail/sendmail errors.
+- Confirm /etc/ssmtp/ssmtp.conf exists inside the backend container.

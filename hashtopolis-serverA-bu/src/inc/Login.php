@@ -1,0 +1,169 @@
+<?php
+
+namespace Hashtopolis\inc;
+
+use Exception;
+use Hashtopolis\dba\QueryFilter;
+use Hashtopolis\dba\models\Session;
+use Hashtopolis\dba\models\User;
+use Hashtopolis\dba\Factory;
+use Hashtopolis\inc\defines\DLogEntry;
+use Hashtopolis\inc\defines\DLogEntryIssuer;
+use Hashtopolis\inc\defines\DNotificationType;
+use Hashtopolis\inc\defines\DPayloadKeys;
+use Hashtopolis\inc\handlers\NotificationHandler;
+use function PHPUnit\Framework\assertNotNull;
+
+/**
+ * Handles the login sessions
+ *
+ * @author Sein
+ */
+class Login {
+  private ?User    $user    = null;
+  private bool     $valid   = false;
+  private ?Session $session = null;
+  
+  private static ?Login $instance = null;
+  
+  public function setUser(User $user): void {
+    $this->user = $user;
+  }
+  
+  /**
+   * Get an instance of the Login class
+   * @return ?Login
+   */
+  public static function getInstance(): ?Login {
+    if (self::$instance == null) {
+      self::$instance = new Login();
+    }
+    return self::$instance;
+  }
+  
+  /**
+   * Creates a Login-Instance and checks automatically if there is a session
+   * running. It updates the session lifetime again up to the session limit.
+   * @throws Exception
+   */
+  private function __construct() {
+    if (isset($_COOKIE['session'])) {
+      $session_cookie = $_COOKIE['session'];
+      $filter1 = new QueryFilter(Session::SESSION_KEY, $session_cookie, "=");
+      $filter2 = new QueryFilter(Session::IS_OPEN, "1", "=");
+      $filter3 = new QueryFilter(Session::LAST_ACTION_DATE, time() - 100000, ">");
+      $check = Factory::getSessionFactory()->filter([Factory::FILTER => [$filter1, $filter2, $filter3]]);
+      if ($check === null || sizeof($check) == 0) {
+        setcookie("session", false, time() - 600); //delete invalid or old cookie
+        return;
+      }
+      $session = $check[0];
+      $this->user = Factory::getUserFactory()->get($session->getUserId());
+      if ($this->user !== null) {
+        if ($session->getLastActionDate() < time() - $this->user->getSessionLifetime()) {
+          setcookie("session", false, time() - 600); //delete invalid or old cookie
+          return;
+        }
+        $this->valid = true;
+        $this->session = $session;
+        $session = Factory::getSessionFactory()->set($session, Session::LAST_ACTION_DATE, time());
+        setcookie("session", $session->getSessionKey(), time() + $this->user->getSessionLifetime(), "", "", false, true);
+      }
+    }
+  }
+  
+  /**
+   * Returns true if the user currently is loggedin with a valid session
+   */
+  public function isLoggedin(): bool {
+    return $this->valid;
+  }
+  
+  /**
+   * Logs the current user out and closes his session
+   * @throws Exception
+   */
+  public function logout(): void {
+    assertNotNull($this->session);
+    Factory::getSessionFactory()->set($this->session, Session::IS_OPEN, 0);
+    $this->session = null;
+    $this->user = null;
+    $this->valid = false;
+    setcookie("session", false, time() - 600);
+  }
+  
+  /**
+   * Returns the uID of the currently logged in user, if the user is not logged
+   * in, the uID will be -1
+   */
+  public function getUserID(): ?int {
+    if (!$this->valid) {
+      return -1;
+    }
+    return $this->user->getId();
+  }
+  
+  public function getUser(): ?User {
+    if (!$this->valid) {
+      return null;
+    }
+    return $this->user;
+  }
+  
+  /**
+   * Executes a login with given username and password (plain)
+   *
+   * @param string $username username of the user to be logged in
+   * @param string $password password which was entered on login form
+   * @return bool true on success and false on failure
+   * @throws Exception
+   */
+  public function login(string $username, string $password): bool {
+    /****** Check password ******/
+    if ($this->valid) {
+      return false;
+    }
+    $filter = new QueryFilter(User::USERNAME, $username, "=");
+    
+    $check = Factory::getUserFactory()->filter([Factory::FILTER => $filter]);
+    if ($check === null || sizeof($check) == 0) {
+      return false;
+    }
+    $user = $check[0];
+    
+    if ($user->getIsValid() != 1) {
+      return false;
+    }
+    else if (!Encryption::passwordVerify($password, $user->getPasswordSalt(), $user->getPasswordHash())) {
+      Util::createLogEntry(DLogEntryIssuer::USER, $user->getId(), DLogEntry::WARN, "Failed login attempt due to wrong password!");
+      
+      $payload = new DataSet(array(DPayloadKeys::USER => $user));
+      NotificationHandler::checkNotifications(DNotificationType::USER_LOGIN_FAILED, $payload);
+      return false;
+    }
+    $this->user = $user;
+    /****** End check password ******/
+    
+    // At this point the user is authenticated successfully, so the session can be created.
+    
+    /****** Create session ******/
+    $startTime = time();
+    $session = new Session(null, $this->user->getId(), $startTime, $startTime, 1, $this->user->getSessionLifetime(), "");
+    $session = Factory::getSessionFactory()->save($session);
+    if ($session === null) {
+      return false;
+    }
+    $sessionKey = Encryption::sessionHash($session->getId(), $startTime, $user->getEmail());
+    Factory::getSessionFactory()->set($session, Session::SESSION_KEY, $sessionKey);
+    $this->user = Factory::getUserFactory()->set($this->user, User::LAST_LOGIN_DATE, time());
+    
+    $this->valid = true;
+    Util::createLogEntry(DLogEntryIssuer::USER, $user->getId(), DLogEntry::INFO, "Successful login!");
+    setcookie("session", "$sessionKey", time() + $this->user->getSessionLifetime(), "", "", false, true);
+    return true;
+  }
+}
+
+
+
+

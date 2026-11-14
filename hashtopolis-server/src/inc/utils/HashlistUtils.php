@@ -201,6 +201,7 @@ class HashlistUtils {
    * @param User $user
    * @return array
    * @throws HTException
+   * @throws HttpError
    * @throws Exception
    */
   public static function createWordlists(int $hashlistId, User $user): array {
@@ -251,10 +252,17 @@ class HashlistUtils {
       }
     }
     fclose($wordlistFile);
+    if ($wordCount == 0) {
+      unlink($wordlistFilename);
+      throw new HttpError("There are no cracked hashes to create a wordlist from!");
+    }
     
     //add file to files list
-    $file = new File(null, $wordlistName, Util::filesize($wordlistFilename), $hashlist->getIsSecret(), DFileType::WORDLIST, $hashlist->getAccessGroupId(), $wordCount);
+    $file = new File(null, $wordlistName, Util::filesize($wordlistFilename), $hashlist->getIsSecret(), DFileType::WORDLIST, $hashlist->getAccessGroupId(), $wordCount, null);
     $file = Factory::getFileFactory()->save($file);
+    if ($file !== null) {
+      FileChecksumUtils::enqueue($file->getId());
+    }
     # TODO: returning wordCount and wordlistName are not really required here as the name and the count are already given in the file object
     return [$wordCount, $wordlistName, $file];
   }
@@ -728,6 +736,7 @@ class HashlistUtils {
    * @param User $user
    * @return File
    * @throws HTException
+   * @throws HttpError
    * @throws Exception
    */
   public static function export(int $hashlistId, User $user): File {
@@ -748,11 +757,6 @@ class HashlistUtils {
       $factory = Factory::getHashBinaryFactory();
       $orderObject = HashBinary::HASH_BINARY_ID;
     }
-    $file = fopen($tmpfile, "wb");
-    if (!$file) {
-      throw new HTException("Failed to write file!");
-    }
-    
     $hashlistIds = array();
     foreach ($hashlists as $hl) {
       $hashlistIds[] = $hl->getId();
@@ -760,6 +764,14 @@ class HashlistUtils {
     $qF1 = new ContainFilter(Hash::HASHLIST_ID, $hashlistIds);
     $qF2 = new QueryFilter(Hash::IS_CRACKED, "1", "=");
     $count = $factory->countFilter([Factory::FILTER => [$qF1, $qF2]]);
+    if ($count == 0) {
+      throw new HttpError("There are no cracked hashes to export!");
+    }
+    
+    $file = fopen($tmpfile, "wb");
+    if (!$file) {
+      throw new HTException("Failed to write file!");
+    }
     $pagingSize = 5000;
     if (SConfig::getInstance()->getVal(DConfig::HASHES_PAGE_SIZE) !== null) {
       $pagingSize = SConfig::getInstance()->getVal(DConfig::HASHES_PAGE_SIZE);
@@ -795,8 +807,12 @@ class HashlistUtils {
     fclose($file);
     usleep(1000000);
     
-    $file = new File(null, $tmpname, Util::filesize($tmpfile), $hashlist->getIsSecret(), DFileType::OTHER, $hashlist->getAccessGroupId(), $numEntries);
-    return Factory::getFileFactory()->save($file);
+    $file = new File(null, $tmpname, Util::filesize($tmpfile), $hashlist->getIsSecret(), DFileType::OTHER, $hashlist->getAccessGroupId(), $numEntries, null);
+    $file = Factory::getFileFactory()->save($file);
+    if ($file !== null) {
+      FileChecksumUtils::enqueue($file->getId());
+    }
+    return $file;
   }
   
   /**
@@ -1113,6 +1129,7 @@ class HashlistUtils {
    * @param User $user
    * @return File
    * @throws HTException
+   * @throws HttpError
    * @throws Exception
    */
   public static function leftlist(int $hashlistId, User $user): File {
@@ -1133,6 +1150,13 @@ class HashlistUtils {
       $hashlistIds[] = $hl->getId();
     }
     
+    $qF1 = new ContainFilter(Hash::HASHLIST_ID, $hashlistIds);
+    $qF2 = new QueryFilter(Hash::IS_CRACKED, "0", "=");
+    $count = Factory::getHashFactory()->countFilter([Factory::FILTER => [$qF1, $qF2]]);
+    if ($count == 0) {
+      throw new HttpError("There are no hashes left to export!");
+    }
+    
     $tmpname = "Leftlist_" . $hashlist->getId() . "_" . date("d-m-Y_H-i-s") . ".txt";
     $tmpfile = Factory::getStoredValueFactory()->get(DDirectories::FILES)->getVal() . "/$tmpname";
     
@@ -1140,10 +1164,6 @@ class HashlistUtils {
     if (!$file) {
       throw new HTException("Failed to write file!");
     }
-    
-    $qF1 = new ContainFilter(Hash::HASHLIST_ID, $hashlistIds);
-    $qF2 = new QueryFilter(Hash::IS_CRACKED, "0", "=");
-    $count = Factory::getHashFactory()->countFilter([Factory::FILTER => [$qF1, $qF2]]);
     $pagingSize = 5000;
     if (SConfig::getInstance()->getVal(DConfig::HASHES_PAGE_SIZE) !== null) {
       $pagingSize = SConfig::getInstance()->getVal(DConfig::HASHES_PAGE_SIZE);
@@ -1167,8 +1187,12 @@ class HashlistUtils {
     fclose($file);
     usleep(1000000);
     
-    $file = new File(null, $tmpname, Util::filesize($tmpfile), $hashlist->getIsSecret(), DFileType::OTHER, $hashlist->getAccessGroupId(), $numEntries);
-    return Factory::getFileFactory()->save($file);
+    $file = new File(null, $tmpname, Util::filesize($tmpfile), $hashlist->getIsSecret(), DFileType::OTHER, $hashlist->getAccessGroupId(), $numEntries, null);
+    $file = Factory::getFileFactory()->save($file);
+    if ($file !== null) {
+      FileChecksumUtils::enqueue($file->getId());
+    }
+    return $file;
   }
   
   /**

@@ -1,0 +1,97 @@
+import pytest
+
+from hashtopolis import File, Helper
+from utils import BaseTest, BackgroundJob
+
+
+class FileTest(BaseTest):
+    model_class = File
+
+    def create_test_object(self, *nargs, **kwargs):
+        return self.create_file(*nargs, **kwargs)
+
+    def test_create(self):
+        model_obj = self.create_test_object()
+        self._test_create(model_obj)
+
+    def test_patch(self):
+        model_obj = self.create_test_object()
+        self._test_patch(model_obj, 'isSecret', True)
+
+    def test_delete(self):
+        model_obj = self.create_test_object(delete=False)
+        self._test_delete(model_obj)
+
+    def test_expandables(self):
+        model_obj = self.create_test_object()
+        expandables = ['accessGroup']
+        self._test_expandables(model_obj, expandables)
+
+    def test_create_binary(self):
+        model_obj = self.create_test_object(compress=True)
+        self._test_create(model_obj)
+
+    def test_recount_wordlist(self):
+        # Note: The recounting is enqueued as background job, but it was already done on the object creation,
+        #       the file is returned with its immutable line count.
+        model_obj = self.create_test_object()
+
+        helper = Helper()
+        file = helper.recount_file_lines(file=model_obj)
+
+        self.assertEqual(file.lineCount, 3)
+
+        # The enqueued background job must be removed again, the runner processing is
+        # covered by test_backgroundjob.py
+        jobs = [job for job in BackgroundJob.objects.all() if job.payload.get('fileId') == model_obj.id]
+        self.assertEqual(len(jobs), 1)
+        jobs[0].delete()
+
+    def test_helper_get_file(self):
+        model_obj = self.create_test_object()
+
+        helper = Helper()
+        file_data = helper.get_file(file=model_obj)
+        self.assertEqual(file_data, "12345678\n123456\nprincess\n")
+
+    def test_range_request_get_file(self):
+        model_obj = self.create_test_object()
+
+        helper = Helper()
+        file_data = helper.get_file(file=model_obj, range="bytes=9-15")
+        self.assertEqual(file_data, "123456\n")
+
+    def test_suffix_range_request_get_file(self):
+        model_obj = self.create_test_object()
+
+        helper = Helper()
+        file_data = helper.get_file(file=model_obj, range="bytes=-9")
+        self.assertEqual(file_data, "princess\n")
+
+    def test_open_ended_range_request_get_file(self):
+        model_obj = self.create_test_object()
+
+        helper = Helper()
+        file_data = helper.get_file(file=model_obj, range="bytes=9-")
+        self.assertEqual(file_data, "123456\nprincess\n")
+
+    def test_bulk_delete(self):
+        files = [self.create_test_object(delete=False) for i in range(5)]
+        File.objects.delete_many(files)
+
+    def test_acl(self):
+        model_obj = self.create_test_object()
+        self._test_acl_list(model_obj, {'permFileRead': True})
+        self._test_acl_count(model_obj, {'permFileRead': True})
+
+    @pytest.mark.synthetic_only
+    def test_helper_rescan_global_files(self):
+        model_obj1 = self.create_test_object()
+        model_obj2 = self.create_test_object()
+
+        helper = Helper()
+        data = helper.rescan_global_files()
+        self.assertEqual(data, {"Rescan": "Success"})
+
+        check_obj1 = File.objects.get(fileId=model_obj1.id)
+        self.assertEqual(3, check_obj1.lineCount)

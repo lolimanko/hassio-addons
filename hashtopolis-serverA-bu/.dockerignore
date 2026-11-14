@@ -1,0 +1,21 @@
+/.buildpath
+/.project
+/.settings/
+query.log
+.idea/
+*.iml
+src/files/*
+!src/files/.htaccess
+.vs/
+*.phpproj
+*.sln
+*.phpproj.user
+
+# for docker stuff
+/db/
+data/conf.php
+.env
+src/import/*
+.gitignore
+.dockerignore
+src/inc/conf.php

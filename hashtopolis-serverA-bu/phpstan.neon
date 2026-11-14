@@ -1,0 +1,12 @@
+parameters:
+    paths:
+        - src/inc/apiv2
+        - src/inc/agentapi
+        - src/dba
+        - src/inc
+        - ci/phpunit
+    level: 4
+    treatPhpDocTypesAsCertain: false
+    excludePaths:
+        # this is deprecated/legacy and will not be touched until remove
+        - src/inc/Login.php

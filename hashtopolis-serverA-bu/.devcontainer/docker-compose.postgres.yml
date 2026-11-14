@@ -1,0 +1,56 @@
+services:
+  hashtopolis-server-dev:
+    container_name: hashtopolis-server-dev
+    build:
+      context: ..
+      target: hashtopolis-server-dev
+      args:
+        - CONTAINER_USER_CMD_PRE
+        - CONTAINER_USER_CMD_POST
+    environment:
+      HASHTOPOLIS_DB_TYPE: postgres
+      HASHTOPOLIS_DB_USER: hashtopolis
+      HASHTOPOLIS_DB_PASS: hashtopolis
+      HASHTOPOLIS_DB_HOST: hashtopolis-db-dev
+      HASHTOPOLIS_DB_DATABASE: hashtopolis
+      HASHTOPOLIS_APIV2_ENABLE: 1
+      # The refresh token cookie is only sent cross-origin when the API names a concrete allowed
+      # origin instead of a wildcard, so the dev frontend on :4200 has to be named here.
+      HASHTOPOLIS_BACKEND_URL: http://localhost:8080/api/v2
+      HASHTOPOLIS_FRONTEND_URLS: http://localhost:4200,http://127.0.0.1:4200
+      HASHTOPOLIS_CRON_ENABLE: 0
+    depends_on:
+      - hashtopolis-db-dev
+    ports:
+      - "8080:80"
+    volumes:
+      # This is where VS Code should expect to find your project's source code
+      # and the value of "workspaceFolder" in .devcontainer/devcontainer.json
+      - ..:/var/www/html
+      - hashtopolis-server-dev:/usr/local/share/hashtopolis:Z
+      # - ./jwks.json:/keys/jwks.json:ro
+    networks:
+      - hashtopolis_dev
+  hashtopolis-db-dev:
+    container_name: hashtopolis-db-dev
+    image: postgres:18
+    restart: always
+    ports:
+      - "5432:5432"
+    volumes:
+      - hashtopolis-db-dev:/var/lib/postgresql
+    environment:
+      POSTGRES_DB: hashtopolis
+      POSTGRES_USER: hashtopolis
+      POSTGRES_PASSWORD: hashtopolis
+    networks:
+      - hashtopolis_dev
+
+volumes:
+  hashtopolis-db-dev:
+  hashtopolis-server-dev:
+
+networks:
+  hashtopolis_dev:
+    # This network will also be used by the python-agent
+    name: hashtopolis_dev

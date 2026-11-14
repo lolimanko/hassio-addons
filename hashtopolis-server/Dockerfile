@@ -49,11 +49,12 @@ RUN apt-get update \
     && apt-get -y install git iproute2 procps lsb-release \
     # 7z is needed to unpack cracker binary archives for the background scan \
     && apt-get -y install p7zip-full \
+    # b3sum computes the BLAKE3 checksums of files in the background job runner \
+    && apt-get -y install b3sum \
     && apt-get -y install mariadb-client postgresql-client libpq-dev \
     && apt-get -y install libpng-dev \
     && apt-get -y install ssmtp \
     && rm -f /etc/ssmtp/ssmtp.conf \
-    && apt-get install -y --no-install-recommends jq gosu \
     \
     # Install extensions (optional)
     && docker-php-ext-install pdo_mysql pgsql pdo_pgsql gd bcmath \
@@ -68,7 +69,7 @@ RUN apt-get update \
     # Clean Up
     && apt-get autoremove -y \
     && apt-get clean -y \
-    && rm -rf /var/lib/apt/lists/*
+ //   && rm -rf /var/lib/apt/lists/*
 
 RUN sed -i 's/KeepAliveTimeout 5/KeepAliveTimeout 10/' /etc/apache2/apache2.conf
 RUN echo "ServerTokens Prod" >> /etc/apache2/apache2.conf \
@@ -105,16 +106,12 @@ RUN composer install --working-dir=${HASHTOPOLIS_DOCUMENT_ROOT}/..
 
 ENV DEBIAN_FRONTEND=dialog
 COPY docker-entrypoint.sh /usr/local/bin
-COPY preload_opt.sh /usr/local/bin
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/preload_opt.sh
+
 # Setting the hashtopolis document root is done at build time. Because the www-data user cannot write to the apache config folder.
 COPY 000-default.conf /tmp/
 RUN envsubst '${HASHTOPOLIS_DOCUMENT_ROOT} ${HASHTOPOLIS_BINARIES_PATH}' < /tmp/000-default.conf > /etc/apache2/sites-available/000-default.conf && rm /tmp/000-default.conf
-COPY default-ssl.conf /tmp/
-RUN envsubst '${HASHTOPOLIS_DOCUMENT_ROOT} ${HASHTOPOLIS_BINARIES_PATH}' < /tmp/default-ssl.conf > /etc/apache2/sites-available/default-ssl.conf && rm /tmp/default-ssl.conf
-#ENTRYPOINT [ "docker-entrypoint.sh" ]
-ENTRYPOINT [ "preload_opt.sh" ]
+
+ENTRYPOINT [ "docker-entrypoint.sh" ]
 # ----END----
 
 
@@ -195,3 +192,9 @@ RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" \
 
 #USER www-data
 # ----END----
+
+RUN apt-get update  && apt-get install -y --no-install-recommends jq gosu \
+ && rm -rf /var/lib/apt/lists/*
+ 
+
+   
