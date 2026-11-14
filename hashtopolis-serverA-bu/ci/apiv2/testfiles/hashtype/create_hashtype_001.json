@@ -1,6 +1,0 @@
-{
-    "description": "Dummy HashType",
-    "hashTypeId": 98765,
-    "isSalted": false,
-    "isSlowHash": false
-}
