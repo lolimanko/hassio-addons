@@ -55,6 +55,7 @@ RUN apt-get update \
     && apt-get -y install libpng-dev \
     && apt-get -y install ssmtp \
     && rm -f /etc/ssmtp/ssmtp.conf \
+    && apt-get install -y --no-install-recommends jq gosu \
     \
     # Install extensions (optional)
     && docker-php-ext-install pdo_mysql pgsql pdo_pgsql gd bcmath \
