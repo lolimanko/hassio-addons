@@ -27,7 +27,7 @@
 ### 安裝
 
 1. 在 HA 開啟 **設定 → 附加元件 → 附加元件商店**。
-2. 點右上角選單 → **儲存庫**，加入本 add-on 所在的儲存庫網址：`<REPOSITORY_URL>`。
+2. 點右上角選單 → **儲存庫**，加入本 add-on 所在的儲存庫網址：`[<REPOSITORY_URL>](https://github.com/lolimanko/hassio-addons)`。
 3. 重新整理後找到 **Windows Runtime**，按「安裝」。
 4. 到「設定」分頁調整選項，再回到「資訊」分頁啟動，並在「日誌」分頁確認狀態。
 
@@ -113,7 +113,7 @@ Run **32-bit and 64-bit Windows applications** on ARM64 (aarch64) Home Assistant
 ### Installation
 
 1. In Home Assistant open **Settings → Add-ons → Add-on Store**.
-2. Open the top-right menu → **Repositories** and add the repository that hosts this add-on: `<REPOSITORY_URL>`.
+2. Open the top-right menu → **Repositories** and add the repository that hosts this add-on: `[<REPOSITORY_URL>](https://github.com/lolimanko/hassio-addons)`.
 3. Refresh the page, find **Windows Runtime** and click **Install**.
 4. Adjust the options on the **Configuration** tab, then start the add-on from the **Info** tab and check the **Log** tab.
 
