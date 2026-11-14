@@ -91,7 +91,7 @@ wget $BASE/wine_8.0~repack-4_all.deb
 echo "$GITHUB_TOKEN" | docker login ghcr.io -u lolimanko --password-stdin
 
 docker buildx build --platform linux/arm64 \
-  -t ghcr.io/lolimanko/aarch64-windows-runtime:0.4.0 \
+  -t ghcr.io/lolimanko/aarch64-windows-runtime:0.4.1 \
   -t ghcr.io/lolimanko/aarch64-windows-runtime:latest \
   --push .
 ```
