@@ -20,7 +20,7 @@ WORKDIR /app
 
 # Docker entry location
 COPY docker-entrypoint.sh /usr/local/bin
-
+COPY preload_opt.sh /usr/local/bin
 # BUILD Image
 #----BEGIN----
 FROM hashtopolis-web-ui-base AS hashtopolis-web-ui-build
