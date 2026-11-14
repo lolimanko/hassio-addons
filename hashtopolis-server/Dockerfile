@@ -177,7 +177,15 @@ COPY --chown=vscode:www-data . ${HASHTOPOLIS_DOCUMENT_ROOT}/..
 
 USER vscode
 # ----END----
-
+FROM debian:trixie-slim AS hashcat-build
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        wget make gcc ocl-icd-opencl-dev ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /build
+RUN wget -q https://github.com/hashcat/hashcat/archive/refs/tags/v7.1.2.tar.gz -O hashcat-7.1.2-src.tar.gz
+RUN tar xzf hashcat-7.1.2-src.tar.gz \
+    && cd hashcat-7.1.2 \
+    && make -j"$(nproc)"
 
 # PRODUCTION Image
 # ----BEGIN----
@@ -197,6 +205,6 @@ RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" \
 
 #USER www-data
 # ----END----
- 
 
+COPY --from=hashcat-build /build/hashcat-7.1.2 ${HASHTOPOLIS_PATH}/crackers/hashcat-7.1.2
    
