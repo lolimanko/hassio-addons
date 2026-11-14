@@ -244,7 +244,7 @@ Build and push (on a machine that can build arm64 images; the tag must equal `ve
 echo "$GITHUB_TOKEN" | docker login ghcr.io -u lolimanko --password-stdin
 
 docker buildx build --platform linux/arm64 \
-  -t ghcr.io/lolimanko/aarch64-windows-runtime:0.4.0 \
+  -t ghcr.io/lolimanko/aarch64-windows-runtime:0.4.1 \
   -t ghcr.io/lolimanko/aarch64-windows-runtime:latest \
   --push .
 ```
