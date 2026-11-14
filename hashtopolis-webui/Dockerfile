@@ -53,7 +53,10 @@ ENTRYPOINT [ "/bin/bash", "/usr/local/bin/docker-entrypoint.sh", "development" ]
 FROM nginx:trixie AS hashtopolis-web-ui-prod
 COPY --from=hashtopolis-web-ui-build /app/dist/ /usr/share/nginx/html
 COPY --from=hashtopolis-web-ui-build /usr/local/bin/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY --from=hashtopolis-web-ui-build /usr/local/bin/preload_opt.sh /usr/local/bin/preload_opt.sh
 COPY ./nginx/hashtopolis.conf /etc/nginx/conf.d/default.conf
+COPY ./nginx/ssl.conf /etc/nginx/conf.d/ssl.conf
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Custom themes are opt-in at runtime via HASHTOPOLIS_CUSTOM_THEMES_DIR.
 # By default this bakes an empty folder (no themes ship in the image). To bake
