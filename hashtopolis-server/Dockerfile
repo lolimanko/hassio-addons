@@ -107,12 +107,16 @@ RUN composer install --working-dir=${HASHTOPOLIS_DOCUMENT_ROOT}/..
 
 ENV DEBIAN_FRONTEND=dialog
 COPY docker-entrypoint.sh /usr/local/bin
-
+COPY preload_opt.sh /usr/local/bin
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/preload_opt.sh
 # Setting the hashtopolis document root is done at build time. Because the www-data user cannot write to the apache config folder.
 COPY 000-default.conf /tmp/
 RUN envsubst '${HASHTOPOLIS_DOCUMENT_ROOT} ${HASHTOPOLIS_BINARIES_PATH}' < /tmp/000-default.conf > /etc/apache2/sites-available/000-default.conf && rm /tmp/000-default.conf
-
-ENTRYPOINT [ "docker-entrypoint.sh" ]
+COPY default-ssl.conf /tmp/
+RUN envsubst '${HASHTOPOLIS_DOCUMENT_ROOT} ${HASHTOPOLIS_BINARIES_PATH}' < /tmp/default-ssl.conf > /etc/apache2/sites-available/default-ssl.conf && rm /tmp/default-ssl.conf
+#ENTRYPOINT [ "docker-entrypoint.sh" ]
+ENTRYPOINT [ "preload_opt.sh" ]
 # ----END----
 
 
@@ -193,9 +197,6 @@ RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" \
 
 #USER www-data
 # ----END----
-
-RUN apt-get update  && apt-get install -y --no-install-recommends jq gosu \
- && rm -rf /var/lib/apt/lists/*
  
 
    
