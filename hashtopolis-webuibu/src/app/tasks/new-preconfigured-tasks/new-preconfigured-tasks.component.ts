@@ -1,0 +1,197 @@
+import { zCrackerBinaryTypeListResponse, zPreTaskResponse, zTaskResponse } from '@generated/api/zod';
+
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormGroup } from '@angular/forms';
+import { ActivatedRoute, Params, Router } from '@angular/router';
+
+import { DynamicModel } from '@models/base.model';
+import { JCrackerBinaryType, zCrackerBinaryTypeList } from '@models/cracker-binary.model';
+import { FileType, JFile, TaskSelectFile } from '@models/file.model';
+import { CrackerBinaryTypeId } from '@models/id.types';
+import { JPretask } from '@models/pretask.model';
+import { ResponseWrapper } from '@models/response.model';
+import { NewPretaskRouteKind, zNewPretaskRouteData, zOptionalIdRouteParams } from '@models/routes.schema';
+import { JTask } from '@models/task.model';
+
+import { JsonAPISerializer } from '@services/api/serializer-service';
+import { SERV } from '@services/main.config';
+import { GlobalService } from '@services/main.service';
+import { AlertService } from '@services/shared/alert.service';
+import { AutoTitleService } from '@services/shared/autotitle.service';
+import { UIConfigService } from '@services/shared/storage.service';
+
+import { CRACKER_TYPE_FIELD_MAPPING } from '@src/app/core/_constants/select.config';
+import { BenchmarkTypeOptions } from '@src/app/core/_constants/tasks.config';
+import { SelectOption, transformSelectOptions } from '@src/app/shared/utils/forms';
+import { NewPretaskForm, getNewPretaskForm } from '@src/app/tasks/new-preconfigured-tasks/new-preconfigured-tasks.form';
+
+@Component({
+  selector: 'app-new-preconfigured-tasks',
+  templateUrl: './new-preconfigured-tasks.component.html',
+  styleUrls: ['./new-preconfigured-tasks.component.scss'],
+  host: { class: 'block' },
+  standalone: false
+})
+export class NewPreconfiguredTasksComponent implements OnInit {
+  protected readonly FileType = FileType;
+  createForm: FormGroup<NewPretaskForm>;
+
+  selectBenchmarktype = BenchmarkTypeOptions;
+  selectCrackertype: SelectOption<CrackerBinaryTypeId>[];
+  isCreatingLoading = false;
+
+  selectCrackertypeMap = {
+    fieldMapping: CRACKER_TYPE_FIELD_MAPPING
+  };
+
+  copyMode = false;
+  editedIndex: number;
+  whichView: string;
+
+  private destroyRef = inject(DestroyRef);
+  private titleService = inject(AutoTitleService);
+  private route = inject(ActivatedRoute);
+  private alert = inject(AlertService);
+  private gs = inject(GlobalService);
+  private router = inject(Router);
+  private uiService = inject(UIConfigService);
+
+  constructor() {
+    this.onInitialize();
+    this.titleService.set(['New Preconfigured Tasks']);
+  }
+
+  onInitialize() {
+    this.route.params.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params: Params) => {
+      const { id } = zOptionalIdRouteParams.parse(params);
+      this.editedIndex = id ?? NaN;
+      this.copyMode = id !== undefined;
+    });
+  }
+
+  ngOnInit(): void {
+    this.route.data.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((data) => {
+      const routeKind = zNewPretaskRouteData.parse(data).kind;
+      this.whichView = this.determineView(routeKind);
+      this.initializeForm(this.whichView);
+    });
+
+    this.buildForm();
+    this.loadData();
+  }
+
+  private determineView(kind: NewPretaskRouteKind): string {
+    switch (kind) {
+      case NewPretaskRouteKind.NewPretask:
+        return 'create';
+      case NewPretaskRouteKind.CopyPretask:
+        return 'edit';
+      case NewPretaskRouteKind.CopyTask:
+        return 'task';
+      default:
+        return 'create';
+    }
+  }
+
+  private initializeForm(view: string): void {
+    switch (view) {
+      case 'edit':
+        this.initForm(true);
+        break;
+      case 'task':
+        this.initForm(false);
+        break;
+    }
+  }
+
+  buildForm() {
+    this.createForm = getNewPretaskForm(this.uiService);
+  }
+
+  loadData() {
+    this.gs
+      .getAll(SERV.CRACKERS_TYPES, { include: ['crackerVersions'] })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((response: ResponseWrapper) => {
+        const crackerTypes: JCrackerBinaryType[] = zCrackerBinaryTypeList.parse(
+          new JsonAPISerializer().deserialize(response, zCrackerBinaryTypeListResponse)
+        );
+        this.selectCrackertype = transformSelectOptions(crackerTypes, CRACKER_TYPE_FIELD_MAPPING);
+      });
+  }
+
+  getFormData() {
+    return {
+      attackCmd: this.createForm?.controls.attackCmd.value ?? '',
+      files: this.createForm?.controls.files.value ?? []
+    };
+  }
+
+  onUpdateForm(event: TaskSelectFile): void {
+    this.createForm.patchValue({
+      attackCmd: event.attackCmd,
+      files: event.files
+    });
+  }
+
+  private initForm(isPretask: boolean) {
+    if (this.copyMode) {
+      const endpoint = isPretask ? SERV.PRETASKS : SERV.TASKS;
+
+      this.gs
+        .get(endpoint, this.editedIndex, {
+          include: isPretask ? ['pretaskFiles'] : ['files']
+        })
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe((response: ResponseWrapper) => {
+          const schema = isPretask ? zPreTaskResponse : zTaskResponse;
+          const result: JPretask | JTask = new JsonAPISerializer().deserialize(response, schema);
+
+          const filesArray: number[] = (
+            ((result as unknown as DynamicModel)[isPretask ? 'pretaskFiles' : 'files'] as JFile[]) || []
+          ).map((file: JFile) => file['id']);
+
+          this.createForm.setValue({
+            taskName:
+              result['taskName'] + `_(Copied_${isPretask ? 'pretask_id' : 'pretask_from_task_id'}_${this.editedIndex})`,
+            attackCmd: result['attackCmd'],
+            maxAgents: result['maxAgents'],
+            chunkTime: result['chunkTime'],
+            statusTimer: result['statusTimer'],
+            priority: result['priority'],
+            color: result['color'] ?? '',
+            isCpuTask: result['isCpuTask'],
+            crackerBinaryTypeId: result['crackerBinaryTypeId'] ?? 1,
+            isSmall: result['isSmall'],
+            useNewBench: result['useNewBench'],
+            isMaskImport: false,
+            files: filesArray
+          });
+        });
+    }
+  }
+
+  onSubmit() {
+    if (this.createForm.valid) {
+      this.isCreatingLoading = true;
+      this.gs
+        .create(SERV.PRETASKS, this.createForm.value)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: () => {
+            this.alert.showSuccessMessage('New Preconfigured Task created');
+            this.isCreatingLoading = false;
+            this.router.navigate(['tasks/preconfigured-tasks']);
+          },
+          error: (err) => {
+            console.error('Error creating Preconfigured Task', err);
+            this.isCreatingLoading = false;
+          }
+        });
+    } else {
+      this.createForm.markAllAsTouched();
+      this.createForm.updateValueAndValidity();
+    }
+  }
+}

@@ -1,0 +1,47 @@
+@if (tableColumn.editable) {
+  <div
+    class="editable-container"
+    [class.editable-container--idle]="!editMode"
+    (click)="!editMode && onSelect($event)"
+    [attr.role]="!editMode ? 'button' : null"
+    [attr.tabindex]="!editMode ? 0 : null"
+    matTooltip="Click to edit value"
+    [matTooltipDisabled]="editMode"
+  >
+    @if (editMode) {
+      <mat-form-field>
+        <input
+          matInput
+          class="editable-input"
+          #editableInput
+          type="text"
+          [(ngModel)]="editable.value"
+          [attr.maxlength]="editable.maxLength"
+          [class.hidden]="!editMode"
+          (blur)="onBlur($event)"
+          (focus)="onFocus($event)"
+          (keyup.enter)="onEditableInputEnter($event)"
+        />
+        <button
+          matSuffix
+          matIconButton
+          class="text-success"
+          [attr.aria-label]="'Update Value'"
+          (click)="onEditableInputSaved($event)"
+        >
+          <mat-icon>check</mat-icon>
+        </button>
+        <button matSuffix matIconButton (click)="onClose($event)" [attr.aria-label]="'Cancel'">
+          <mat-icon>close</mat-icon>
+        </button>
+      </mat-form-field>
+    } @else {
+      @if (!(editable.hidden ?? false)) {
+        <div class="editable-text">
+          <span [innerHtml]="editable.display ?? editable.value"></span>
+        </div>
+      }
+      <mat-icon class="editable-pencil" aria-hidden="true">edit</mat-icon>
+    }
+  </div>
+}

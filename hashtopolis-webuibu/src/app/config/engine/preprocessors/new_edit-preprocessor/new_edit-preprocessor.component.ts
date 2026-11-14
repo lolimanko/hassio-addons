@@ -1,0 +1,172 @@
+import { HttpStatus } from '@constants/http.config';
+import { zPreprocessorResponse } from '@generated/api/zod';
+import { firstValueFrom, lastValueFrom } from 'rxjs';
+
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
+
+import { ResponseWrapper } from '@models/response.model';
+import { zIdRouteParams } from '@models/routes.schema';
+
+import { JsonAPISerializer } from '@services/api/serializer-service';
+import { SERV, ValidationPatterns } from '@services/main.config';
+import { GlobalService } from '@services/main.service';
+import { PreprocessorRoleService } from '@services/roles/binaries/preprocessor-role.service';
+import { AlertService } from '@services/shared/alert.service';
+import { ConfigService } from '@services/shared/config.service';
+
+import {
+  NewEditPreprocessorForm,
+  getNewEditPreprocessorForm
+} from '@src/app/config/engine/preprocessors/new_edit-preprocessor/new_edit-preprocessor.form';
+import { ButtonsModule } from '@src/app/shared/buttons/buttons.module';
+import { GridModule } from '@src/app/shared/grid-containers/grid.module';
+import { InputModule } from '@src/app/shared/input/input.module';
+import { PageTitleModule } from '@src/app/shared/page-headers/page-title.module';
+
+@Component({
+  selector: 'app-new-preprocessor',
+  imports: [ButtonsModule, FormsModule, GridModule, InputModule, PageTitleModule, ReactiveFormsModule],
+  templateUrl: './new_edit-preprocessor.component.html'
+})
+export class NewEditPreprocessorComponent implements OnInit {
+  urlPattern = ValidationPatterns.URL;
+
+  pageTitle = 'New Preprocessor';
+  submitButtonText = 'Create';
+
+  isEditMode = false;
+  preprocessorId: number | null = null;
+
+  newEditPreprocessorForm: FormGroup<NewEditPreprocessorForm>;
+
+  loading = false;
+
+  isLoading = true;
+
+  private route = inject(ActivatedRoute);
+  private gs = inject(GlobalService);
+  private router = inject(Router);
+  private alert = inject(AlertService);
+  private cs = inject(ConfigService);
+  private http = inject(HttpClient);
+  protected roleService = inject(PreprocessorRoleService);
+  private destroyRef = inject(DestroyRef);
+
+  constructor() {
+    this.newEditPreprocessorForm = getNewEditPreprocessorForm();
+  }
+
+  async ngOnInit(): Promise<void> {
+    const routeParams = zIdRouteParams.safeParse(this.route.snapshot.params);
+
+    if (routeParams.success) {
+      // Edit mode
+      this.isEditMode = true;
+      this.preprocessorId = routeParams.data.id;
+      this.pageTitle = 'Edit Preprocessor';
+      this.submitButtonText = 'Update';
+
+      try {
+        await this.loadPreprocessor(this.preprocessorId);
+      } catch (e: unknown) {
+        const status = e instanceof HttpErrorResponse ? e.status : undefined;
+
+        if (status === HttpStatus.FORBIDDEN) {
+          void this.router.navigateByUrl('/forbidden');
+          return;
+        }
+
+        if (status === HttpStatus.NOT_FOUND) {
+          void this.router.navigateByUrl('/not-found');
+          return;
+        }
+
+        // For other server errors show an error message instead of redirecting
+        // so the user knows the server failed. Keep the loading flag disabled.
+
+        const msg = status ? `Error loading preprocessor (server returned ${status}).` : 'Error loading preprocessor.';
+        this.alert.showErrorMessage(msg);
+        this.isLoading = false;
+        return;
+      }
+    }
+
+    this.isLoading = false;
+  }
+
+  /**
+   * Load preprocessor data from the server and patch the form with the data
+   * @param preprocessorId ID of the preprocessor to load
+   */
+  private async loadPreprocessor(preprocessorId: number): Promise<void> {
+    const url = `${this.cs.getEndpoint()}${SERV.PREPROCESSORS.URL}/${preprocessorId}`;
+
+    const response = await lastValueFrom<ResponseWrapper>(this.http.get<ResponseWrapper>(url));
+
+    const preprocessor = new JsonAPISerializer().deserialize(response, zPreprocessorResponse);
+
+    this.pageTitle = 'Preprocessor ' + (preprocessor.name ?? '');
+
+    this.newEditPreprocessorForm.patchValue({
+      name: preprocessor.name,
+      binaryName: preprocessor.binaryName,
+      url: preprocessor.url,
+      keyspaceCommand: preprocessor.keyspaceCommand,
+      limitCommand: preprocessor.limitCommand,
+      skipCommand: preprocessor.skipCommand
+    });
+  }
+
+  /**
+   * Create / update preprocessor upon form submission and redirect on success
+   */
+  async onSubmit(): Promise<void> {
+    if (this.newEditPreprocessorForm.invalid) {
+      this.newEditPreprocessorForm.markAllAsTouched();
+      this.newEditPreprocessorForm.updateValueAndValidity();
+      return;
+    }
+    this.loading = true;
+
+    const payload = {
+      name: this.newEditPreprocessorForm.value.name,
+      binaryName: this.newEditPreprocessorForm.value.binaryName,
+      url: this.newEditPreprocessorForm.value.url,
+      keyspaceCommand: this.newEditPreprocessorForm.value.keyspaceCommand,
+      limitCommand: this.newEditPreprocessorForm.value.limitCommand,
+      skipCommand: this.newEditPreprocessorForm.value.skipCommand
+    };
+
+    if (this.isEditMode && this.preprocessorId !== null) {
+      try {
+        this.gs
+          .update(SERV.PREPROCESSORS, this.preprocessorId, payload)
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe(() => {
+            this.alert.showSuccessMessage('Preprocessor updated');
+            void this.router.navigate(['config/engine/preprocessors']);
+          });
+      } catch {
+        const msg = 'Error updating preprocessor!';
+        this.alert.showErrorMessage(msg);
+      } finally {
+        this.loading = false;
+      }
+    } else {
+      try {
+        await firstValueFrom(this.gs.create(SERV.PREPROCESSORS, payload));
+        this.alert.showSuccessMessage('Preprocessor created!');
+        void this.router.navigate(['config/engine/preprocessors']);
+      } catch {
+        const msg = 'Error creating preprocessor!';
+        this.alert.showErrorMessage(msg);
+      } finally {
+        this.loading = false;
+      }
+    }
+  }
+}

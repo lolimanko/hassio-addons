@@ -1,0 +1,257 @@
+import { zAgentListResponse, zHashlistListResponse, zTaskListResponse, zUserListResponse } from '@generated/api/zod';
+
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormControl, FormGroup, Validators } from '@angular/forms';
+import { Router } from '@angular/router';
+
+import { ThinJAgent } from '@models/agent.model';
+import { JHashlist } from '@models/hashlist.model';
+import { ResponseWrapper } from '@models/response.model';
+import { JTask } from '@models/task.model';
+import { JUser } from '@models/user.model';
+
+import { JsonAPISerializer } from '@services/api/serializer-service';
+import { SERV } from '@services/main.config';
+import { GlobalService } from '@services/main.service';
+import { NotificationsRoleService } from '@services/roles/config/notifications-role.service';
+import { AlertService } from '@services/shared/alert.service';
+import { AutoTitleService } from '@services/shared/autotitle.service';
+
+import { Filter } from '@src/app/account/notifications/notifications.component';
+import {
+  ACTION,
+  AGENT_ACTIONS,
+  HASHLIST_ACTIONS,
+  LOG_ACTIONS,
+  NOTIFARRAY,
+  TASK_ACTIONS,
+  USER_ACTIONS
+} from '@src/app/core/_constants/notifications.config';
+
+export interface NewNotificationForm {
+  action: FormControl<string>;
+  actionFilter: FormControl<string>;
+  notification: FormControl<string>;
+  receiver: FormControl<string>;
+  isActive: FormControl<boolean>;
+}
+
+@Component({
+  selector: 'app-new-notification',
+  templateUrl: './new-notification.component.html',
+  standalone: false
+})
+export class NewNotificationComponent implements OnInit {
+  private titleService = inject(AutoTitleService);
+  private alert = inject(AlertService);
+  private gs = inject(GlobalService);
+  private router = inject(Router);
+  private roleService = inject(NotificationsRoleService);
+  private destroyRef = inject(DestroyRef);
+
+  static readonly SUBMITLABEL = 'Save Notification';
+  static readonly SUBTITLE = 'Create Notification';
+
+  /** On form create show a spinner loading */
+  isCreatingLoading = false;
+
+  form: FormGroup<NewNotificationForm>;
+  filters: Filter[];
+  active = false;
+  actionFilterIsRequired = false;
+  allowedActions: Array<{ id: string; name: string }> = [];
+
+  maxResults: string | number;
+  notifications = NOTIFARRAY.map((notif) => ({ id: notif, name: notif }));
+  submitLabel = NewNotificationComponent.SUBMITLABEL;
+  subTitle = NewNotificationComponent.SUBTITLE;
+  actionToServiceMap: Record<string, { URL: string; RESOURCE: string } | null> = {
+    [ACTION.AGENT_ERROR]: SERV.AGENTS,
+    [ACTION.OWN_AGENT_ERROR]: SERV.AGENTS,
+    [ACTION.DELETE_AGENT]: SERV.AGENTS,
+    [ACTION.NEW_TASK]: SERV.TASKS,
+    [ACTION.TASK_COMPLETE]: SERV.TASKS,
+    [ACTION.DELETE_TASK]: SERV.TASKS,
+    [ACTION.NEW_HASHLIST]: null,
+    [ACTION.DELETE_HASHLIST]: SERV.HASHLISTS,
+    [ACTION.HASHLIST_ALL_CRACKED]: SERV.HASHLISTS,
+    [ACTION.HASHLIST_CRACKED_HASH]: SERV.HASHLISTS,
+    [ACTION.USER_CREATED]: SERV.USERS,
+    [ACTION.USER_DELETED]: SERV.USERS,
+    [ACTION.USER_LOGIN_FAILED]: SERV.USERS,
+    [ACTION.LOG_WARN]: null,
+    [ACTION.LOG_FATAL]: null,
+    [ACTION.LOG_ERROR]: null
+  };
+
+  actionsWithFilters: readonly string[] = [
+    ACTION.AGENT_ERROR,
+    ACTION.OWN_AGENT_ERROR,
+    ACTION.DELETE_AGENT,
+    ACTION.TASK_COMPLETE,
+    ACTION.DELETE_TASK,
+    ACTION.DELETE_HASHLIST,
+    ACTION.HASHLIST_ALL_CRACKED,
+    ACTION.HASHLIST_CRACKED_HASH,
+    ACTION.USER_DELETED,
+    ACTION.USER_LOGIN_FAILED
+  ];
+
+  constructor() {
+    this.titleService.set(['New Notification']);
+  }
+
+  /**
+   * Initializes the form for creating a new notification.
+   */
+  ngOnInit(): void {
+    this.buildAllowedActions();
+    this.createForm();
+  }
+
+  /**
+   * Creates the form for creating a new notification.
+   * Initializes form controls with default values and validators.
+   */
+  createForm(): void {
+    this.form = new FormGroup<NewNotificationForm>({
+      action: new FormControl<string>('', { nonNullable: true, validators: [Validators.required] }),
+      actionFilter: new FormControl<string>('', { nonNullable: true }),
+      notification: new FormControl<string>('ChatBot', { nonNullable: true, validators: [Validators.required] }),
+      receiver: new FormControl<string>('', { nonNullable: true, validators: [Validators.required] }),
+      isActive: new FormControl<boolean>(true, { nonNullable: true })
+    });
+
+    //subscribe to changes to handle select trigger actions
+    this.form.controls.action.valueChanges.subscribe((newvalue: string) => {
+      this.changeAction(newvalue);
+    });
+  }
+
+  /**
+   * Handles the change of action for creating a new notification.
+   * Updates the available filters based on the selected action.
+   *
+   * @param {string} action - The selected action.
+   */
+  changeAction(action: string): void {
+    // only enable filter if action requires it
+    if (!this.actionsWithFilters.includes(action)) {
+      this.active = false;
+      this.filters = [];
+      this.actionFilterIsRequired = false;
+      this.resetActionFilter();
+      return;
+    }
+
+    const path = this.actionToServiceMap[action];
+    if (path) {
+      this.active = true;
+      this.actionFilterIsRequired = true;
+
+      // set required validator now that control is visible
+      const ctrl = this.form.controls.actionFilter;
+      ctrl.setValidators([Validators.required]);
+      ctrl.updateValueAndValidity();
+
+      this.gs
+        .getAll(path)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe((response: ResponseWrapper) => {
+          let _filters: Filter[] = [];
+
+          if (path === SERV.AGENTS) {
+            const agents = new JsonAPISerializer().deserialize(response, zAgentListResponse) as ThinJAgent[];
+            _filters = agents.map((a) => ({ id: a.id, name: a.agentName }));
+          } else if (path === SERV.TASKS) {
+            const tasks: JTask[] = new JsonAPISerializer().deserialize(response, zTaskListResponse);
+            _filters = tasks.map((t) => ({ id: t.id, name: t.taskName ?? '' }));
+          } else if (path === SERV.USERS) {
+            const users: JUser[] = new JsonAPISerializer().deserialize(response, zUserListResponse);
+            _filters = users.map((u) => ({ id: u.id, name: u.name }));
+          } else if (path === SERV.HASHLISTS) {
+            const hashlists: JHashlist[] = new JsonAPISerializer().deserialize(response, zHashlistListResponse);
+            _filters = hashlists.map((h) => ({ id: h.id, name: h.name }));
+          }
+
+          this.filters = _filters;
+        });
+    } else {
+      this.active = false;
+      this.actionFilterIsRequired = false;
+      this.resetActionFilter();
+    }
+  }
+
+  /**
+   * Resets the action filter control by clearing validators, resetting the value, and updating validity.
+   */
+  resetActionFilter(): void {
+    const ctrl = this.form.controls.actionFilter;
+    ctrl.clearValidators();
+    ctrl.setValue('');
+    ctrl.updateValueAndValidity();
+  }
+
+  /**
+   * Checks if the form for creating a new notification is valid.
+   *
+   * @returns {boolean} True if the form is valid; otherwise, false.
+   */
+  formIsValid(): boolean {
+    return this.form.valid;
+  }
+
+  /**
+   * Submits the form to create a new notification.
+   * Sends a request to the server and navigates on success.
+   */
+  onSubmit(): void {
+    this.form.patchValue({
+      actionFilter: String(this.form.controls.actionFilter.value)
+    });
+    if (this.form.valid) {
+      this.isCreatingLoading = true;
+      this.gs
+        .create(SERV.NOTIFICATIONS, this.form.value)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: () => {
+            this.alert.showSuccessMessage('New Notification created');
+            this.isCreatingLoading = false;
+            this.router.navigate(['/account/notifications']);
+          },
+          error: (err) => {
+            console.error('Error creating new notification', err);
+            this.isCreatingLoading = false;
+          }
+        });
+    } else {
+      this.form.markAllAsTouched();
+      this.form.updateValueAndValidity();
+    }
+  }
+
+  /**
+   * Build action drop down entries depending on user roles
+   * @private
+   */
+  private buildAllowedActions(): void {
+    if (this.roleService.hasRole('createAgentNotification')) {
+      this.allowedActions.push(...AGENT_ACTIONS.map((action) => ({ id: action, name: action })));
+    }
+    if (this.roleService.hasRole('createTaskNotification')) {
+      this.allowedActions.push(...TASK_ACTIONS.map((action) => ({ id: action, name: action })));
+    }
+    if (this.roleService.hasRole('createHashListNotification')) {
+      this.allowedActions.push(...HASHLIST_ACTIONS.map((action) => ({ id: action, name: action })));
+    }
+    if (this.roleService.hasRole('createUserNotification')) {
+      this.allowedActions.push(...USER_ACTIONS.map((action) => ({ id: action, name: action })));
+    }
+    if (this.roleService.hasRole('createLogNotification')) {
+      this.allowedActions.push(...LOG_ACTIONS.map((action) => ({ id: action, name: action })));
+    }
+  }
+}

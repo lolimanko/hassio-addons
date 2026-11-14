@@ -1,0 +1,63 @@
+@if (isAuthenticated) {
+  <mat-toolbar class="app-header mat-elevation-z0">
+    <div class="app-header__inner">
+      <a class="app-header__brand" routerLink="/" style="width:auto;height:auto;background:none;padding:0;border-radius:0;">
+        <img
+          class="app-header__logo"
+          [src]="easterEggFlag ? headerConfig.brand.logored : (isDarkMode ? headerConfig.brand.logoheaderdark : headerConfig.brand.logoheader)"
+          [alt]="headerConfig.brand.name"
+          style="display:block;height:64px;width:auto;"
+        />
+        <span class="app-header__brand-name">{{ headerConfig.brand.name }}</span>
+      </a>
+
+      <nav class="app-header__nav">
+        @for (menuItem of mainMenu; track menuItem.label) {
+          @if (menuItem.display) {
+            <action-menu
+              [label]="menuItem.label ?? ''"
+              [icon]="menuItem.icon ?? ''"
+              [actionMenuItems]="menuItem.actions"
+              [enableHoverClose]="true"
+              [openOnMouseEnter]="true"
+              panelClass="app-header-menu-panel"
+              (menuItemClicked)="menuItemClicked($event)"
+            ></action-menu>
+          }
+        }
+      </nav>
+
+      <div class="app-header__user">
+        @for (menuItem of userMenu; track menuItem.label) {
+          @if (menuItem.display) {
+            <action-menu
+              [label]="menuItem.label ?? ''"
+              [icon]="menuItem.icon ?? ''"
+              [actionMenuItems]="menuItem.actions"
+              [enableHoverClose]="true"
+              [openOnMouseEnter]="true"
+              panelClass="app-header-menu-panel"
+              (menuItemClicked)="menuItemClicked($event)"
+            ></action-menu>
+          }
+        }
+        <button
+          matIconButton
+          class="app-header__theme-toggle"
+          [matMenuTriggerFor]="themeMenu"
+          aria-label="Theme selector"
+        >
+          <mat-icon>{{ getCurrentThemeIcon() }}</mat-icon>
+        </button>
+        <mat-menu #themeMenu="matMenu">
+          @for (themeOption of themeOptions; track themeOption.value) {
+            <button mat-menu-item (click)="selectTheme(themeOption.value)">
+              <mat-icon>{{ themeOption.icon }}</mat-icon>
+              {{ themeOption.description }}
+            </button>
+          }
+        </mat-menu>
+      </div>
+    </div>
+  </mat-toolbar>
+}

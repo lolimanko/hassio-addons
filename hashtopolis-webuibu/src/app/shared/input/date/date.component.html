@@ -1,0 +1,45 @@
+<div class="field-stack" [class.is-invalid]="hasError && isTouched && !readonly" [class.input--readonly]="readonly">
+  <label class="field-stack__label" [attr.for]="inputId" [title]="title">
+    @if (linkTo) {
+      <a [routerLink]="linkTo">{{ title }}</a>
+    } @else {
+      {{ title }}
+    }
+    @if (isRequired && !readonly) {
+      <span class="field-stack__required" aria-hidden="true">*</span>
+    }
+  </label>
+
+  <mat-form-field class="form-group field-stack__field" appearance="outline" [title]="title">
+    <input
+      matInput
+      [matDatepicker]="picker"
+      [value]="value"
+      (dateChange)="onDateChange($event)"
+      (blur)="onTouched()"
+      [required]="isRequired"
+      [disabled]="disabled"
+      [readonly]="readonly"
+      [id]="inputId"
+      #inputField
+    />
+    @if (hint) {
+      <mat-hint>{{ hint }}</mat-hint>
+    }
+    @if (!readonly) {
+      <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+    }
+    <mat-datepicker #picker></mat-datepicker>
+
+    @if (hasError && errors && !readonly) {
+      <mat-hint class="mat-mdc-form-field-error text-destructive">
+        @if (errors['required']) {
+          <span>{{ title }} is required</span>
+        }
+        @if (errors['invalidDate']) {
+          <span>Please enter a valid date</span>
+        }
+      </mat-hint>
+    }
+  </mat-form-field>
+</div>

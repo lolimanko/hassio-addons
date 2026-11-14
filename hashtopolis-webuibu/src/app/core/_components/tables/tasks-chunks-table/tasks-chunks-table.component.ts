@@ -1,0 +1,234 @@
+import { ChangeDetectionStrategy, Component, Input, OnChanges, OnInit, SimpleChanges, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { SafeHtml } from '@angular/platform-browser';
+
+import { JChunk } from '@models/chunk.model';
+
+import { ChunkActionsService } from '@services/actions/chunk-actions.service';
+import { ChunkContextMenuService } from '@services/context-menu/chunk-menu.service';
+
+import { ActionMenuEvent } from '@components/menus/action-menu/action-menu.model';
+import { RowActionMenuAction } from '@components/menus/row-action-menu/row-action-menu.constants';
+import { BaseTableComponent } from '@components/tables/base-table/base-table.component';
+import { HTTableColumn } from '@components/tables/ht-table/ht-table.models';
+import {
+  TasksChunksTableCol,
+  TasksChunksTableColumnLabel
+} from '@components/tables/tasks-chunks-table/tasks-chunks-table.constants';
+
+import { TasksChunksDataSource } from '@datasources/tasks-chunks.datasource';
+
+import { ChunkStateLabels, ChunkStatePillClass } from '@src/app/core/_constants/chunks.config';
+import { FilterType } from '@src/app/core/_models/request-params.model';
+import { chunkCheckpointPercent, chunkProgressPercent, chunkTimeSpent } from '@src/app/shared/utils/chunk';
+import { formatSeconds, formatUnixTimestamp } from '@src/app/shared/utils/datetime';
+import { convertToLocale } from '@src/app/shared/utils/util';
+
+@Component({
+  selector: 'app-tasks-chunks-table',
+  templateUrl: './tasks-chunks-table.component.html',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  standalone: false
+})
+export class TasksChunksTableComponent extends BaseTableComponent implements OnInit, OnChanges {
+  // Input property to specify a task ID for filtering chunks.
+  @Input() taskId: number;
+  // Input property to specify to filter all chunks or only live. Live = 0, All = 1
+  @Input() isChunksLive: number;
+
+  tableColumns: HTTableColumn[] = [];
+  dataSource: TasksChunksDataSource;
+  selectedFilterColumn: HTTableColumn;
+
+  // Track initialization
+  private isInitialized = false;
+
+  private readonly chunkActions = inject(ChunkActionsService);
+
+  ngOnInit(): void {
+    this.setColumnLabels(TasksChunksTableColumnLabel);
+    this.tableColumns = this.getColumns();
+    this.dataSource = new TasksChunksDataSource(this.injector);
+    this.dataSource.setColumns(this.tableColumns);
+    this.contextMenuService = new ChunkContextMenuService(this.permissionService).addContextMenu();
+    // Do NOT load yet
+    this.isInitialized = true;
+    this.tryLoadData(); // Now safe to load
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (!this.isInitialized) return; // Wait until ngOnInit ran
+
+    if (changes['taskId'] || changes['isChunksLive']) {
+      this.tryLoadData();
+    }
+  }
+
+  private tryLoadData(): void {
+    if (this.taskId != null) {
+      this.dataSource.setTaskId(this.taskId);
+      this.dataSource.setIsChunksLive(this.isChunksLive);
+      this.dataSource.loadAll().then();
+    }
+  }
+
+  getColumns(): HTTableColumn[] {
+    return [
+      {
+        id: TasksChunksTableCol.ID,
+        dataKey: 'id',
+        routerLink: (chunk: JChunk) => this.renderChunkDetailLink(chunk.id),
+        isSortable: true,
+        isSearchable: true
+      },
+      {
+        id: TasksChunksTableCol.START,
+        dataKey: 'skip',
+        isSortable: true
+      },
+      {
+        id: TasksChunksTableCol.LENGTH,
+        dataKey: 'length',
+        isSortable: true
+      },
+      {
+        id: TasksChunksTableCol.CHECKPOINT,
+        dataKey: 'checkpoint',
+        render: (chunk: JChunk) => this.renderCheckpoint(chunk),
+        isSortable: true
+      },
+      {
+        id: TasksChunksTableCol.PROGRESS,
+        dataKey: 'progress',
+        render: (chunk: JChunk) => this.renderProgress(chunk),
+        isSortable: true
+      },
+      {
+        id: TasksChunksTableCol.AGENT,
+        dataKey: 'agentName',
+        routerLink: (chunk: JChunk) => this.renderAgentLinkFromChunk(chunk),
+        isSortable: true
+      },
+      {
+        id: TasksChunksTableCol.DISPATCH_TIME,
+        dataKey: 'dispatchTime',
+        render: (chunk: JChunk) => this.renderDispatchTime(chunk),
+        isSortable: true
+      },
+      {
+        id: TasksChunksTableCol.LAST_ACTIVITY,
+        dataKey: 'solveTime',
+        render: (chunk: JChunk) => this.renderLastActivity(chunk),
+        isSortable: true
+      },
+      {
+        id: TasksChunksTableCol.TIME_SPENT,
+        dataKey: 'timeSpent',
+        render: (chunk: JChunk) => this.renderTimeSpent(chunk),
+        isSortable: true
+      },
+      {
+        id: TasksChunksTableCol.STATE,
+        dataKey: 'state',
+        render: (chunk: JChunk) => this.renderState(chunk),
+        isSortable: true
+      },
+      {
+        id: TasksChunksTableCol.CRACKED,
+        dataKey: 'cracked',
+        routerLink: (chunk: JChunk) => this.renderCrackedLinkFromChunk(chunk),
+        isSortable: true
+      }
+    ];
+  }
+
+  filter(input: string) {
+    const selectedColumn = this.selectedFilterColumn;
+    if (input && input.length > 0) {
+      this.dataSource.loadAll({
+        value: input,
+        field: selectedColumn.dataKey ?? '',
+        operator: FilterType.ICONTAINS,
+        parent: selectedColumn.parent
+      });
+    } else {
+      this.dataSource.loadAll().then();
+    }
+  }
+
+  handleBackendSqlFilter(event: string) {
+    if (event && event.trim().length > 0) {
+      this.filter(event);
+    } else {
+      // Clear the filter when search box is cleared
+      this.dataSource.clearFilter();
+    }
+  }
+
+  // --- Render functions ---
+  renderState(chunk: JChunk): SafeHtml {
+    const label = ChunkStateLabels[chunk.state];
+    if (!label) {
+      return this.sanitize(`<span class="pill">${chunk.state}</span>`);
+    }
+
+    return this.sanitize(`<span class="pill ${ChunkStatePillClass[chunk.state]}">${label}</span>`);
+  }
+
+  renderTimeSpent(chunk: JChunk): SafeHtml {
+    const seconds = chunkTimeSpent(chunk);
+    if (seconds) {
+      return this.sanitize(formatSeconds(seconds));
+    }
+
+    return this.sanitize('0');
+  }
+
+  renderCheckpoint(chunk: JChunk): SafeHtml {
+    if (!chunk.checkpoint) {
+      return this.sanitize('0');
+    }
+    const percent = Number(chunkCheckpointPercent(chunk).toFixed(2));
+
+    return this.sanitize(`${chunk.checkpoint} (${convertToLocale(percent)}%)`);
+  }
+
+  renderProgress(chunk: JChunk): SafeHtml {
+    const percent = chunkProgressPercent(chunk);
+    if (percent === null) {
+      return this.sanitize('N/A');
+    }
+
+    return this.sanitize(`${convertToLocale(percent)}%`);
+  }
+
+  renderDispatchTime(chunk: JChunk): SafeHtml {
+    const formattedDate = formatUnixTimestamp(chunk.dispatchTime, this.dateTimeFormat);
+
+    return this.sanitize(formattedDate === '' ? 'N/A' : formattedDate);
+  }
+
+  renderLastActivity(chunk: JChunk): SafeHtml {
+    if (chunk.solveTime === 0) {
+      return '(No activity)';
+    } else if (chunk.solveTime > 0) {
+      return this.sanitize(formatUnixTimestamp(chunk.solveTime, this.dateTimeFormat));
+    }
+
+    return this.sanitize(`${chunk.solveTime}`);
+  }
+
+  rowActionClicked(event: ActionMenuEvent<JChunk>): void {
+    switch (event.menuItem.action) {
+      case RowActionMenuAction.RESET:
+        this.chunkActions
+          .resetChunk(event.data)
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe(() => {
+            this.alertService.showSuccessMessage('Successfully reseted chunk!');
+            this.reload();
+          });
+        break;
+    }
+  }
+}

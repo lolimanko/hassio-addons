@@ -1,0 +1,72 @@
+import { HTTP_SKIP_ERROR_HEADER_CONFIG } from '@constants/http.config';
+import { zHealthCheckListResponse } from '@generated/api/zod';
+import { catchError, finalize, forkJoin, of } from 'rxjs';
+
+import { HttpHeaders } from '@angular/common/http';
+
+import { JHealthCheck } from '@models/health-check.model';
+import { Filter } from '@models/request-params.model';
+import { ResponseWrapper } from '@models/response.model';
+
+import { SERV } from '@services/main.config';
+import { RequestParamBuilder } from '@services/params/builder-implementation.service';
+
+import { BaseDataSource } from '@datasources/base.datasource';
+
+export class HealthChecksDataSource extends BaseDataSource<JHealthCheck> {
+  private _currentFilter: Filter | null = null;
+
+  loadAll(query?: Filter): void {
+    this.loading = true;
+    // Store the current filter if provided
+    if (query) {
+      this._currentFilter = query;
+    }
+
+    // Use stored filter if no new filter is provided
+    const activeFilter = query || this._currentFilter;
+    let params = new RequestParamBuilder().addInitial(this).addInclude('hashType');
+    params = this.applyFilterWithPaginationReset(params, activeFilter, query);
+
+    // Create headers to skip error dialog for filter validation errors
+    const httpOptions = { headers: new HttpHeaders(HTTP_SKIP_ERROR_HEADER_CONFIG) };
+    const healthChecks$ = this.service.getAll(SERV.HEALTH_CHECKS, params.create(), httpOptions);
+
+    this.subscriptions.push(
+      forkJoin([healthChecks$])
+        .pipe(
+          catchError((error) => {
+            this.handleFilterError(error);
+            return of([] as ResponseWrapper[]);
+          }),
+          finalize(() => (this.loading = false))
+        )
+        .subscribe(([response]: ResponseWrapper[]) => {
+          const healthChecks: JHealthCheck[] = this.serializer.deserialize(response, zHealthCheckListResponse);
+
+          healthChecks.forEach((healthCheck: JHealthCheck) => {
+            healthCheck.hashTypeDescription = healthCheck.hashType?.description;
+          });
+
+          const length = response.meta.page.total_elements;
+          const nextLink = response.links.next;
+          const prevLink = response.links.prev;
+          const after = nextLink ? new URL(nextLink).searchParams.get('page[after]') : null;
+          const before = prevLink ? new URL(prevLink).searchParams.get('page[before]') : null;
+
+          this.setPaginationConfig(this.pageSize, length, after, before, this.index);
+          this.setData(healthChecks);
+        })
+    );
+  }
+
+  reload(): void {
+    this.clearSelection();
+    this.loadAll();
+  }
+  clearFilter(): void {
+    this._currentFilter = null;
+    this.setPaginationConfig(this.pageSize, undefined, undefined, undefined, 0);
+    this.reload();
+  }
+}

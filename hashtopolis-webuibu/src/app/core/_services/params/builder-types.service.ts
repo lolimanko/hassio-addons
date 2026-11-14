@@ -1,0 +1,49 @@
+/**
+ * Interface and intermediate type definitions for request param builder design pattern
+ */
+import { BaseModel } from '@models/base.model';
+
+import { SortingColumn } from '@components/tables/ht-table/ht-table.models';
+
+import { BaseDataSource } from '@datasources/base.datasource';
+
+import { Aggregate, Filter, type RequestParams } from '@src/app/core/_models/request-params.model';
+
+/**
+ * Intermediate class to build RequestParams from using a builder interface implementation
+ */
+export class RequestParamsIntermediate {
+  public pageSize?: number;
+  public pageBefore?: number | string | undefined;
+  public pageAfter?: number | string | undefined;
+  public includes?: Array<string>;
+  public filters?: Array<Filter>;
+  public sortOrder?: Array<string>;
+  public includeTotal?: boolean;
+  public aggregate?: Array<Aggregate>;
+}
+
+/**
+ * Interface definition for a RequestParamBuilder
+ */
+export interface IParamBuilder {
+  setPageSize(pageSize: number): IParamBuilder;
+
+  setPageBefore(pageBefore: number | string | undefined): IParamBuilder;
+
+  setPageAfter(pageAfter: number | string | undefined): IParamBuilder;
+
+  addInclude(include: string): IParamBuilder;
+
+  addSorting(sortingColumn: SortingColumn): IParamBuilder;
+
+  addFilter(filter: Filter): IParamBuilder;
+
+  addIncludeTotal(includeTotal: boolean): IParamBuilder;
+
+  addAggregate(aggregate: Aggregate): IParamBuilder;
+
+  addInitial(datasource: BaseDataSource<BaseModel>): IParamBuilder;
+
+  create(): RequestParams;
+}

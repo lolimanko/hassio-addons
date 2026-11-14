@@ -1,0 +1,9 @@
+<app-page [title]="pageTitle" actionTitle="New Task" actionLink="/tasks/new-task" [showAction]="showCreateButton">
+  <app-table>
+    <app-tasks-table #table name="tasksTable">
+      <div class="table-action-wrapper" extra-actions>
+        <mat-slide-toggle (change)="toggleIsArchived($event)">Show Archived</mat-slide-toggle>
+      </div>
+    </app-tasks-table>
+  </app-table>
+</app-page>

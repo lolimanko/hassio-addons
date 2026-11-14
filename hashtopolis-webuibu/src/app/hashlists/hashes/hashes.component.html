@@ -1,0 +1,24 @@
+<grid-main>
+  @if (whichView === HashesViewType.CHUNKS || whichView === HashesViewType.TASKS || whichView === HashesViewType.HASHLISTS) {
+    <h2 class="text-lg font-medium text-heading-foreground mb-4">
+      Hashes of
+      @switch (whichView) {
+        @case (HashesViewType.CHUNKS) {
+          chunk
+        }
+        @case (HashesViewType.TASKS) {
+          task
+        }
+        @case (HashesViewType.HASHLISTS) {
+          hashlist
+        }
+      }
+      <a [routerLink]="getRouterLink()">{{ titleName }}</a>
+    </h2>
+  }
+  <app-hexconvertor></app-hexconvertor>
+</grid-main>
+<!-- Hashes -->
+<app-table>
+  <hashes-table [id]="editedIndex" [dataType]="whichView" [filterParam]="filterParam"></hashes-table>
+</app-table>

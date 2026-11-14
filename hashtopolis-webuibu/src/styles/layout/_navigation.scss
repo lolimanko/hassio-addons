@@ -1,0 +1,86 @@
+/* ==================================
+          SECTION NAVIGATION
+   ================================== */
+
+// Remove caret from boostrap
+// .dropdown-toggle {
+//   &:after, .dropend &:after, .dropstart &:before, .dropup &:after {
+//       display: none;
+//   }
+// }
+
+.active {
+  background-color: var(--surface-soft);
+}
+
+// Default pointer
+
+.point {
+  cursor: pointer;
+}
+
+// Dropdown medium - used for notifications
+
+.dropdown-menu-medium {
+  min-width: 350px;
+  border-radius: var(--radius-2xl);
+}
+
+@media (max-width: 575.98px) {
+  .dropdown-menu-medium {
+    min-width: 300px;
+  }
+}
+
+// Remove hyperlink blue color and underline
+
+a:link {
+  text-decoration: none;
+}
+
+// Dots Nav
+
+.steps-container {
+  min-height: 300px;
+}
+
+.horizontalnav {
+  background: transparent;
+  padding: 0;
+  height: auto;
+  min-height: 0;
+  border-bottom: 1px solid var(--border-faint);
+
+  mat-button-toggle-group {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    margin-left: 0;
+    gap: var(--space-2xs);
+  }
+
+  .mat-button-toggle {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    font-family: var(--font-body);
+    font-size: var(--text-md);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: var(--muted-foreground);
+    transition:
+      color var(--duration-fast) var(--easing-standard),
+      border-color var(--duration-fast) var(--easing-standard),
+      background var(--duration-fast) var(--easing-standard);
+
+    .mat-button-toggle-label-content {
+      line-height: 36px;
+      padding: 0 var(--space-md);
+    }
+
+    &:hover {
+      color: var(--heading-foreground);
+      background: var(--surface-soft);
+    }
+  }
+}

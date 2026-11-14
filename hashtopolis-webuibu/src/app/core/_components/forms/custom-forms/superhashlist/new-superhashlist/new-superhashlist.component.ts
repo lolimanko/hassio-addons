@@ -1,0 +1,123 @@
+import { HashListFormat } from '@constants/hashlist.config';
+import { zHashlistListResponse } from '@generated/api/zod';
+
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormControl, FormGroup, Validators } from '@angular/forms';
+import { Router } from '@angular/router';
+
+import { JHashlist } from '@models/hashlist.model';
+import { HashlistId } from '@models/id.types';
+import { FilterType } from '@models/request-params.model';
+import { ResponseWrapper } from '@models/response.model';
+
+import { JsonAPISerializer } from '@services/api/serializer-service';
+import { SERV } from '@services/main.config';
+import { GlobalService } from '@services/main.service';
+import { RequestParamBuilder } from '@services/params/builder-implementation.service';
+import { AlertService } from '@services/shared/alert.service';
+import { AutoTitleService } from '@services/shared/autotitle.service';
+
+import { DEFAULT_FIELD_MAPPING } from '@src/app/core/_constants/select.config';
+import { sameHashTypeValidator } from '@src/app/core/_validators/same-hash-type.validator';
+import { SelectOption, transformSelectOptions } from '@src/app/shared/utils/forms';
+
+interface NewSuperhashlistForm {
+  name: FormControl<string>;
+  hashlistIds: FormControl<number[] | null>;
+}
+
+/**
+ * Represents the NewSuperhashlistComponent responsible for creating a new Superhashlist.
+ */
+@Component({
+  selector: 'app-new-superhashlist',
+  templateUrl: './new-superhashlist.component.html',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  standalone: false
+})
+export class NewSuperhashlistComponent implements OnInit {
+  /** Flag indicating whether data is still loading. */
+  isLoading = true;
+
+  /** Form group for the new Superhashlist. */
+  form: FormGroup<NewSuperhashlistForm>;
+
+  /** Select List of hashlists. */
+  selectHashlists: SelectOption<HashlistId>[];
+
+  private hashlists: JHashlist[] = [];
+
+  private destroyRef = inject(DestroyRef);
+  private changeDetectorRef = inject(ChangeDetectorRef);
+  private titleService = inject(AutoTitleService);
+  private alert = inject(AlertService);
+  private globalService = inject(GlobalService);
+  private router = inject(Router);
+
+  constructor() {
+    this.buildForm();
+    this.titleService.set(['New Superhashlist']);
+  }
+
+  /**
+   * Lifecycle hook called after component initialization.
+   */
+  ngOnInit(): void {
+    this.loadData();
+  }
+
+  /**
+   * Builds the form for creating a new Superhashlist.
+   */
+  buildForm(): void {
+    this.form = new FormGroup<NewSuperhashlistForm>({
+      name: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+      hashlistIds: new FormControl<number[] | null>(null, [
+        Validators.required,
+        sameHashTypeValidator(() => this.hashlists)
+      ])
+    });
+  }
+
+  /**
+   * Loads data, specifically hashlists, for the component.
+   */
+  loadData(): void {
+    const requestParams = new RequestParamBuilder()
+      .addFilter({ field: 'isArchived', operator: FilterType.EQUAL, value: false })
+      .addFilter({ field: 'format', operator: FilterType.EQUAL, value: HashListFormat.TEXT })
+      .create();
+
+    this.globalService
+      .getAll(SERV.HASHLISTS, requestParams)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((response: ResponseWrapper) => {
+        const hashlists: JHashlist[] = new JsonAPISerializer().deserialize(response, zHashlistListResponse);
+        this.hashlists = hashlists;
+        this.selectHashlists = transformSelectOptions(hashlists, DEFAULT_FIELD_MAPPING);
+        this.form.controls.hashlistIds.updateValueAndValidity({ emitEvent: false });
+        this.isLoading = false;
+        this.changeDetectorRef.detectChanges();
+      });
+  }
+
+  /**
+   * Handles form submission, creating a new Superhashlist.
+   * If the form is valid, it makes an API request and navigates to the Superhashlist page.
+   */
+  onSubmit(): void {
+    if (this.form.valid) {
+      this.globalService
+        .chelper(SERV.HELPER, 'createSuperHashlist', this.form.value)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe(() => {
+          this.alert.showSuccessMessage('New Superhashlist created');
+          this.router.navigate(['hashlists/superhashlist']);
+        });
+    } else {
+      this.form.markAllAsTouched();
+      this.form.updateValueAndValidity();
+    }
+  }
+}

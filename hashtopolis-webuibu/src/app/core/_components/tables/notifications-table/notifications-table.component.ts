@@ -1,0 +1,322 @@
+import { Observable, catchError, of } from 'rxjs';
+
+import { AfterViewInit, Component, OnInit } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+
+import { JNotification } from '@models/notification.model';
+
+import { NotificationsContextMenuService } from '@services/context-menu/notifications-menu.service';
+import { SERV } from '@services/main.config';
+
+import { ActionMenuEvent } from '@components/menus/action-menu/action-menu.model';
+import { BulkActionMenuAction } from '@components/menus/bulk-action-menu/bulk-action-menu.constants';
+import { RowActionMenuAction } from '@components/menus/row-action-menu/row-action-menu.constants';
+import { BaseTableComponent } from '@components/tables/base-table/base-table.component';
+import { HTTableColumn, HTTableRouterLink } from '@components/tables/ht-table/ht-table.models';
+import {
+  NotificationsTableCol,
+  NotificationsTableColumnLabel
+} from '@components/tables/notifications-table/notifications-table.constants';
+import { TableDialogComponent } from '@components/tables/table-dialog/table-dialog.component';
+import { DialogData } from '@components/tables/table-dialog/table-dialog.model';
+
+import { NotificationsDataSource } from '@datasources/notifications.datasource';
+
+import { ACTION } from '@src/app/core/_constants/notifications.config';
+import { FilterType } from '@src/app/core/_models/request-params.model';
+
+@Component({
+  selector: 'app-notifications-table',
+  templateUrl: './notifications-table.component.html',
+  standalone: false
+})
+export class NotificationsTableComponent extends BaseTableComponent implements OnInit, AfterViewInit {
+  tableColumns: HTTableColumn[] = [];
+  dataSource: NotificationsDataSource;
+  selectedFilterColumn: HTTableColumn;
+
+  ngOnInit(): void {
+    this.setColumnLabels(NotificationsTableColumnLabel);
+    this.tableColumns = this.getColumns();
+    this.dataSource = new NotificationsDataSource(this.injector);
+    this.dataSource.setColumns(this.tableColumns);
+    this.contextMenuService = new NotificationsContextMenuService(this.permissionService).addContextMenu();
+    this.setupFilterErrorSubscription(this.dataSource);
+  }
+
+  ngAfterViewInit(): void {
+    // Wait until paginator is defined
+    this.dataSource.loadAll();
+  }
+
+  filter(input: string) {
+    const selectedColumn = this.selectedFilterColumn;
+    if (input && input.length > 0) {
+      this.dataSource.loadAll({
+        value: input,
+        field: selectedColumn.dataKey ?? '',
+        operator: FilterType.ICONTAINS,
+        parent: selectedColumn.parent
+      });
+      return;
+    } else {
+      this.dataSource.loadAll(); // Reload all data if input is empty
+    }
+  }
+  handleBackendSqlFilter(event: string) {
+    if (event && event.trim().length > 0) {
+      this.filter(event);
+    } else {
+      // Clear the filter when search box is cleared
+      this.dataSource.clearFilter();
+    }
+  }
+
+  getColumns(): HTTableColumn[] {
+    return [
+      {
+        id: NotificationsTableCol.ID,
+        dataKey: 'id',
+        isSortable: true,
+        isSearchable: true,
+        export: async (notification: JNotification) => notification.id + ''
+      },
+      {
+        id: NotificationsTableCol.STATUS,
+        dataKey: 'isActive',
+        render: (notification: JNotification) => (notification.isActive ? 'Active' : 'Inactive'),
+        icon: (notification: JNotification) => this.renderStatusIcon(notification),
+        isSortable: true,
+        export: async (notification: JNotification) => notification.isActive + ''
+      },
+      {
+        id: NotificationsTableCol.ACTION,
+        dataKey: 'action',
+        isSortable: true,
+        isSearchable: true,
+        export: async (notification: JNotification) => notification.action
+      },
+      {
+        id: NotificationsTableCol.APPLIED_TO,
+        dataKey: 'appliedTo',
+        routerLink: (notification: JNotification) => this.renderAppliedToLink(notification),
+        isSortable: false,
+        export: async (notification: JNotification) => notification.action
+      },
+      {
+        id: NotificationsTableCol.NOTIFICATION,
+        dataKey: 'notification',
+        isSortable: true,
+        isSearchable: true,
+        export: async (notification: JNotification) => notification.notification
+      },
+      {
+        id: NotificationsTableCol.RECEIVER,
+        dataKey: 'receiver',
+        isSearchable: true,
+        isSortable: true,
+        export: async (notification: JNotification) => notification.receiver
+      }
+    ];
+  }
+
+  openDialog(data: DialogData<JNotification>) {
+    const dialogRef = this.dialog.open(TableDialogComponent, {
+      data: data,
+      width: '450px'
+    });
+
+    dialogRef
+      .afterClosed()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((result) => {
+        if (result && result.action) {
+          switch (result.action) {
+            case BulkActionMenuAction.ACTIVATE:
+              this.bulkActionActivate(result.data, true);
+              break;
+            case BulkActionMenuAction.DEACTIVATE:
+              this.bulkActionActivate(result.data, false);
+              break;
+            case BulkActionMenuAction.DELETE:
+              this.bulkActionDelete(result.data);
+              break;
+            case RowActionMenuAction.DELETE:
+              this.rowActionDelete(result.data);
+              break;
+          }
+        }
+      });
+  }
+
+  // --- Action functions ---
+
+  exportActionClicked(event: ActionMenuEvent<JNotification[]>): void {
+    const visibleColumnIds = this.table.displayedColumns.map(Number);
+    const visibleColumns = this.tableColumns.filter((col) => visibleColumnIds.includes(col.id));
+    this.exportService.handleExportAction<JNotification>(
+      event,
+      visibleColumns,
+      NotificationsTableColumnLabel,
+      'hashtopolis-notifications'
+    );
+  }
+
+  rowActionClicked(event: ActionMenuEvent<JNotification>): void {
+    switch (event.menuItem.action) {
+      case RowActionMenuAction.DELETE:
+        this.openDialog({
+          rows: [event.data],
+          title: `Deleting notification ${event.data.action} (${event.data.id}) ...`,
+          icon: 'warning',
+          body: `Are you sure you want to delete it? Note that this action cannot be undone.`,
+          warn: true,
+          action: event.menuItem.action
+        });
+        break;
+      case RowActionMenuAction.ACTIVATE:
+        this.bulkActionActivate([event.data], true);
+        break;
+      case RowActionMenuAction.DEACTIVATE:
+        this.bulkActionActivate([event.data], false);
+        break;
+    }
+  }
+
+  bulkActionClicked(event: ActionMenuEvent<JNotification[]>): void {
+    switch (event.menuItem.action) {
+      case BulkActionMenuAction.ACTIVATE:
+        this.openDialog({
+          rows: event.data,
+          title: `Activating ${event.data.length} notifications ...`,
+          icon: 'info',
+          listAttribute: 'action',
+          action: event.menuItem.action
+        });
+        break;
+      case BulkActionMenuAction.DEACTIVATE:
+        this.openDialog({
+          rows: event.data,
+          title: `Deactivating ${event.data.length} notifications ...`,
+          icon: 'info',
+          listAttribute: 'action',
+          action: event.menuItem.action
+        });
+        break;
+      case BulkActionMenuAction.DELETE:
+        this.openDialog({
+          rows: event.data,
+          title: `Deleting ${event.data.length} notifications ...`,
+          icon: 'warning',
+          body: `Are you sure you want to delete the above notifications? Note that this action cannot be undone.`,
+          warn: true,
+          listAttribute: 'action',
+          action: event.menuItem.action
+        });
+        break;
+    }
+  }
+
+  /**
+   * @todo Implement error handling.
+   */
+  private bulkActionDelete(notifications: JNotification[]): void {
+    this.gs
+      .bulkDelete(SERV.NOTIFICATIONS, notifications)
+      .pipe(
+        catchError((error) => {
+          console.error('Error during deletion: ', error);
+          return [];
+        }),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe(() => {
+        this.alertService.showSuccessMessage(`Successfully deleted notifications!`);
+        this.dataSource.reload();
+      });
+  }
+
+  /**
+   * @todo Implement error handling.
+   */
+  private bulkActionActivate(notifications: JNotification[], isActive: boolean): void {
+    const action = isActive ? 'activated' : 'deactivated';
+
+    this.gs
+      .bulkUpdate(SERV.NOTIFICATIONS, notifications, { isActive: isActive })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        this.alertService.showSuccessMessage(`Successfully ${action} notifications!`);
+        this.dataSource.reload();
+      });
+  }
+
+  /**
+   * @todo Implement error handling.
+   */
+  private rowActionDelete(notifications: JNotification[]): void {
+    this.gs
+      .delete(SERV.NOTIFICATIONS, notifications[0].id)
+      .pipe(
+        catchError((error) => {
+          console.error('Error during deletion:', error);
+          return [];
+        }),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe(() => {
+        this.alertService.showSuccessMessage('Successfully deleted notification!');
+        this.reload();
+      });
+  }
+
+  private renderAppliedToLink(notification: JNotification): Observable<HTTableRouterLink[]> {
+    const links: HTTableRouterLink[] = [];
+
+    if (!notification.objectId) {
+      // Plain text placeholder, no link
+      links.push({ label: 'N/A', routerLink: null });
+      return of(links);
+    }
+
+    switch (notification.action) {
+      case ACTION.AGENT_ERROR:
+      case ACTION.OWN_AGENT_ERROR:
+      case ACTION.DELETE_AGENT:
+        links.push({
+          label: `Agent: ${notification.objectId}`,
+          routerLink: ['/agents', 'show-agents', notification.objectId, 'edit']
+        });
+        break;
+
+      case ACTION.NEW_TASK:
+      case ACTION.TASK_COMPLETE:
+      case ACTION.DELETE_TASK:
+        links.push({
+          label: `Task: ${notification.objectId}`,
+          routerLink: ['/tasks', 'show-tasks', notification.objectId, 'edit']
+        });
+        break;
+
+      case ACTION.DELETE_HASHLIST:
+      case ACTION.HASHLIST_ALL_CRACKED:
+      case ACTION.HASHLIST_CRACKED_HASH:
+        links.push({
+          label: `Hashlist: ${notification.objectId}`,
+          routerLink: ['/hashlists', 'hashlist', notification.objectId, 'edit']
+        });
+        break;
+
+      case ACTION.USER_CREATED:
+      case ACTION.USER_DELETED:
+      case ACTION.USER_LOGIN_FAILED:
+        links.push({
+          label: `User: ${notification.objectId}`,
+          routerLink: ['/users', notification.objectId]
+        });
+        break;
+    }
+
+    return of(links);
+  }
+}

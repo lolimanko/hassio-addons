@@ -1,0 +1,6 @@
+<h2 mat-dialog-title>{{ supertaskName }}</h2>
+<mat-dialog-content>
+  <app-table>
+    <app-tasks-supertasks-table (linkClicked)="close()" [supertaskId]="supertaskId"></app-tasks-supertasks-table>
+  </app-table>
+</mat-dialog-content>

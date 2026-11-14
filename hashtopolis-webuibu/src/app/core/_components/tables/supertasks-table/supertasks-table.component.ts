@@ -1,0 +1,240 @@
+import { catchError } from 'rxjs';
+
+import { AfterViewInit, Component, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+
+import { CrackerBinaryTypeId } from '@models/id.types';
+import { JSuperTask, JSuperTaskAggregateFields } from '@models/supertask.model';
+
+import { SuperTaskContextMenuService } from '@services/context-menu/tasks/supertask-menu.service';
+import { CrackerBinaryTypesService, fallbackCrackerTypeName } from '@services/crackers/cracker-binary-types.service';
+import { SERV } from '@services/main.config';
+
+import { ActionMenuEvent } from '@components/menus/action-menu/action-menu.model';
+import { BulkActionMenuAction } from '@components/menus/bulk-action-menu/bulk-action-menu.constants';
+import { RowActionMenuAction } from '@components/menus/row-action-menu/row-action-menu.constants';
+import { BaseTableComponent } from '@components/tables/base-table/base-table.component';
+import { HTTableColumn, HTTableRouterLink } from '@components/tables/ht-table/ht-table.models';
+import {
+  SupertasksTableCol,
+  SupertasksTableColumnLabel
+} from '@components/tables/supertasks-table/supertasks-table.constants';
+import { TableDialogComponent } from '@components/tables/table-dialog/table-dialog.component';
+import { DialogData } from '@components/tables/table-dialog/table-dialog.model';
+
+import { SuperTasksDataSource } from '@datasources/supertasks.datasource';
+
+import { FilterType } from '@src/app/core/_models/request-params.model';
+
+@Component({
+  selector: 'app-supertasks-table',
+  templateUrl: './supertasks-table.component.html',
+  standalone: false
+})
+export class SuperTasksTableComponent extends BaseTableComponent implements OnInit, AfterViewInit {
+  tableColumns: HTTableColumn[] = [];
+  dataSource: SuperTasksDataSource;
+  selectedFilterColumn: HTTableColumn;
+
+  private crackerTypeNames: ReadonlyMap<CrackerBinaryTypeId, string> = new Map();
+  private crackerBinaryTypes = inject(CrackerBinaryTypesService);
+
+  ngOnInit(): void {
+    this.setColumnLabels(SupertasksTableColumnLabel);
+    this.tableColumns = this.getColumns();
+    this.dataSource = new SuperTasksDataSource(this.injector);
+    this.dataSource.setColumns(this.tableColumns);
+    this.contextMenuService = new SuperTaskContextMenuService(this.permissionService).addContextMenu();
+    // Setup filter error handling
+    this.setupFilterErrorSubscription(this.dataSource);
+  }
+
+  ngAfterViewInit(): void {
+    // the type names are needed to render the rows; getTypeNames never fails, so the rows always load
+    this.crackerBinaryTypes
+      .getTypeNames()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((names) => {
+        this.crackerTypeNames = names;
+        this.dataSource.loadAll();
+      });
+  }
+
+  filter(input: string) {
+    const selectedColumn = this.selectedFilterColumn;
+    if (input && input.length > 0) {
+      this.dataSource.loadAll({
+        value: input,
+        field: selectedColumn.dataKey ?? '',
+        operator: FilterType.ICONTAINS,
+        parent: selectedColumn.parent
+      });
+      return;
+    } else {
+      this.dataSource.loadAll(); // Reload all data if input is empty
+    }
+  }
+  handleBackendSqlFilter(event: string) {
+    if (event && event.trim().length > 0) {
+      this.filter(event);
+    } else {
+      // Clear the filter when search box is cleared
+      this.dataSource.clearFilter();
+    }
+  }
+  getColumns(): HTTableColumn[] {
+    return [
+      {
+        id: SupertasksTableCol.ID,
+        isNumeric: true,
+        dataKey: 'id',
+        isSortable: true,
+        isSearchable: true,
+        export: async (supertask: JSuperTask) => supertask.id + ''
+      },
+      {
+        id: SupertasksTableCol.NAME,
+        dataKey: 'supertaskName',
+        routerLink: (supertask: JSuperTask) => this.renderSupertaskLink(supertask),
+        isSortable: true,
+        isSearchable: true,
+        export: async (supertask: JSuperTask) => supertask.supertaskName
+      },
+      {
+        id: SupertasksTableCol.PRETASKS,
+        isNumeric: true,
+        dataKey: 'pretasks',
+        isSortable: false,
+        render: (supertask: JSuperTaskAggregateFields) => (supertask.amountPretasks ? supertask.amountPretasks : ''),
+        export: async (supertask: JSuperTaskAggregateFields) =>
+          supertask.amountPretasks ? supertask.amountPretasks.toString() : ''
+      },
+      {
+        id: SupertasksTableCol.CRACKER_TYPE,
+        dataKey: 'crackerBinaryTypeId',
+        isSortable: true,
+        render: (supertask: JSuperTask) => this.crackerTypeName(supertask.crackerBinaryTypeId),
+        export: async (supertask: JSuperTask) => this.crackerTypeName(supertask.crackerBinaryTypeId)
+      }
+    ];
+  }
+
+  /** Name of a cracker binary type, `Type #<id>` if the type list does not contain it */
+  private crackerTypeName(id: CrackerBinaryTypeId): string {
+    return this.crackerTypeNames.get(id) ?? fallbackCrackerTypeName(id);
+  }
+
+  openDialog(data: DialogData<JSuperTask>) {
+    const dialogRef = this.dialog.open(TableDialogComponent, {
+      data: data,
+      width: '450px'
+    });
+
+    dialogRef
+      .afterClosed()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((result) => {
+        if (result && result.action) {
+          switch (result.action) {
+            case RowActionMenuAction.DELETE:
+              this.rowActionDelete(result.data);
+              break;
+            case BulkActionMenuAction.DELETE:
+              this.bulkActionDelete(result.data);
+              break;
+          }
+        }
+      });
+  }
+
+  // --- Action functions ---
+
+  exportActionClicked(event: ActionMenuEvent<JSuperTask[]>): void {
+    const visibleColumnIds = this.table.displayedColumns.map(Number);
+    const visibleColumns = this.tableColumns.filter((col) => visibleColumnIds.includes(col.id));
+    this.exportService.handleExportAction<JSuperTask>(
+      event,
+      visibleColumns,
+      SupertasksTableColumnLabel,
+      'hashtopolis-supertasks'
+    );
+  }
+
+  rowActionClicked(event: ActionMenuEvent<JSuperTask>): void {
+    switch (event.menuItem.action) {
+      case RowActionMenuAction.EDIT:
+        this.rowActionEdit(event.data);
+        break;
+      case RowActionMenuAction.APPLY_TO_HASHLIST:
+        this.rowActionApplyToHashlist(event.data);
+        break;
+      case RowActionMenuAction.DELETE:
+        this.openDialog({
+          rows: [event.data],
+          title: `Deleting Supertask ${event.data.supertaskName} ...`,
+          icon: 'warning',
+          body: `Are you sure you want to delete it? Note that this action cannot be undone.`,
+          warn: true,
+          action: event.menuItem.action
+        });
+        break;
+    }
+  }
+
+  bulkActionClicked(event: ActionMenuEvent<JSuperTask[]>): void {
+    switch (event.menuItem.action) {
+      case BulkActionMenuAction.DELETE:
+        this.openDialog({
+          rows: event.data,
+          title: `Deleting ${event.data.length} supertasks ...`,
+          icon: 'warning',
+          body: `Are you sure you want to delete the above supertasks? Note that this action cannot be undone.`,
+          warn: true,
+          listAttribute: 'supertaskName',
+          action: event.menuItem.action
+        });
+        break;
+    }
+  }
+
+  /**
+   * @todo Implement error handling.
+   */
+  private bulkActionDelete(supertask: JSuperTask[]): void {
+    this.gs.bulkDelete(SERV.SUPER_TASKS, supertask).subscribe(() => {
+      this.alertService.showSuccessMessage(`Successfully deleted supertasks!`);
+      this.dataSource.reload();
+    });
+  }
+
+  /**
+   * @todo Implement error handling.
+   */
+  private rowActionDelete(supertasks: JSuperTask[]): void {
+    this.gs
+      .delete(SERV.SUPER_TASKS, supertasks[0].id)
+      .pipe(
+        catchError((error) => {
+          console.error('Error during deletion:', error);
+          return [];
+        }),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe(() => {
+        this.alertService.showSuccessMessage('Successfully deleted supertask!');
+        this.reload();
+      });
+  }
+
+  private rowActionApplyToHashlist(supertask: JSuperTask): void {
+    this.router.navigate(['/tasks/', supertask.id, 'applyhashlist']).then(() => {});
+  }
+
+  private rowActionEdit(supertask: JSuperTask): void {
+    this.renderSupertaskLink(supertask)
+      .subscribe((links: HTTableRouterLink[]) => {
+        this.router.navigate(links[0].routerLink ?? []).then(() => {});
+      })
+      .unsubscribe();
+  }
+}
