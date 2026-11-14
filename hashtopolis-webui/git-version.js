@@ -14,6 +14,13 @@ const commitTime = childProcess.execSync("git log -1 --pretty=format:'%cd'").toS
 const commitMsg = childProcess.execSync("git log -1 --pretty=%B").toString().trim();
 const totalCommitCount = childProcess.execSync("git rev-list --count HEAD").toString().trim();
 
+const longSHA = 'unknown';
+const shortSHA = 'unknown';
+const branch = 'unknown';
+const commitTime = 'unknown';
+const commitMsg = 'unknown';
+const totalCommitCount = 'unknown';
+/*
 const versionInfo = {
     shortSHA: shortSHA,
     SHA : longSHA,
@@ -21,7 +28,7 @@ const versionInfo = {
     lastCommitTime: commitTime,
     lastCommitMessage: commitMsg,
     lastCommitNumber: totalCommitCount
-}
+}*/
 
 const versionInfoJson = JSON.stringify(versionInfo, null, 2);
 

@@ -1,0 +1,28 @@
+name: "hashtopolis-webui"
+description: "frontend"
+version: "1.1.1"
+slug: "hashtopolis-webui"
+#init: false
+#host_network: true
+ports:
+  80/tcp: 4200
+  443/tcp: 4201
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+map:
+  - type: ssl
+    read_only: False
+ingress: true 
+#ingress_port: 80
+#image: "redroid/redroid" 
+options:
+  hashtopolis_backend_url: https://example.duckdns.org:8081/api/v2
+  SSL: false
+schema:
+  hashtopolis_backend_url: str
+  SSL: bool
+#image: "ghcr.io/lolimanko/{arch}-hashtopolis-webui"
