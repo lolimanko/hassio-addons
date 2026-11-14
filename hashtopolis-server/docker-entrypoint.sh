@@ -139,4 +139,4 @@ if [[ "$HASHTOPOLIS_CRON_ENABLE" == "1" ]]; then
     ) &
 fi
 
-docker-php-entrypoint apache2-foreground
+#docker-php-entrypoint apache2-foreground
