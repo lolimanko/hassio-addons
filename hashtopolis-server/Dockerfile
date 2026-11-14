@@ -185,7 +185,7 @@ WORKDIR /build
 RUN wget -q https://github.com/hashcat/hashcat/archive/refs/tags/v7.1.2.tar.gz -O hashcat-7.1.2-src.tar.gz
 RUN tar xzf hashcat-7.1.2-src.tar.gz \
     && cd hashcat-7.1.2 \
-    && make -j"$(nproc)"
+    && make -j2
 
 # PRODUCTION Image
 # ----BEGIN----
