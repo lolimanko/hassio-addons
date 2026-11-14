@@ -37,3 +37,4 @@ schema:
   ssl: bool
   certfile: str
   keyfile: str
+panel_icon: mdi:lan
