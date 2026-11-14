@@ -69,7 +69,7 @@ RUN apt-get update \
     # Clean Up
     && apt-get autoremove -y \
     && apt-get clean -y \
- //   && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 RUN sed -i 's/KeepAliveTimeout 5/KeepAliveTimeout 10/' /etc/apache2/apache2.conf
 RUN echo "ServerTokens Prod" >> /etc/apache2/apache2.conf \
