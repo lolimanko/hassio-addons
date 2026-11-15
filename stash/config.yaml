@@ -37,4 +37,4 @@ schema:
   certfile: str
   keyfile: str
 panel_icon: mdi:video-box
-#image: "ghcr.io/lolimanko/{arch}-stash" 
+image: "ghcr.io/lolimanko/{arch}-stash" 
