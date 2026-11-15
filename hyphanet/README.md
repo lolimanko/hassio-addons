@@ -10,7 +10,7 @@
 
 ## Data Persistence
 All sensitive data is stored in /addon_configs/fdd0cf77_hyphanet
-
+You can disable Hypha in HAOS backups to prevent the backup files from becoming too large.
 ## Security Notes
 - 🔐 FProxy bound to container network only by default
 - 🛡️ All sensitive files stored in isolated volume
