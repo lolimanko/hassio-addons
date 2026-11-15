@@ -26,4 +26,4 @@ export HASHTOPOLIS_BACKEND_URL=$(jq -r '.hashtopolis_backend_url' /data/options.
 export HASHTOPOLIS_FRONTEND_URLS=$(jq -r '.hashtopolis_frontend_urls' /data/options.json)
 
 # 用 exec 讓 SIGTERM 能正確傳給 Apache；降權只在 docker-entrypoint.sh 內針對 PHP 步驟進行
-exec /usr/local/bin/docker-entrypoint.sh
+exec gosu www-data /usr/local/bin/docker-entrypoint.sh
