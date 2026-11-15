@@ -5,9 +5,6 @@ set -e
 chown -R www-data:www-data "${HASHTOPOLIS_PATH}"
 chmod -R g+w "${HASHTOPOLIS_PATH}"
 
-if [ -d /config ]; then
-    chmod -R 777 /config
-fi
 
 # 確保 Apache log 目錄存在（root 啟動的 Apache 可直接寫入）
 mkdir -p /var/log/apache2
