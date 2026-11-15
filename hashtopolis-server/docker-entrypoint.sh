@@ -2,7 +2,7 @@
 paths=(inc/utils/locks)
 
 for path in ${paths[@]}; do
-  if gosu www-data test -w "${HASHTOPOLIS_DOCUMENT_ROOT}/${path}" ; then
+  if [ -w ${HASHTOPOLIS_DOCUMENT_ROOT}/${path} ] ; then
     echo "${path} writeable"
   else
     echo "${path} is not writeable, please fix."
@@ -70,7 +70,7 @@ done
 
 # required to trigger the initialization
 echo "Start initialization process..."
-gosu www-data php -f ${HASHTOPOLIS_DOCUMENT_ROOT}/inc/startup/setup.php
+php -f ${HASHTOPOLIS_DOCUMENT_ROOT}/inc/startup/setup.php
 rc=$? # capture the status
 if (( rc != 0 )); then
     echo "Hashtopolis setup.php failed (exit code $rc)" >&2
@@ -133,11 +133,10 @@ if [[ "$HASHTOPOLIS_CRON_ENABLE" == "1" ]]; then
     echo "Starting background job runner scheduler (every 60s)..."
     (
         while true; do
-            gosu www-data php -d xdebug.mode=off -f ${HASHTOPOLIS_DOCUMENT_ROOT}/inc/cron.php
+            php -d xdebug.mode=off -f ${HASHTOPOLIS_DOCUMENT_ROOT}/inc/cron.php
             sleep 60
         done
     ) &
 fi
 
-# Apache 以 root 啟動（才能綁 port、寫 log），worker 會自行降權為 www-data
-exec docker-php-entrypoint apache2-foreground
+#docker-php-entrypoint apache2-foreground
