@@ -2,7 +2,6 @@ blobs_path: /root/.stash/blobs
 blobs_storage: FILESYSTEM
 cache: /root/.stash/cache
 create_image_clip_from_videos: false
-dangerous_allow_public_without_auth: "true"
 database: /root/.stash/stash-go.sqlite
 gallery_cover_regex: (poster|cover|folder|board)\.[^\.]+$
 generated: /root/.stash/generated
@@ -31,7 +30,6 @@ scrapers:
           name: Community (stable)
           url: https://stashapp.github.io/CommunityScrapers/stable/index.yml
 scrapers_path: /root/.stash/scrapers
-security_tripwire_accessed_from_public_internet: 172.30.32.1
 sequential_scanning: false
 show_one_time_moved_notification: false
 sound_on_preview: false
