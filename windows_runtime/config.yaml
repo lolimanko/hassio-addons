@@ -34,4 +34,4 @@ schema:
   arch_mode: list(auto|32|64)
   locale: list(ja_JP.UTF-8|zh_TW.UTF-8|zh_CN.UTF-8|ko_KR.UTF-8|en_US.UTF-8)
   vnc_password: password
-image: "ghcr.io/lolimanko/{arch}-windows-runtime" 
+#image: "ghcr.io/lolimanko/{arch}-windows-runtime" 
