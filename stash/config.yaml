@@ -6,8 +6,8 @@ url: https://github.com/stashapp/stash
 init: false
 #host_network: true
 ports:
-  9999/tcp: 9999
-  10000/tcp: 10000
+  9999/tcp:
+  10000/tcp:
 ports_description:
   9999/tcp: http
   10000/tcp: https
