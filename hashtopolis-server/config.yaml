@@ -51,9 +51,4 @@ schema:
   SSL: bool
 ingress: true
 ingress_port: 80
-privileged:
-  - NET_ADMIN
-  - SYS_ADMIN
-  - SYS_RAWIO
-  - SYS_MODULE
 #image: ghcr.io/lolimanko/{arch}-hashtopolis-server
