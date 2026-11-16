@@ -37,3 +37,4 @@ schema:
   api_key: password
   download_dir: str
   log_level: list(DEBUG|INFO|WARNING|ERROR|CRITICAL)
+image: ghcr.io/lolimanko/{arch}-tribler
