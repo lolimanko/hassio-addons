@@ -1,0 +1,39 @@
+name: "Tribler"
+version: "0.3.1"
+slug: tribler
+description: "Tribler 匿名 P2P 下載器（headless + Web UI，Ingress 側邊欄，bridge 網路）"
+url: "https://github.com/Tribler/tribler"
+arch:
+  - amd64
+  - aarch64
+init: false
+startup: services
+boot: auto
+# bridge 網路（不使用 host_network）：只有下列埠會對應到主機。
+# 注意：BitTorrent 的主機埠請維持與容器埠相同（55574），否則對外宣告的埠號會與實際轉發不一致。
+ports:
+  55574/tcp: 55574
+  55574/udp: 55574
+  8090/udp: 8090
+  8085/tcp: null
+ports_description:
+  55574/tcp: "BitTorrent（TCP）"
+  55574/udp: "BitTorrent / DHT（UDP）"
+  8090/udp: "Tribler IPv8 / 匿名網路（UDP）"
+  8085/tcp: "直連 Web UI（選用，預設關閉；請勿對外網開放）"
+ingress: true
+ingress_port: 8099
+ingress_stream: true
+panel_icon: mdi:download-network
+panel_title: Tribler
+panel_admin: true
+map:
+  - media:rw
+options:
+  api_key: ""
+  download_dir: "/media/tribler"
+  log_level: WARNING
+schema:
+  api_key: password
+  download_dir: str
+  log_level: list(DEBUG|INFO|WARNING|ERROR|CRITICAL)
