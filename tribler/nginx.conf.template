@@ -15,6 +15,7 @@ http {
     ""      "";
   }
 
+  # ---------- Ingress（HA 側邊欄）----------
   server {
     listen 8099;
     # 只允許 Home Assistant Supervisor（Ingress）連線
@@ -31,9 +32,9 @@ http {
     }
 
     location / {
-      proxy_pass http://127.0.0.1:@API_PORT@;
+      proxy_pass http://127.0.0.1:@INTERNAL_PORT@;
       proxy_http_version 1.1;
-      proxy_set_header Host 127.0.0.1:@API_PORT@;
+      proxy_set_header Host 127.0.0.1:@INTERNAL_PORT@;
       proxy_set_header X-Api-Key "@API_KEY@";
       proxy_set_header Upgrade $http_upgrade;
       proxy_set_header Connection $connection_upgrade;
@@ -42,12 +43,12 @@ http {
       proxy_read_timeout 3600s;
 
       # Tribler 回傳的重新導向（例如 /ui → /ui/）也要帶上 Ingress 前綴
-      proxy_redirect http://127.0.0.1:@API_PORT@/ $http_x_ingress_path/;
+      proxy_redirect http://127.0.0.1:@INTERNAL_PORT@/ $http_x_ingress_path/;
       proxy_redirect / $http_x_ingress_path/;
 
-      # 改寫頁面中的絕對路徑，加上 Ingress 前綴（直接存取時前綴為空 = 不變）
+      # 改寫頁面中的絕對路徑，加上 Ingress 前綴（text/html 預設就會處理）
       sub_filter_once off;
-      sub_filter_types text/html text/css application/javascript text/javascript;
+      sub_filter_types text/css application/javascript text/javascript;
       sub_filter '<head>' '<head><script>@SHIM@</script>';
       sub_filter 'src="/' 'src="$http_x_ingress_path/';
       sub_filter 'href="/' 'href="$http_x_ingress_path/';
@@ -57,4 +58,5 @@ http {
       sub_filter '`/ui/' '`$http_x_ingress_path/ui/';
     }
   }
+@DIRECT_SERVER@
 }
