@@ -1,0 +1,60 @@
+daemon off;
+pid /tmp/nginx.pid;
+error_log /dev/stderr warn;
+
+events { worker_connections 1024; }
+
+http {
+  access_log off;
+  include /etc/nginx/mime.types;
+  default_type application/octet-stream;
+  client_max_body_size 0;
+
+  map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ""      "";
+  }
+
+  server {
+    listen 8099;
+    # 只允許 Home Assistant Supervisor（Ingress）連線
+    allow 172.30.32.2;
+    deny all;
+
+    # 不要讓 nginx 自己產生 http://host:8099 這種絕對網址的重新導向（HTTPS 頁面會被 Mixed Content 擋下）
+    absolute_redirect off;
+
+    # 進入側邊欄時用「相對路徑」在瀏覽器端跳轉到 Web UI；key 放在 # 後面，不會送到伺服器
+    location = / {
+      default_type text/html;
+      return 200 '<!doctype html><meta charset="utf-8"><title>Tribler</title><script>var p=location.pathname;if(p.slice(-1)!=="/")p+="/";location.replace(p+"ui/#/downloads/all?key=@API_KEY@");</script>';
+    }
+
+    location / {
+      proxy_pass http://127.0.0.1:@API_PORT@;
+      proxy_http_version 1.1;
+      proxy_set_header Host 127.0.0.1:@API_PORT@;
+      proxy_set_header X-Api-Key "@API_KEY@";
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection $connection_upgrade;
+      proxy_set_header Accept-Encoding "";
+      proxy_buffering off;
+      proxy_read_timeout 3600s;
+
+      # Tribler 回傳的重新導向（例如 /ui → /ui/）也要帶上 Ingress 前綴
+      proxy_redirect http://127.0.0.1:@API_PORT@/ $http_x_ingress_path/;
+      proxy_redirect / $http_x_ingress_path/;
+
+      # 改寫頁面中的絕對路徑，加上 Ingress 前綴（直接存取時前綴為空 = 不變）
+      sub_filter_once off;
+      sub_filter_types text/html text/css application/javascript text/javascript;
+      sub_filter '<head>' '<head><script>@SHIM@</script>';
+      sub_filter 'src="/' 'src="$http_x_ingress_path/';
+      sub_filter 'href="/' 'href="$http_x_ingress_path/';
+      sub_filter 'url(/' 'url($http_x_ingress_path/';
+      sub_filter '"/ui/' '"$http_x_ingress_path/ui/';
+      sub_filter "'/ui/" "'$http_x_ingress_path/ui/";
+      sub_filter '`/ui/' '`$http_x_ingress_path/ui/';
+    }
+  }
+}
