@@ -1,5 +1,5 @@
 name: "Tribler"
-version: "0.2.2"
+version: "0.2.3"
 slug: tribler
 description: "Tribler 匿名 P2P 下載器（headless + Web UI，支援側邊欄 Ingress）"
 url: "https://github.com/Tribler/tribler"
