@@ -13,10 +13,6 @@ arch:
 map:
   - type: ssl
     read_only: False
-  - type: media
-    read_only: False
-  - type: share
-    read_only: false
   - type: addon_config
     read_only: false
     path: /usr/local/share/hashtopolis
