@@ -9,6 +9,7 @@ ports:
   443/tcp: 8081
 arch:
   - amd64
+  - aarch64
 map:
   - type: ssl
     read_only: False
