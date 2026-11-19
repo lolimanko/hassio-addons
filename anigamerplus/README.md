@@ -6,7 +6,7 @@
 
 首次使用cookie,UA,JA3指紋,Akamai指紋需添加
 
-在設定頁中需輸入cookie  UA、JA3指紋、Akamai指紋在Web UI內輸入
+在設定頁中需輸入cookie，UA、JA3指紋、Akamai指紋在Web UI內輸入
 
 cookie、UA、JA3指紋、Akamai指紋獲取方法與config.json配置文件說明在 [原作者頁面](https://github.com/miyouzi/aniGamerPlus)
 
