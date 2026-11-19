@@ -10,13 +10,15 @@
 
 cookie會自動更新 cookie過時無法使用時 請輸入新cookie並開啟覆寫cookie後執行一次後關閉覆寫cookie
 
+cookie、UA、JA3指紋、Akamai指紋獲取方法與config.json配置文件說明在 [原作者頁面](https://github.com/miyouzi/aniGamerPlus)
+
 如要使用SSL請在設定頁中開啟SSL，設定好憑證檔名及私鑰檔名(都放在/ssl下)及輸入SSL Port
 
 其餘設定可使用 [filebrowser](https://github.com/alexbelgium/hassio-addons/tree/master/filebrowser) 之類工具修改config.json
 
 config.json  aniGamer.db  cookie.txt  logs 位置在 /addon_configs/fdd0cf77_anigamerplus 
 
-cookie、UA 獲取方法，config.json配置文件說明在 [原作者頁面](https://github.com/miyouzi/aniGamerPlus)
+
 
 MQTT 功能需安裝[Mosquitto broker](https://github.com/home-assistant/addons/tree/master/mosquitto)
 
