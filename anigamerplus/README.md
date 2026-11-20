@@ -20,4 +20,4 @@ config.json  aniGamer.db  cookie.txt  logs 位置在 /addon_configs/fdd0cf77_ani
 
 如要使用MQTT功能需安裝[Mosquitto broker](https://github.com/home-assistant/addons/tree/master/mosquitto) 並在設定內開啟MQTT
 
-完成下載後會送出MQTT訊息 自動化範本為automation.yaml
+完成下載後會送出MQTT訊息 自動化範本為[automation.yaml](https://github.com/lolimanko/hassio-addons/blob/master/anigamerplus/automation.yaml)
