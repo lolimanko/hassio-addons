@@ -456,6 +456,7 @@ class CrackerScanUtils {
    * @param string $binaryName binary name of the cracker, e.g. 'hashcat'
    * @return array<string> candidate filenames, empty when the name is not a plain basename
    */
+  /*
   public static function binaryCandidates(string $binaryName): array {
     // the binary name is user input, it must be a plain basename so the
     // candidates cannot escape the unpack directory with ../
@@ -468,7 +469,37 @@ class CrackerScanUtils {
       $binaryName . '32.bin',
     ];
   }
-
+*/
+  private static function detectArchitecture(): string {
+    $machine = strtolower(php_uname('m'));
+    return match ($machine) {
+      'aarch64', 'arm64' => 'arm64',
+      'x86_64', 'amd64' => 'x86_64',
+      default => $machine,
+    };
+  }
+  
+  public static function binaryCandidates(string $binaryName): array {
+    // the binary name is user input, it must be a plain basename so the
+    // candidates cannot escape the unpack directory with ../
+    if ($binaryName !== basename($binaryName) || str_contains($binaryName, '..')) {
+      return [];
+    }
+    if (self::detectArchitecture() === 'arm64') {
+      return [
+        $binaryName . '.arm64',
+        $binaryName . '.bin',
+        $binaryName . '64.bin',
+        $binaryName . '32.bin',
+      ];
+    }
+    return [
+      $binaryName . '.bin',
+      $binaryName . '64.bin',
+      $binaryName . '32.bin',
+    ];
+  }
+  
   /**
    * Finds the executable of the cracker in the unpack directory, looking for
    * every name of binaryCandidates() in the directory itself and in its
