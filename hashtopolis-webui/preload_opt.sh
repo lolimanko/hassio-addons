@@ -1,5 +1,6 @@
 #!/bin/bash
 #export HASHTOPOLIS_BACKEND_URL=$(bashio::config 'hashtopolis_backend_url')
+chmod 755 -R /custom-themes
 export HASHTOPOLIS_BACKEND_URL=$(jq -r '.hashtopolis_backend_url' /data/options.json)
 #ssl=$(bashio::config 'SSL')
 ssl=$(jq -r '.SSL' /data/options.json)
