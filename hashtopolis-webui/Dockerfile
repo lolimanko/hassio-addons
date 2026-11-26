@@ -63,7 +63,8 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 # themes, build with --build-arg CUSTOM_THEMES_DIR=custom-themes (or your own
 # folder of *.css), then set HASHTOPOLIS_CUSTOM_THEMES_DIR=/custom-themes at
 # runtime to enable them.
-ARG CUSTOM_THEMES_DIR=docker/empty-custom-themes
+#ARG CUSTOM_THEMES_DIR=docker/empty-custom-themes
+ARG CUSTOM_THEMES_DIR=custom-themes
 COPY ${CUSTOM_THEMES_DIR}/ /custom-themes/
 
 RUN apt-get update && apt-get install -y --no-install-recommends jq 
