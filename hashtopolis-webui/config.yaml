@@ -1,6 +1,6 @@
 name: "hashtopolis-webui"
 description: "frontend"
-version: "1.1.1"
+version: "1.1.2"
 slug: "hashtopolis-webui"
 #init: false
 #host_network: true
@@ -16,6 +16,9 @@ arch:
 map:
   - type: ssl
     read_only: False
+  - type: addon_config
+    read_only: false
+    path: /custom-themes
 ingress: true 
 #ingress_port: 80
 #image: "redroid/redroid" 
@@ -25,4 +28,4 @@ options:
 schema:
   hashtopolis_backend_url: str
   SSL: bool
-#image: "ghcr.io/lolimanko/{arch}-hashtopolis-webui"
+image: "ghcr.io/lolimanko/{arch}-hashtopolis-webui"
